@@ -216,34 +216,51 @@ struct RealLibraryControls: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Tu puntaje").font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
-                HStack(spacing: 4) {
-                    ForEach(1...5, id: \.self) { n in
-                        let on = (entry?.rating ?? 0) >= n
-                        Button {
-                            library.setRating(n, for: template)
-                        } label: {
-                            Image(systemName: on ? "star.fill" : "star")
-                                .font(.system(size: 28))
-                                .foregroundStyle(on ? Theme.star : Theme.line)
-                                .frame(width: 40, height: 40)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(n) de 5")
+                // Estrellas y manitos en la misma fila (si no entran, las manitos bajan solas).
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        stars
+                        Rectangle().fill(Theme.line).frame(width: 1, height: 26)
+                        thumbs
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        stars
+                        thumbs
                     }
                 }
-                HStack(spacing: 8) {
-                    Text("o con manitos:").font(.subheadline).foregroundStyle(Theme.ink2)
-                    thumbButton(-1, icons: ["hand.thumbsdown"], label: "No me gustó")
-                    thumbButton(1, icons: ["hand.thumbsup"], label: "Me gustó")
-                    thumbButton(2, icons: ["hand.thumbsup", "hand.thumbsup"], label: "Me encantó")
-                }
-                .padding(.top, 4)
                 Text("Usá estrellas o manitos: si elegís uno, el otro se borra. Tu puntaje y tus listas se usan para \"Para vos\" en Inicio.")
                     .font(.caption)
                     .foregroundStyle(Theme.ink2)
             }
         }
         .padding(.top, 16)
+    }
+
+    private var stars: some View {
+        let rating = library.entry(template.key)?.rating ?? 0
+        return HStack(spacing: 0) {
+            ForEach(1...5, id: \.self) { n in
+                let on = rating >= n
+                Button {
+                    library.setRating(n, for: template)
+                } label: {
+                    Image(systemName: on ? "star.fill" : "star")
+                        .font(.system(size: 24))
+                        .foregroundStyle(on ? Theme.star : Theme.line)
+                        .frame(width: 34, height: 38)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(n) de 5")
+            }
+        }
+    }
+
+    private var thumbs: some View {
+        HStack(spacing: 6) {
+            thumbButton(-1, icons: ["hand.thumbsdown"], label: "No me gustó")
+            thumbButton(1, icons: ["hand.thumbsup"], label: "Me gustó")
+            thumbButton(2, icons: ["hand.thumbsup", "hand.thumbsup"], label: "Me encantó")
+        }
     }
 
     private func thumbButton(_ value: Int, icons: [String], label: String) -> some View {
@@ -256,10 +273,10 @@ struct RealLibraryControls: View {
                     Image(systemName: on ? icon + ".fill" : icon)
                 }
             }
-            .font(.system(size: 20))
+            .font(.system(size: 17))
             .foregroundStyle(on ? Theme.paper : (value < 0 ? Theme.ink2 : Theme.magenta))
-            .padding(.horizontal, 10)
-            .frame(height: 38)
+            .padding(.horizontal, 8)
+            .frame(height: 34)
             .background(on ? (value < 0 ? Theme.ink2 : Theme.magenta) : Theme.chip, in: Capsule())
         }
         .buttonStyle(.plain)
