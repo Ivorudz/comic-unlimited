@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 // Pestaña Biblioteca: los cómics que tenés en archivos (.cbz, .zip o PDF).
@@ -28,7 +29,7 @@ struct LibraryView: View {
                 Button {
                     showImporter = true
                 } label: {
-                    Label("Importar cómic (.cbz, .zip o PDF)", systemImage: "square.and.arrow.down")
+                    Label("Importar cómic (.cbz, .zip, .cbr o PDF)", systemImage: "square.and.arrow.down")
                         .font(.system(size: 16, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .padding(14)
@@ -80,19 +81,16 @@ struct LibraryView: View {
             .padding(.bottom, 30)
         }
         .background(Theme.paper)
-        .fileImporter(isPresented: $showImporter,
-                      allowedContentTypes: [.pdf, .zip, .data],
-                      allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls):
+        .sheet(isPresented: $showImporter) {
+            DocumentPicker { urls in
+                showImporter = false
+                guard !urls.isEmpty else { return }
                 Task {
                     problems = await library.importFiles(urls)
                     showProblems = !problems.isEmpty
                 }
-            case .failure(let error):
-                problems = [error.localizedDescription]
-                showProblems = true
             }
+            .ignoresSafeArea()
         }
         .alert("Algunos archivos no se pudieron importar", isPresented: $showProblems) {
             Button("OK", role: .cancel) {}
@@ -143,6 +141,40 @@ private struct LocalComicCard: View {
         }
         .task(id: comic.id) {
             cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)
+        }
+    }
+}
+
+/// Selector de archivos del iPhone. Pide una COPIA de cada archivo elegido:
+/// así funciona también dentro de LiveContainer, donde leer el original puede fallar.
+private struct DocumentPicker: UIViewControllerRepresentable {
+    let onPick: ([URL]) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        var types: [UTType] = [.pdf, .zip, .data]
+        for ext in ["cbz", "cbr"] {
+            if let type = UTType(filenameExtension: ext) { types.append(type) }
+        }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
+        picker.allowsMultipleSelection = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let onPick: ([URL]) -> Void
+        init(onPick: @escaping ([URL]) -> Void) { self.onPick = onPick }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            onPick(urls)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            onPick([])
         }
     }
 }

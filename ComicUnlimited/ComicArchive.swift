@@ -16,6 +16,7 @@ enum ArchiveError: LocalizedError {
     case encrypted
     case noPages
     case badPDF
+    case rar
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +27,7 @@ enum ArchiveError: LocalizedError {
         case .encrypted: return "El archivo tiene contraseña y no se puede abrir."
         case .noPages: return "No encontré páginas (imágenes) adentro del archivo."
         case .badPDF: return "No se pudo abrir el PDF."
+        case .rar: return "Este .cbr está comprimido como RAR, y la app no puede abrir RAR. Podés convertirlo a .cbz con otra app y volver a importarlo."
         }
     }
 }
@@ -154,8 +156,14 @@ final class ComicFile {
             guard let doc = PDFDocument(url: url), doc.pageCount > 0 else { throw ArchiveError.badPDF }
             source = .pdf(doc)
             pageCount = doc.pageCount
-        case "cbz", "zip":
-            let zip = try ZipArchive(url: url)
+        case "cbz", "zip", "cbr":
+            // Muchos .cbr en realidad son .zip con otro nombre: los intentamos abrir igual.
+            let zip: ZipArchive
+            do {
+                zip = try ZipArchive(url: url)
+            } catch ArchiveError.notZip where url.pathExtension.lowercased() == "cbr" {
+                throw ArchiveError.rar
+            }
             // Solo imágenes, sin las carpetas ocultas que agrega la Mac, en orden natural (2 antes que 10).
             let pages = zip.entries
                 .filter { entry in

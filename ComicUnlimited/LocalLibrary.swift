@@ -52,7 +52,7 @@ final class LocalLibrary {
         for url in urls {
             let name = url.lastPathComponent
             let ext = url.pathExtension.lowercased()
-            guard ["cbz", "zip", "pdf"].contains(ext) else {
+            guard ["cbz", "zip", "cbr", "pdf"].contains(ext) else {
                 problems.append("\(name): \(ArchiveError.notSupported.errorDescription ?? "")")
                 continue
             }
@@ -61,8 +61,16 @@ final class LocalLibrary {
             let id = UUID().uuidString
             let dest = Self.folder.appendingPathComponent("\(id).\(ext)")
             let access = url.startAccessingSecurityScopedResource()
+            // Si el iPhone nos dio una copia temporal, la movemos (así no ocupa lugar dos veces).
+            // Si es el archivo original, lo copiamos: nunca se toca el original.
+            let isTemporaryCopy = url.standardizedFileURL.path
+                .hasPrefix(FileManager.default.temporaryDirectory.standardizedFileURL.path)
             do {
-                try FileManager.default.copyItem(at: url, to: dest)
+                if isTemporaryCopy {
+                    try FileManager.default.moveItem(at: url, to: dest)
+                } else {
+                    try FileManager.default.copyItem(at: url, to: dest)
+                }
             } catch {
                 if access { url.stopAccessingSecurityScopedResource() }
                 problems.append("\(name): no se pudo copiar el archivo.")
