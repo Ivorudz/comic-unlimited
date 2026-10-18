@@ -20,7 +20,7 @@ struct ReaderSession: Identifiable {
     var id: String { comic.id }
 }
 
-// Las cinco pestañas de abajo. Por ahora solo Inicio funciona del todo.
+// Las cinco pestañas de abajo. Por ahora funcionan Inicio y Próximos.
 struct RootView: View {
     @Environment(ReadingStore.self) private var store
     @State private var session: ReaderSession?
@@ -32,8 +32,7 @@ struct RootView: View {
             ComingSoonView(title: "Biblioteca", icon: "books.vertical",
                            message: "Acá vas a ver lo que estás leyendo, lo que querés leer y tus colecciones.")
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
-            ComingSoonView(title: "Próximos", icon: "calendar",
-                           message: "Acá va a estar el calendario de lanzamientos.")
+            UpcomingView()
                 .tabItem { Label("Próximos", systemImage: "calendar") }
             ComingSoonView(title: "Comunidad", icon: "bubble.left",
                            message: "Acá vas a poder charlar sobre cómics y leer reseñas.")
