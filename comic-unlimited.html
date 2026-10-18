@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Cómic Unlimited</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --paper:#EEF2F4; --card:#FFFFFF; --ink:#17191E; --ink2:#5B6170; --line:#D5DCE1; --chip:#E1E7EB;
+  --cyan:#0090C4; --magenta:#D1006C; --yellow:#FFD400; --star:#E8A800;
+  --cyan-a:rgba(0,144,196,.55); --magenta-a:rgba(209,0,108,.5);
+  --bar:rgba(238,242,244,.88);
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#121419; --card:#1C1F26; --ink:#EEF1F4; --ink2:#9AA1AE; --line:#2B2F38; --chip:#262A33;
+    --cyan:#3CC3F0; --magenta:#FF4FA3; --star:#FFD400;
+    --cyan-a:rgba(60,195,240,.6); --magenta-a:rgba(255,79,163,.55);
+    --bar:rgba(18,20,25,.88);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121419; --card:#1C1F26; --ink:#EEF1F4; --ink2:#9AA1AE; --line:#2B2F38; --chip:#262A33;
+  --cyan:#3CC3F0; --magenta:#FF4FA3; --star:#FFD400;
+  --cyan-a:rgba(60,195,240,.6); --magenta-a:rgba(255,79,163,.55);
+  --bar:rgba(18,20,25,.88);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0;min-height:100%}
+body{font-family:'Archivo',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;background:var(--paper);color:var(--ink);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+input,textarea,select{font:inherit;font-size:16px;color:var(--ink)}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+img,svg{max-width:100%}
+
+main{max-width:560px;margin:0 auto;padding:12px 18px calc(100px + env(safe-area-inset-bottom,0px))}
+.top{display:flex;justify-content:space-between;align-items:flex-start;padding-top:10px}
+.big-title{margin:0;font-stretch:125%;font-weight:900;font-size:clamp(36px,11vw,46px);line-height:.92;letter-spacing:-.025em;text-shadow:3px 1.5px 0 var(--cyan-a),-2px -1px 0 var(--magenta-a)}
+.title{margin:10px 0 16px;font-stretch:125%;font-weight:900;font-size:32px;line-height:1;letter-spacing:-.025em;text-shadow:2px 1px 0 var(--cyan-a),-1.5px -1px 0 var(--magenta-a)}
+h2{font-stretch:112%;font-weight:800;font-size:19px;letter-spacing:-.01em;margin:28px 0 12px}
+.avatar{width:42px;height:42px;border-radius:50%;background:var(--yellow);color:#14161B;font-weight:900;font-stretch:125%;display:grid;place-items:center;font-size:18px;flex:none}
+.avatar.lg{width:64px;height:64px;font-size:26px}
+.empty{color:var(--ink2);font-size:15px;margin:10px 0}
+.note{color:var(--ink2);font-size:13px;margin-top:22px}
+
+.search{display:flex;align-items:center;gap:8px;background:var(--chip);border-radius:12px;padding:10px 12px;margin:18px 0 4px}
+.search svg{width:18px;height:18px;flex:none;color:var(--ink2)}
+.search input{border:0;background:transparent;width:100%;outline:none}
+
+.row{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -18px;padding:0 18px 4px;scrollbar-width:none}
+.row::-webkit-scrollbar{display:none}
+.cont{flex:0 0 80%;max-width:310px;scroll-snap-align:start;display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px}
+.cont .cv{width:62px;flex:none}
+.cont b{display:block;font-size:15px;line-height:1.2}
+.cont .grow{flex:1;min-width:0}
+.sub{display:block;font-size:13px;color:var(--ink2);margin-top:3px}
+.bar{display:block;height:5px;border-radius:3px;background:var(--chip);margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--magenta);border-radius:3px}
+
+.cv{display:block;aspect-ratio:2/3;border-radius:4px;overflow:hidden;background:var(--chip);box-shadow:0 0 0 1px var(--line);position:relative}
+.cv svg,.cv img{width:100%;height:100%;display:block;object-fit:cover}
+.badge{position:absolute;top:6px;left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;line-height:1.4}
+.b-editorial{background:#00A3D9;color:#fff}.b-indie{background:#D1006C;color:#fff}.b-propio{background:#FFD400;color:#14161B}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:3px 8px;border-radius:5px}
+
+.feat{display:grid;grid-template-columns:36% 1fr;gap:16px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:24px;align-items:center}
+.feat-k{display:block;font-size:13px;color:var(--magenta);font-weight:700}
+.feat b{display:block;font-stretch:125%;font-weight:900;font-size:24px;line-height:1.02;margin:4px 0 8px;letter-spacing:-.02em}
+.feat .s{display:block;font-size:14px;color:var(--ink2);line-height:1.4}
+.feat .go{display:inline-block;margin-top:12px;font-size:14px;font-weight:800;border-bottom:2px solid var(--magenta)}
+
+.chips{display:flex;gap:8px;overflow-x:auto;margin:0 -18px 14px;padding:0 18px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:8px 14px;border-radius:999px;background:var(--chip);font-weight:600;font-size:14px}
+.chip.on{background:var(--ink);color:var(--paper)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 12px}
+.grid .empty{grid-column:1/-1}
+.card b{display:block;font-size:14px;line-height:1.2;margin-top:8px}
+.card .sub{font-size:12px;margin-top:2px}
+.card .sc{font-size:12px;font-weight:700;margin-top:3px;display:block}
+.sc .st{color:var(--star)}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);border-top:1px solid var(--line)}
+.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;font-weight:600;color:var(--ink2);padding:4px 0;text-align:center}
+.tabs button.on{color:var(--magenta)}
+.tabs svg{width:26px;height:26px}
+
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--chip);border-radius:11px;padding:3px;gap:3px}
+.seg button{padding:8px 4px;border-radius:8px;font-size:14px;font-weight:600;color:var(--ink2);text-align:center}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.14)}
+
+.screen{position:fixed;inset:0;z-index:30;background:var(--paper);overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(36px + env(safe-area-inset-bottom,0px));animation:slideIn .28s cubic-bezier(.2,.8,.2,1)}
+.screen.out{animation:slideOut .22s ease-in forwards}
+@keyframes slideIn{from{transform:translateX(100%)}to{transform:none}}
+@keyframes slideOut{to{transform:translateX(100%)}}
+.nav{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:calc(8px + env(safe-area-inset-top,0px)) 12px 8px;background:var(--bar);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px)}
+.back,.nav-act{display:flex;align-items:center;gap:2px;color:var(--magenta);font-weight:600;font-size:16px;padding:6px}
+.nav-act svg{width:20px;height:20px}
+.inner{max-width:560px;margin:0 auto;padding:0 18px}
+
+.d-hero{display:grid;grid-template-columns:40% 1fr;gap:16px;margin-top:10px;align-items:end}
+.d-title{font-stretch:125%;font-weight:900;font-size:27px;line-height:1;letter-spacing:-.025em;margin:10px 0 8px;text-shadow:2px 1px 0 var(--cyan-a),-1.5px -1px 0 var(--magenta-a)}
+.d-title .iss{color:var(--magenta);text-shadow:none}
+.d-by{margin:0;font-size:14px;color:var(--ink2)}
+.d-score{margin:10px 0 0;font-size:15px}
+.d-score .st{color:var(--star)}
+.d-score span{color:var(--ink2);font-size:13px}
+.primary{display:block;width:100%;background:var(--ink);color:var(--paper);border-radius:14px;padding:15px;font-weight:800;font-size:17px;text-align:center;margin:20px 0 12px}
+.syn{font-size:16px;line-height:1.55;margin:18px 0 0;max-width:66ch}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 0}
+.facts div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.facts dt{font-size:12px;color:var(--ink2)}
+.facts dd{margin:2px 0 0;font-weight:700;font-size:14px}
+
+.stars{display:flex;gap:4px}
+.stars button{width:40px;height:40px;display:grid;place-items:center}
+.stars svg{width:32px;height:32px;fill:var(--line);transition:transform .15s}
+.stars button.on svg{fill:var(--star)}
+.stars button:active svg{transform:scale(.85)}
+.ms{color:var(--star);letter-spacing:1px;font-size:13px}
+.ms span{color:var(--line)}
+
+.composer{display:grid;gap:10px;margin-bottom:8px}
+.composer textarea,.sheet input,.sheet textarea,.sheet select,.name input{width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px;outline:none}
+.composer textarea:focus,.sheet input:focus,.sheet textarea:focus,.name input:focus{border-color:var(--cyan)}
+.secondary{justify-self:end;background:var(--magenta);color:#fff;border-radius:10px;padding:10px 16px;font-weight:700;font-size:15px}
+.rev{padding:14px 0;border-top:1px solid var(--line)}
+.rev-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rev-h b{font-size:14px}
+.when{color:var(--ink2);font-size:12px;margin-left:auto}
+.rev p,.post p{margin:6px 0 0;font-size:15px;line-height:1.5}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;flex:none}
+.rev-c{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--ink2)}
+.rev-c .cv{width:26px}
+
+.item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item-t b{display:block;font-size:16px;line-height:1.2}
+.pill{background:var(--chip);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px}
+.import{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:22px;border:2px dashed var(--line);border-radius:14px;padding:14px;font-weight:700;color:var(--ink2)}
+.import svg{width:20px;height:20px}
+.col{border-bottom:1px solid var(--line)}
+.col-h{display:flex;align-items:center;gap:14px;width:100%;padding:12px 0}
+.stack{display:flex;width:84px;flex:none}
+.stack .cv{width:44px;flex:none}
+.stack .cv+.cv{margin-left:-24px}
+.col-h b{display:block;font-size:16px}
+
+.thr{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.thr b{display:block;font-size:16px;line-height:1.25}
+.thr .cv{width:40px}
+.newbtn{display:block;width:100%;text-align:center;background:var(--ink);color:var(--paper);border-radius:12px;padding:12px;font-weight:700;margin:16px 0 14px}
+.t-title{font-stretch:118%;font-weight:900;font-size:24px;line-height:1.08;letter-spacing:-.02em;margin:12px 0 10px}
+.t-comic{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink2)}
+.t-comic .cv{width:30px}
+.post{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:14px 0;border-bottom:1px solid var(--line)}
+.post b{font-size:14px}
+.posts{margin:12px 0 18px}
+
+.me{display:flex;gap:16px;align-items:center}
+.name{flex:1}
+.name span{display:block;font-size:13px;color:var(--ink2);margin-bottom:6px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}
+.stats div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 10px}
+.stats b{display:block;font-stretch:125%;font-weight:900;font-size:26px;line-height:1}
+.stats span{font-size:12px;color:var(--ink2)}
+.gen{display:grid;grid-template-columns:110px 1fr 24px;gap:10px;align-items:center;font-size:14px;margin:8px 0}
+.gen .bar{margin:0;height:10px}
+.gen .n{text-align:right;color:var(--ink2)}
+.danger{display:block;width:100%;margin-top:30px;padding:13px;border-radius:12px;border:1px solid var(--line);color:var(--magenta);font-weight:700;text-align:center}
+
+.sheet-wrap{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+.sheet{width:100%;max-width:560px;background:var(--card);border-radius:18px 18px 0 0;padding:10px 18px calc(22px + env(safe-area-inset-bottom,0px));max-height:86vh;overflow:auto;animation:up .26s cubic-bezier(.2,.8,.2,1)}
+.sheet h3{font-stretch:115%;font-weight:800;font-size:19px;margin:4px 0 14px}
+.sheet .field{display:grid;gap:6px;margin-bottom:12px;font-size:13px;color:var(--ink2)}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+.chk{display:flex;align-items:center;gap:12px;width:100%;padding:12px 0;border-bottom:1px solid var(--line);font-weight:600}
+.chk .box{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;flex:none}
+.chk.on .box{background:var(--magenta);border-color:var(--magenta);color:#fff}
+.chk .box svg{width:16px;height:16px}
+.chk .n{margin-left:auto;color:var(--ink2);font-weight:500;font-size:14px}
+.newcol{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:16px}
+@keyframes fade{from{opacity:0}}
+@keyframes up{from{transform:translateY(100%)}}
+
+.reader{position:fixed;inset:0;z-index:50;background:#000;color:#fff;animation:fade .2s}
+.reader.out{animation:fadeOut .2s forwards}
+@keyframes fadeOut{to{opacity:0}}
+.r-track{position:absolute;inset:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;outline:none}
+.r-track::-webkit-scrollbar{display:none}
+.r-page{flex:0 0 100%;width:100%;height:100%;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;scroll-snap-stop:always;padding:calc(env(safe-area-inset-top,0px) + 4px) 4px calc(env(safe-area-inset-bottom,0px) + 4px)}
+.r-page svg{width:100%;height:100%}
+.r-page img{max-width:100%;max-height:100%;object-fit:contain;-webkit-user-select:none;user-select:none}
+.reader.vertical .r-track{flex-direction:column;overflow-x:hidden;overflow-y:auto;scroll-snap-type:none}
+.reader.vertical .r-page{flex:none;height:auto;padding:0}
+.reader.vertical .r-page svg{height:auto;display:block}
+.reader.vertical .r-page img{width:100%;max-height:none;display:block}
+.reader.vertical .r-end{min-height:80vh;padding:40px 20px}
+.r-top,.r-bottom{position:absolute;left:0;right:0;z-index:2;display:flex;align-items:center;gap:12px;padding:10px 14px;transition:opacity .2s,transform .2s}
+.r-top{top:0;padding-top:calc(10px + env(safe-area-inset-top,0px));background:linear-gradient(rgba(0,0,0,.85),rgba(0,0,0,0))}
+.r-bottom{bottom:0;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.85))}
+.reader.bare .r-top{opacity:0;transform:translateY(-12px);pointer-events:none}
+.reader.bare .r-bottom{opacity:0;transform:translateY(12px);pointer-events:none}
+.r-title{flex:1;font-weight:700;font-size:15px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r-btn{background:rgba(255,255,255,.16);border-radius:999px;padding:8px 13px;font-size:14px;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:center;gap:4px}
+.r-btn svg{width:18px;height:18px}
+.r-bottom input{flex:1;accent-color:#FF4FA3}
+.r-count{font-variant-numeric:tabular-nums;font-size:13px;min-width:54px;text-align:right}
+.end-card{max-width:330px;text-align:center}
+.end-card .k{color:#FF4FA3;font-weight:700;margin:0}
+.end-card h2{font-stretch:125%;font-weight:900;font-size:30px;line-height:1;margin:8px 0 16px}
+.end-card .stars{justify-content:center;margin:12px 0 22px}
+.end-card .stars svg{fill:#3A3F4A}
+.end-card .stars button.on svg{fill:#FFD400}
+.end-actions{display:grid;gap:10px}
+.r-btn.wide{padding:13px;font-size:15px}
+.r-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.3)}
+
+.ext{display:flex;gap:10px;overflow-x:auto;margin:0 -18px 18px;padding:0 18px 4px;scrollbar-width:none}
+.ext::-webkit-scrollbar{display:none}
+.ext a{flex:0 0 64%;max-width:240px;text-decoration:none;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:block}
+.ext b{display:flex;justify-content:space-between;font-size:15px}
+.ext .open{color:var(--magenta)}
+.lang{display:inline-block;font-size:11px;font-weight:700;margin-top:8px;padding:2px 7px;border-radius:5px;background:var(--chip);color:var(--ink2)}
+.gcard{display:block;width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.gcard b{display:block;font-size:17px;font-stretch:112%;font-weight:800;line-height:1.2}
+.steps{list-style:none;margin:14px 0 0;padding:0}
+.step{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;padding:14px 0;border-bottom:1px solid var(--line);width:100%}
+.step .num{width:32px;height:32px;border-radius:50%;background:var(--chip);display:grid;place-items:center;font-weight:900;font-stretch:125%;font-size:15px}
+.step .num svg{width:18px;height:18px}
+.step.on .num{background:var(--magenta);color:#fff}
+.step b{display:block;font-size:16px;line-height:1.25}
+.step.on b{color:var(--ink2)}
+.gn{display:block;font-size:14px;margin-top:5px;line-height:1.45}
+.src{display:block;margin-bottom:10px;padding:14px;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700}
+.teaser{display:flex;gap:14px;align-items:center;width:100%;margin-top:22px;padding:14px 16px;border-radius:16px;background:var(--ink);color:var(--paper)}
+.teaser .tn{font-stretch:125%;font-weight:900;font-size:40px;line-height:1;color:var(--yellow)}
+.teaser b{display:block;font-size:16px}
+.teaser .sub{color:inherit;opacity:.75}
+.rd{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:26px 0 4px;font-size:18px}
+.rd span{font-size:13px;font-weight:700;color:var(--magenta);font-stretch:100%;white-space:nowrap}
+.rel{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line)}
+.rel b{display:block;font-size:16px;line-height:1.25;margin-top:6px}
+.rl{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px}
+.l-marvel{background:#D1006C;color:#fff}.l-dc{background:#00A3D9;color:#fff}.l-image{background:#FFD400;color:#14161B}.l-starwars{background:var(--ink);color:var(--paper)}
+.bell{border:1.5px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;white-space:nowrap;text-align:center}
+.bell.on{background:var(--magenta);border-color:var(--magenta);color:#fff}
+.note a{color:var(--magenta)}
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px;z-index:80;font-size:14px;font-weight:600;max-width:88vw;text-align:center;pointer-events:none;transition:opacity .2s,transform .2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main id="main"></main>
+<nav class="tabs" aria-label="Secciones">
+  <button data-tab="inicio" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</button>
+  <button data-tab="biblioteca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4v16H4zM10 4h4v16h-4zM15.5 5.5l3.5-1 3.3 15-3.5 1z"/></svg>Biblioteca</button>
+  <button data-tab="proximos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Próximos</button>
+  <button data-tab="comunidad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.8A8 8 0 1 1 21 12z"/></svg>Comunidad</button>
+  <button data-tab="perfil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Perfil</button>
+</nav>
+<input type="file" id="file" hidden>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- Datos de ejemplo (obras originales) ---------- */
+const COMICS=[
+ {id:'meridiano',title:'Meridiano',issue:'#1',author:'Paula Kessler y Joaquín Sosa',publisher:'Faro Sur',source:'editorial',genre:'Ciencia ficción',pal:['#2B1055','#D1006C','#FFD400'],rating:4.7,votes:318,
+  synopsis:'Una estación espacial al borde de un sol que se apaga recibe una visita que no figura en ningún mapa.',
+  scenes:['sky','object','duo','figure','sky','close','duo','object','object','figure','duo','close'],
+  lines:['Año 2311. La estación Meridiano orbita un sol que se apaga.','Quedan 214 personas a bordo.','—Capitana, el motor tres no responde.','—Entonces vamos con dos.','Afuera, algo brilla donde no debería haber nada.','—Eso no está en ningún mapa.','—Lo que importa nunca estuvo en un mapa.','Lanzan una sonda.','La sonda vuelve. Con alguien adentro.','—Hola. Llegaron tarde.','—¿Tarde para qué?','—Para irse.']},
+ {id:'grua',title:'La grúa de Dock Sud',issue:'',author:'Valeria Ocampo',source:'indie',genre:'Policial',pal:['#0E2A3B','#00A3D9','#FFD400'],rating:4.6,votes:212,
+  synopsis:'En el puerto, una grúa se mueve sola de madrugada. Dos estibadores y un inspector cansado intentan averiguar por qué.',
+  scenes:['crane','city','duo','sea','object','object','duo','figure','figure','duo','crane','sky'],
+  lines:['Tres noches seguidas, la grúa se movió sola.','Nadie trabaja en el muelle después de las doce.','—¿Escuchaste eso?','—Es el río. Siempre es el río.','Los contenedores no estaban numerados.','Uno tenía una luz adentro.','—Abrilo vos.','—Ni loco. Llamá a Ferreyra.','Ferreyra llegó con el piloto mojado y sin paraguas.','—Esto no es contrabando. Es otra cosa.','Arriba, la grúa giró hacia nosotros.','Continuará…']},
+ {id:'faro',title:'El faro de los que no duermen',issue:'',author:'Martín Aldao',publisher:'Faro Sur',source:'editorial',genre:'Terror',pal:['#1B1B2F','#D1006C','#FFD400'],rating:4.5,votes:187,
+  synopsis:'Un nuevo guardián llega a un faro que no se apaga desde 1952. El anterior no se fue nunca.',
+  scenes:['tower','tower','duo','duo','sea','sea','duo','figure','sky','tower','figure','tower'],
+  lines:['El faro de Cabo Lindo no se apaga desde 1952.','Tampoco su guardián duerme.','—Vengo por el puesto.','—Nadie viene por el puesto. El puesto viene por vos.','La primera noche conté los barcos.','No pasó ninguno. Pero alguien saludó desde el agua.','—¿Quién vive en la isla?','—Nadie que esté vivo.','La segunda noche dejé de tener sueño.','La tercera, el faro empezó a hablarme.','—Cuidalo bien. Ahora es tuyo.','Continuará…']},
+ {id:'gatos',title:'Los gatos del Abasto',issue:'',author:'Tomás Iriarte',source:'indie',genre:'Humor',pal:['#FFD400','#17191E','#D1006C'],rating:4.8,votes:401,
+  synopsis:'Una asamblea de gatos de barrio decide qué hacer con el vecino que pone tango a las tres de la mañana.',
+  scenes:['city','cats','cats','cats','cats','cats','city','cats','cats','close','figure','cats'],
+  lines:['En el Abasto hay más gatos que vecinos.','Y todos tienen opinión.','—El del tercero volvió a poner música a las tres.','—Es tango. El tango no se discute.','—Yo voto por arañarle el felpudo.','—Moción aprobada.','Esa noche: operativo felpudo.','—Silencio total.','—¿Quién trajo cascabel?','—…','El del tercero abrió la puerta y les sirvió leche.','Reunión suspendida hasta nuevo aviso.']},
+ {id:'plancton',title:'Plancton',issue:'#1',author:'Inés Gaitán',publisher:'Marea',source:'editorial',genre:'Aventura',pal:['#004E64','#00A3D9','#FFD400'],rating:4.4,votes:156,
+  synopsis:'A 900 metros de profundidad, una piloto de batiscafo encuentra una ciudad iluminada que no debería existir.',
+  scenes:['sea','object','figure','sea','city','figure','sea','close','close','figure','figure','sea'],
+  lines:['A 900 metros, la luz deja de existir.','Pero Ana encontró otra.','—Batiscafo a superficie: estoy viendo algo.','—Repetí, Ana. Se corta.','Una ciudad. Bajo el agua. Encendida.','—No puede ser natural.','Las luces se apagaron una por una.','Todas menos una, justo frente a ella.','—Me está mirando.','—Ana, subí ya.','—No. Quiere mostrarme algo.','Fin del primer número.']},
+ {id:'ruta',title:'Ruta 40, kilómetro cero',issue:'',author:'Lucía Benítez',source:'indie',genre:'Drama',pal:['#F2C14E','#5A3E2B','#00A3D9'],rating:4.9,votes:96,
+  synopsis:'Una moto, un mapa con una sola marca y tres mil kilómetros para entender a un padre que ya no está.',
+  scenes:['object','sky','duo','figure','sky','tree','duo','figure','tree','close','close','sky'],
+  lines:['Mi viejo me dejó una moto y un mapa.','El mapa tenía una sola marca.','—¿Vas a ir sola hasta allá?','—Voy con él. De alguna forma.','Tres mil kilómetros de ruta.','Viento, guanacos, una estación de servicio cerrada.','—¿Buscás a alguien?','—Busco un lugar.','La marca era un árbol solo en medio de la nada.','Tenía tallado mi nombre.','Y una fecha: el día que nací.','Continuará…']}
+];
+const SEED_REVIEWS={
+ meridiano:[{u:'nico.vinetas',s:5,t:'El final del número te deja con la boca abierta. Los colores de la estación son hermosos.',d:'hace 2 días'},{u:'sofi.panel',s:4,t:'Arranca lento pero la última página lo vale.',d:'hace 5 días'}],
+ grua:[{u:'el_rotulador',s:5,t:'Policial porteño con niebla y todo. Ferreyra ya es mi personaje favorito.',d:'ayer'}],
+ faro:[{u:'nico.vinetas',s:4,t:'Da miedo de verdad. No lo lean de noche.',d:'hace 2 días'},{u:'flor_tintas',s:5,t:'“El puesto viene por vos” es una gran frase.',d:'hace 1 semana'}],
+ gatos:[{u:'flor_tintas',s:5,t:'Me reí en voz alta en el colectivo. El gato del cascabel es lo mejor.',d:'hace 3 días'},{u:'marce_lee',s:4,t:'Corto y tierno. Quiero más reuniones de consorcio gatuno.',d:'hace 1 semana'}],
+ plancton:[{u:'marce_lee',s:4,t:'La escena de las luces apagándose está muy bien resuelta.',d:'hace 4 días'}],
+ ruta:[{u:'sofi.panel',s:5,t:'Me hizo acordar a viajes con mi viejo. El árbol del final, uf.',d:'hace 6 días'}]
+};
+const SEED_THREADS=[
+ {id:'t1',title:'¿Quién saluda desde el agua en El faro?',comic:'faro',d:'hace 3 h',posts:[{u:'flor_tintas',t:'Tengo la teoría de que es el guardián anterior. ¿Qué piensan?'},{u:'nico.vinetas',t:'O el mismo protagonista en el futuro. En ese faro el tiempo no corre igual.'},{u:'el_rotulador',t:'Fíjense que en la página 2 el reflejo no coincide con la figura.'}]},
+ {id:'t2',title:'Teorías sobre la grúa: ¿quién la mueve?',comic:'grua',d:'hace 1 día',posts:[{u:'el_rotulador',t:'Para mí es Ferreyra. Llegó demasiado rápido.'},{u:'marce_lee',t:'Y sin paraguas. Sospechoso.'}]},
+ {id:'t3',title:'Recomiendan cómics independientes para empezar',comic:null,d:'hace 2 días',posts:[{u:'marce_lee',t:'Vengo de leer solo manga y quiero probar autores locales.'},{u:'sofi.panel',t:'Ruta 40, kilómetro cero. Es corto y emociona.'},{u:'flor_tintas',t:'Los gatos del Abasto si querés algo liviano.'}]},
+ {id:'t4',title:'Meridiano #1: ¿tarde para qué?',comic:'meridiano',d:'hace 4 días',posts:[{u:'nico.vinetas',t:'Ese diálogo final me tiene pensando hace días.'}]}
+];
+const SRC={editorial:'Editorial',indie:'Independiente',propio:'Tu archivo'};
+const WEB=[
+ {name:'Whakoom',what:'Colecciones, reseñas y guías de lectura armadas por lectores.',lang:'Español',url:'https://www.whakoom.com'},
+ {name:'r/comicbooks',what:'El foro de cómics más grande de Reddit. Charlas y recomendaciones.',lang:'Inglés',url:'https://www.reddit.com/r/comicbooks/'},
+ {name:'Comic Book Herald',what:'Órdenes de lectura comentados de Marvel, DC y otras editoriales.',lang:'Inglés',url:'https://www.comicbookherald.com'},
+ {name:'League of Comic Geeks',what:'Seguimiento de lecturas, lanzamientos semanales y listas.',lang:'Inglés',url:'https://leagueofcomicgeeks.com'}
+];
+const REL=[
+ {d:'2026-10-21',t:'Star Wars: The Fall of Kylo Ren #3',l:'Star Wars',f:'Número'},
+ {d:'2026-10-21',t:'The Mandalorian and Grogu: Nightmare on Nevarro',l:'Star Wars',f:'Especial'},
+ {d:'2026-10-28',t:'Rogue One – Darth Vader #1',l:'Star Wars',f:'Número',n:'Primer número de una serie nueva.'},
+ {d:'2026-10-28',t:'Star Wars: The Book of Boba Fett #4',l:'Star Wars',f:'Número'},
+ {d:'2026-11-03',t:'Robin & Batman: Jason Todd',l:'DC',f:'Tomo recopilatorio',n:'Reúne la miniserie completa de tres números.'},
+ {d:'2026-11-03',t:'Batman: Jekyll & Hyde (edición 2026)',l:'DC',f:'Tomo recopilatorio',n:'Reedición de la miniserie de seis números.'},
+ {d:'2026-11-03',t:'Star Wars: Hyperspace Stories – The Bad Batch: Rogue Agents',l:'Star Wars',f:'Tomo recopilatorio'},
+ {d:'2026-11-04',t:'Avengers #1',l:'Marvel',f:'Número',by:'Chip Zdarsky y Marco Checchetto',n:'Arranca una etapa nueva de los Vengadores, después del evento Armageddon.'},
+ {d:'2026-11-04',t:'Absolute Superman #25',l:'DC',f:'Número especial',n:'Número extendido que cierra el arco “Get Brainiac”.'},
+ {d:'2026-11-04',t:'Gangs of Gotham #1',l:'DC',f:'Número',n:'Gira alrededor de Anarky, un villano de Gotham.'},
+ {d:'2026-11-04',t:'The Demon #2',l:'DC',f:'Número',by:'James Harren',n:'Etrigan se enfrenta a un príncipe del Infierno.'},
+ {d:'2026-11-04',t:'Ghost Drive Station',l:'Image',f:'Especial',by:'Warren Ellis',n:'Historia corta autoconclusiva.'},
+ {d:'2026-11-04',t:'The Snail',l:'Image',f:'Especial',by:'Garth Ennis',n:'Historia autoconclusiva.'},
+ {d:'2026-11-04',t:'Monstress #66',l:'Image',f:'Número'},
+ {d:'2026-11-11',t:'Absolute Batman: Beyond Ark M #1',l:'DC',f:'Especial',n:'Amplía el universo Absolute de Batman.'},
+ {d:'2026-11-11',t:'Action Comics #1104',l:'DC',f:'Número',by:'Mark Waid y Patricio Delpeche'},
+ {d:'2026-11-11',t:'Legion of Super-Heroes #3',l:'DC',f:'Número',by:'Joshua Williamson y Hayden Sherman'},
+ {d:'2026-11-11',t:'Teen Titans #3',l:'DC',f:'Número',by:'Kyle Higgins y Daniele Di Nicuolo'},
+ {d:'2026-11-11',t:'Absolute Catwoman #5',l:'DC',f:'Número',n:'Anteúltimo número de una miniserie de seis.'},
+ {d:'2026-11-11',t:'Generation: X-23 #10',l:'Marvel',f:'Número',by:'Jody Houser y Jacopo Camagni',n:'Último número de la serie.'},
+ {d:'2026-11-11',t:'Star Wars: The Book of Boba Fett #5',l:'Star Wars',f:'Número'},
+ {d:'2026-11-17',t:'Batman: Gotham Adventures Omnibus Vol. 1',l:'DC',f:'Tomo recopilatorio',n:'Reúne los 42 números de la serie y varios especiales relacionados.'},
+ {d:'2026-11-17',t:'Smugglers and Scoundrels: The Race for Jabba’s Bounty',l:'Star Wars',f:'Novela gráfica'},
+ {d:'2026-11-18',t:'Midnight Spider-Man #2',l:'Marvel',f:'Número',n:'Sigue la nueva línea Midnight: Peter Parker desaparece.'},
+ {d:'2026-11-18',t:'Midnight X-Men #2',l:'Marvel',f:'Número'},
+ {d:'2026-11-18',t:'Midnight Fantastic Four #2',l:'Marvel',f:'Número'},
+ {d:'2026-11-18',t:'X-Orcists #1',l:'Marvel',f:'Número',by:'Ashley Allen y Germán Peralta',n:'Serie nueva dentro de X-Men: Shadows of Tomorrow.'},
+ {d:'2026-11-18',t:'DNX #5',l:'Marvel',f:'Número',by:'Jed MacKay y Federico Vicentini'},
+ {d:'2026-11-18',t:'Detective Comics #1115',l:'DC',f:'Número',by:'Tom Taylor y Mikel Janín'},
+ {d:'2026-11-18',t:'Absolute Flash #21',l:'DC',f:'Número'},
+ {d:'2026-11-18',t:'Star Wars: The Fall of Kylo Ren #4',l:'Star Wars',f:'Número'},
+ {d:'2026-11-24',t:'Star Wars: Darth Vader – Modern Era Epic Collection: The Chosen One',l:'Star Wars',f:'Tomo recopilatorio'},
+ {d:'2026-11-25',t:'Jean Grey #1',l:'Marvel',f:'Número',by:'Jed MacKay y Rogê Antônio'},
+ {d:'2026-11-25',t:'Star Wars: The Book of Boba Fett #6',l:'Star Wars',f:'Número'},
+ {d:'2026-12-01',t:'Star Wars: Shadow of Maul',l:'Star Wars',f:'Tomo recopilatorio'},
+ {d:'2026-12-02',t:'Star Wars: The Fall of Kylo Ren #5',l:'Star Wars',f:'Número'},
+ {d:'2026-12-09',t:'Star Wars: The Book of Boba Fett #7',l:'Star Wars',f:'Número'},
+ {d:'2026-12-16',t:'Star Wars (1977) #42 – Facsimile Edition',l:'Star Wars',f:'Reedición facsimilar'}
+];
+const pd=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const t0=()=>{const x=new Date();x.setHours(0,0,0,0);return x};
+const rid=r=>r.d+'|'+r.t;
+const WHK={name:'Whakoom',why:'Buscá la serie: hay guías armadas por lectores para las ediciones en español.',url:'https://www.whakoom.com'};
+const GUIDES=[
+ {id:'batman',title:'Batman para empezar',intro:'Cinco historias autoconclusivas, en orden de publicación, para conocer al personaje sin depender de décadas de continuidad.',src:[WHK,{name:'Comic Book Herald',why:'Orden de lectura completo y comentado, en inglés.',url:'https://www.comicbookherald.com'}],steps:[
+  {t:'Año uno',by:'Frank Miller y David Mazzucchelli',y:'1987',n:'El primer año de Bruce Wayne como Batman y de Gordon en una Gotham corrupta. El mejor punto de partida.'},
+  {t:'El largo Halloween',by:'Jeph Loeb y Tim Sale',y:'1996–97',n:'Un asesino que actúa una vez por mes, en cada feriado. Un policial que dura un año entero.'},
+  {t:'Victoria oscura',by:'Jeph Loeb y Tim Sale',y:'1999–2000',n:'Continuación directa del anterior. Acá aparece Robin.'},
+  {t:'Silencio',by:'Jeph Loeb y Jim Lee',y:'2002–03',n:'Un misterio nuevo que pasa por casi toda la galería de villanos.'},
+  {t:'La Corte de los Búhos',by:'Scott Snyder y Greg Capullo',y:'2011–12',n:'Una sociedad secreta que controla Gotham desde hace siglos. Buena entrada a la etapa moderna.'}]},
+ {id:'eternauta',title:'Clásicos de la historieta argentina',intro:'Un recorrido por obras fundamentales, ordenado por año de publicación.',src:[WHK],steps:[
+  {t:'Sargento Kirk',by:'Héctor G. Oesterheld y Hugo Pratt',y:'1953',n:'Un western con un soldado que deserta harto de la violencia.'},
+  {t:'El Eternauta',by:'Héctor G. Oesterheld y Francisco Solano López',y:'1957–59',n:'Una nevada mortal cae sobre Buenos Aires y un grupo de vecinos resiste.'},
+  {t:'Mort Cinder',by:'Héctor G. Oesterheld y Alberto Breccia',y:'1962–64',n:'Un anticuario y un hombre que muere y vuelve a vivir a lo largo de la historia.'},
+  {t:'Mafalda',by:'Quino',y:'1964–73',n:'Tiras de una nena que pregunta lo que los grandes prefieren no contestar.'},
+  {t:'Perramus',by:'Juan Sasturain y Alberto Breccia',y:'1984–89',n:'Un hombre sin memoria en una ciudad bajo una dictadura.'}]},
+ {id:'sandman',title:'The Sandman en orden',intro:'Los diez tomos de la serie original de Neil Gaiman, en el orden en que conviene leerlos.',src:[WHK],steps:[
+  {t:'Preludios y nocturnos',by:'Neil Gaiman y varios artistas',y:'1989',n:'Sueño escapa de un encierro de décadas y sale a recuperar sus herramientas.'},
+  {t:'La casa de muñecas',by:'Neil Gaiman y varios artistas',y:'1989–90'},
+  {t:'País de sueños',by:'Neil Gaiman y varios artistas',y:'1990',n:'Cuatro historias autoconclusivas. Se puede leer suelto.'},
+  {t:'Estación de nieblas',by:'Neil Gaiman y varios artistas',y:'1990–91'},
+  {t:'Juego de ti',by:'Neil Gaiman y varios artistas',y:'1991–92'},
+  {t:'Fábulas y reflejos',by:'Neil Gaiman y varios artistas',y:'1991–93',n:'Relatos cortos que mezclan sueños e historia.'},
+  {t:'Vidas breves',by:'Neil Gaiman y Jill Thompson',y:'1992–93'},
+  {t:'El fin de los mundos',by:'Neil Gaiman y varios artistas',y:'1993',n:'Viajeros refugiados de una tormenta se cuentan historias.'},
+  {t:'Las benévolas',by:'Neil Gaiman y Marc Hempel',y:'1994–95',n:'El arco final de la serie.'},
+  {t:'El velatorio',by:'Neil Gaiman y varios artistas',y:'1995–96',n:'El epílogo.'}]},
+ {id:'xmen',title:'X-Men: grandes etapas',intro:'Cinco hitos de los mutantes para entender por qué la serie es tan querida.',src:[WHK,{name:'Comic Book Herald',why:'Guía de la era moderna de los X-Men, en inglés.',url:'https://www.comicbookherald.com'}],steps:[
+  {t:'La saga de Fénix Oscura',by:'Chris Claremont y John Byrne',y:'1980',n:'Jean Grey y un poder que no puede controlar.'},
+  {t:'Días del futuro pasado',by:'Chris Claremont y John Byrne',y:'1981',n:'Un futuro donde los mutantes son perseguidos, y un intento de evitarlo.'},
+  {t:'Dios ama, el hombre mata',by:'Chris Claremont y Brent Anderson',y:'1982',n:'Novela gráfica sobre el odio y el fanatismo.'},
+  {t:'Astonishing X-Men',by:'Joss Whedon y John Cassaday',y:'2004',n:'Una supuesta cura para la mutación divide a todos.'},
+  {t:'House of X / Powers of X',by:'Jonathan Hickman, Pepe Larraz y R. B. Silva',y:'2019',n:'Un reinicio total: los mutantes fundan su propia nación.'}]}
+];
+
+/* ---------- Estado ---------- */
+const KEY='comic-unlimited-v1';
+function defaults(){return{name:'',status:{meridiano:'leyendo',faro:'quiero',gatos:'leido'},progress:{meridiano:1},maxp:{meridiano:1,gatos:3},ratings:{gatos:5},reviews:{},collections:[{id:'c1',name:'Para leer en el viaje',ids:['meridiano','plancton','ruta']}],replies:{},threads:[],mode:'paginas',days:[],theme:'auto',guides:{},follow:[]}}
+let S=defaults();
+try{const raw=localStorage.getItem(KEY);if(raw)S=Object.assign(defaults(),JSON.parse(raw))}catch(e){}
+for(const k of Object.keys(S.status))if(k.startsWith('u'))delete S.status[k];
+S.collections.forEach(c=>c.ids=c.ids.filter(i=>!i.startsWith('u')));
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const USER=[];
+const UI={tab:'inicio',rline:'todas',filter:'todos',query:'',lib:'leyendo',com:'charlas',openCol:null,drafts:{}};
+const all=()=>[...COMICS,...USER];
+const get=id=>all().find(c=>c.id===id);
+const pages=c=>c.imgs?c.imgs.length:4;
+const me=()=>S.name.trim()||'vos';
+
+/* ---------- Utilidades ---------- */
+const esc=s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function hash(str){let h=0;for(const ch of str)h=(h*31+ch.charCodeAt(0))|0;return Math.abs(h)}
+function rnd(seed){let s=seed%233280;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+function shade(hex,amt){const n=parseInt(hex.slice(1),16);const f=v=>Math.max(0,Math.min(255,Math.round(amt<0?v*(1+amt):v+(255-v)*amt)));return'#'+[n>>16,(n>>8)&255,n&255].map(v=>f(v).toString(16).padStart(2,'0')).join('')}
+function lum(hex){const n=parseInt(hex.slice(1),16);return(.299*(n>>16)+.587*((n>>8)&255)+.114*(n&255))/255}
+function wrap(t,max){const out=[];let cur='';for(const w of t.split(' ')){if(cur&&(cur+' '+w).length>max){out.push(cur);cur=w}else cur=(cur?cur+' ':'')+w}if(cur)out.push(cur);return out}
+function ago(ts){const m=Math.round((Date.now()-ts)/60000);if(m<1)return'recién';if(m<60)return`hace ${m} min`;const h=Math.round(m/60);if(h<24)return`hace ${h} h`;const d=Math.round(h/24);return d===1?'ayer':`hace ${d} días`}
+function today(){return new Date().toLocaleDateString('sv-SE')}
+function markDay(){const d=today();if(!S.days.includes(d))S.days.push(d)}
+let tt;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2300)}
+
+const I={
+ chev:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+ plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+ x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+ up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>',
+ star:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z"/></svg>'
+};
+
+/* ---------- Dibujo de portadas y páginas ---------- */
+const INK='#14161B';
+function fig(cx,by,s){const hr=s*.09,top=by-s*.62;return`<circle cx="${cx}" cy="${top}" r="${hr}" fill="${INK}"/><path d="M${cx-hr*2.2} ${by}L${cx-hr*1.5} ${top+hr*1.4}Q${cx} ${top+hr*1.1} ${cx+hr*1.5} ${top+hr*1.4}L${cx+hr*2.2} ${by}Z" fill="${INK}"/>`}
+function cat(cx,by,s,eye){return`<ellipse cx="${cx}" cy="${by-s*.33}" rx="${s*.42}" ry="${s*.33}" fill="${INK}"/><circle cx="${cx+s*.26}" cy="${by-s*.78}" r="${s*.24}" fill="${INK}"/><path d="M${cx+s*.07} ${by-s*.88}L${cx+s*.1} ${by-s*1.12}L${cx+s*.25} ${by-s*.98}ZM${cx+s*.28} ${by-s*.98}L${cx+s*.43} ${by-s*1.12}L${cx+s*.45} ${by-s*.86}Z" fill="${INK}"/><path d="M${cx-s*.38} ${by-s*.3}Q${cx-s*.85} ${by-s*.4} ${cx-s*.62} ${by-s*.98}" stroke="${INK}" stroke-width="${s*.08}" fill="none" stroke-linecap="round"/><circle cx="${cx+s*.18}" cy="${by-s*.8}" r="${s*.045}" fill="${eye}"/><circle cx="${cx+s*.35}" cy="${by-s*.8}" r="${s*.045}" fill="${eye}"/>`}
+function wave(x,w,y0,a,by,fill){return`<path d="M${x} ${y0}Q${x+w*.125} ${y0-a} ${x+w*.25} ${y0}T${x+w*.5} ${y0}T${x+w*.75} ${y0}T${x+w} ${y0}L${x+w} ${by}L${x} ${by}Z" fill="${fill}"/>`}
+function scene(type,x,y,w,h,pal,r){
+ const cx=x+w/2,by=y+h,m=Math.min(w,h);
+ switch(type){
+  case'sky':{let s=`<circle cx="${x+w*.68}" cy="${y+h*.38}" r="${m*.2}" fill="${pal[2]}"/>`;for(let i=0;i<14;i++)s+=`<circle cx="${x+r()*w}" cy="${y+r()*h*.7}" r="${1+r()*2}" fill="#fff" opacity=".8"/>`;return s+`<path d="M${x} ${by}L${x} ${by-h*.18}Q${x+w*.3} ${by-h*.3} ${x+w*.55} ${by-h*.16}T${x+w} ${by-h*.22}L${x+w} ${by}Z" fill="${INK}"/>`}
+  case'city':{let s='';const n=7,bw=w/n;for(let i=0;i<n;i++){const bh=h*(.3+r()*.45),bx=x+i*bw;s+=`<rect x="${bx}" y="${by-bh}" width="${bw+1}" height="${bh}" fill="${INK}"/>`;for(let j=0;j<6;j++)if(r()>.55)s+=`<rect x="${bx+bw*.22+(j%2)*bw*.34}" y="${by-bh+14+Math.floor(j/2)*bh/4}" width="${bw*.16}" height="${bw*.16}" fill="${pal[2]}"/>`}return s}
+  case'figure':return fig(x+w*(.38+r()*.24),by,m);
+  case'duo':return fig(x+w*.3,by,m*.95)+fig(x+w*.68,by,m*.82);
+  case'close':{const ey=y+h*.52,dx=w*.17;return`<circle cx="${cx}" cy="${y+h*1.05}" r="${Math.max(w,h)*.62}" fill="${shade(pal[0],-.55)}"/>`+[-1,1].map(k=>`<ellipse cx="${cx+k*dx}" cy="${ey}" rx="${w*.09}" ry="${h*.07}" fill="#fff"/><circle cx="${cx+k*dx+w*.02}" cy="${ey}" r="${m*.045}" fill="${INK}"/>`).join('')}
+  case'sea':return wave(x,w,y+h*.55,h*.06,by,pal[1])+wave(x,w,y+h*.7,h*.05,by,shade(pal[1],-.35))+wave(x,w,y+h*.85,h*.04,by,INK);
+  case'object':{const bw=w*.46,bh=h*.42,bx=cx-bw/2,byy=by-bh-h*.06;return`<circle cx="${cx}" cy="${byy+bh*.45}" r="${m*.42}" fill="${pal[2]}" opacity=".3"/><rect x="${bx}" y="${byy}" width="${bw}" height="${bh}" fill="${INK}"/><rect x="${cx-bw*.08}" y="${byy+bh*.15}" width="${bw*.16}" height="${bh*.7}" fill="${pal[2]}"/><rect x="${x}" y="${by-h*.06}" width="${w}" height="${h*.06}" fill="${INK}"/>`}
+  case'tree':{const tx=x+w*.55;return`<rect x="${x}" y="${by-h*.12}" width="${w}" height="${h*.12}" fill="${INK}"/><rect x="${tx-m*.03}" y="${by-h*.55}" width="${m*.06}" height="${h*.45}" fill="${INK}"/><circle cx="${tx}" cy="${by-h*.6}" r="${m*.2}" fill="${INK}"/><circle cx="${tx-m*.14}" cy="${by-h*.52}" r="${m*.13}" fill="${INK}"/><circle cx="${tx+m*.15}" cy="${by-h*.5}" r="${m*.12}" fill="${INK}"/>`}
+  case'cats':{const s=m*.32;return`<rect x="${x}" y="${by-h*.08}" width="${w}" height="${h*.08}" fill="${INK}"/>`+cat(x+w*.25,by-h*.08,s,pal[2])+cat(x+w*.55,by-h*.08,s*.8,pal[2])+(w>400?cat(x+w*.82,by-h*.08,s*.9,pal[2]):'')}
+  case'crane':{const tx=x+w*.28;return`<rect x="${tx}" y="${y+h*.14}" width="${w*.05}" height="${h*.86}" fill="${INK}"/><rect x="${tx-w*.12}" y="${y+h*.14}" width="${w*.78}" height="${h*.045}" fill="${INK}"/><line x1="${x+w*.72}" y1="${y+h*.18}" x2="${x+w*.72}" y2="${y+h*.56}" stroke="${INK}" stroke-width="3"/><rect x="${x+w*.6}" y="${y+h*.56}" width="${w*.24}" height="${h*.16}" fill="${pal[1]}" stroke="${INK}" stroke-width="3"/><rect x="${x}" y="${by-h*.08}" width="${w}" height="${h*.08}" fill="${INK}"/>`}
+  case'tower':{const top=y+h*.22,b1=w*.12,b2=w*.065;return`<path d="M${cx} ${top}L${x-w*.1} ${y+h*.02}L${x-w*.1} ${y+h*.42}Z" fill="${pal[2]}" opacity=".35"/><path d="M${cx} ${top}L${x+w*1.1} ${y+h*.05}L${x+w*1.1} ${y+h*.4}Z" fill="${pal[2]}" opacity=".35"/><path d="M${cx-b1} ${by-h*.1}L${cx-b2} ${top+h*.06}L${cx+b2} ${top+h*.06}L${cx+b1} ${by-h*.1}Z" fill="${INK}"/><rect x="${cx-b1*.9}" y="${top+h*.25}" width="${b1*1.8}" height="${h*.07}" fill="${pal[1]}"/><circle cx="${cx}" cy="${top}" r="${m*.06}" fill="${pal[2]}"/>`+wave(x,w,by-h*.1,h*.03,by,INK)}
+ }
+ return'';
+}
+function textBlock(line,x,y,w,h,pal){
+ if(!line)return'';
+ const speech=line.startsWith('—'),t=speech?line.slice(1):line;
+ const fs=w>400?24:20,max=Math.max(8,Math.floor((w-52)/(fs*.56))),ls=wrap(t,max),lh=fs*1.22;
+ const bw=Math.min(w-28,Math.max(...ls.map(l=>l.length))*fs*.56+34),bh=ls.length*lh+20,bx=x+14,byy=y+14;
+ const fg=speech?INK:(lum(pal[2])>.5?INK:'#fff');
+ const txt=ls.map((l,i)=>`<text x="${bx+17}" y="${byy+12+fs*.95+i*lh}" font-size="${fs}" fill="${fg}" font-weight="${speech?600:700}" font-family="Archivo, Arial, sans-serif">${esc(l)}</text>`).join('');
+ if(speech){const ax=bx+bw*.28,bx2=bx+bw*.44,ty=byy+bh;return`<rect x="${bx}" y="${byy}" width="${bw}" height="${bh}" rx="20" fill="#fff" stroke="${INK}" stroke-width="2.5"/><path d="M${ax} ${ty}L${ax-6} ${ty+24}L${bx2} ${ty}" fill="#fff" stroke="${INK}" stroke-width="2.5" stroke-linejoin="round"/><line x1="${ax+2}" y1="${ty}" x2="${bx2-2}" y2="${ty}" stroke="#fff" stroke-width="4"/>${txt}`}
+ return`<rect x="${x+10}" y="${y+10}" width="${bw}" height="${bh}" fill="${pal[2]}" stroke="${INK}" stroke-width="2.5"/>`+txt.replaceAll(`x="${bx+17}"`,`x="${x+27}"`).replace(/y="([\d.]+)"/g,(m0,v)=>`y="${+v-4}"`);
+}
+const LAYOUTS=[
+ [[18,18,564,330],[18,360,276,522],[306,360,276,522]],
+ [[18,18,276,420],[306,18,276,420],[18,450,564,432]],
+ [[18,18,564,276],[18,306,564,276],[18,594,564,288]]
+];
+function pageSVG(c,p){
+ const L=LAYOUTS[p%3],uid=c.id+p,r=rnd(hash(uid));
+ let defs=`<pattern id="ht${uid}" width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="4.5" cy="4.5" r="2.2" fill="${c.pal[2]}"/></pattern>`,body='';
+ L.forEach(([x,y,w,h],i)=>{
+  const k=p*3+i,bg=[c.pal[0],shade(c.pal[0],.16),shade(c.pal[0],-.25)][k%3];
+  defs+=`<clipPath id="cp${uid}_${i}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath>`;
+  body+=`<g clip-path="url(#cp${uid}_${i})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${bg}"/><rect x="${x}" y="${y+h*.45}" width="${w}" height="${h*.55}" fill="url(#ht${uid})" opacity=".26"/>${scene(c.scenes[k]||'sky',x,y,w,h,c.pal,r)}${textBlock(c.lines[k],x,y,w,h,c.pal)}</g><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${INK}" stroke-width="5"/>`;
+ });
+ return`<svg viewBox="0 0 600 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Página ${p+1} de ${esc(c.title)}"><defs>${defs}</defs><rect width="600" height="900" fill="#FBFAF7"/>${body}<text x="300" y="896" text-anchor="middle" font-size="11" fill="#777" font-family="Archivo, Arial, sans-serif">${p+1}</text></svg>`;
+}
+function cover(c){
+ if(c.imgs)return`<img src="${c.imgs[0]}" alt="">`;
+ const uid='cv'+c.id,r=rnd(hash(uid)),tl=wrap(c.title,11),fs=tl.length>2?42:50,blockH=tl.length*fs*1.02+74,fg=lum(c.pal[1])>.55?INK:'#fff';
+ const lines=tl.map((l,i)=>{const est=l.length*fs*.72;return`<text x="22" y="${600-blockH+18+fs*.9+i*fs*1.02}" font-size="${fs}" font-weight="900" fill="${fg}" font-family="Archivo, Arial, sans-serif" style="font-stretch:125%" ${est>356?'textLength="356" lengthAdjust="spacingAndGlyphs"':''}>${esc(l)}</text>`}).join('');
+ return`<svg viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><pattern id="ht${uid}" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="3.3" fill="${c.pal[1]}"/></pattern></defs><rect width="400" height="600" fill="${c.pal[0]}"/><circle cx="270" cy="210" r="175" fill="url(#ht${uid})" opacity=".6"/>${scene(c.scenes[0],0,40,400,600-blockH-30,c.pal,r)}<rect x="0" y="${600-blockH}" width="400" height="${blockH}" fill="${c.pal[1]}"/>${lines}<text x="22" y="580" font-size="17" fill="${fg}" opacity=".85" font-family="Archivo, Arial, sans-serif">${esc(c.author)}</text>${c.issue?`<rect x="18" y="18" width="62" height="36" fill="#FFD400" stroke="${INK}" stroke-width="3"/><text x="49" y="44" text-anchor="middle" font-size="21" font-weight="900" fill="${INK}" font-family="Archivo, Arial, sans-serif">${c.issue}</text>`:''}</svg>`;
+}
+
+/* ---------- Piezas de interfaz ---------- */
+const badge=c=>`<span class="badge b-${c.source}">${SRC[c.source]}</span>`;
+function avg(c){const mine=S.ratings[c.id];const v=c.votes+(mine?1:0);if(!v)return'–';return((c.rating*c.votes+(mine||0))/v).toFixed(1)}
+const votes=c=>c.votes+(S.ratings[c.id]?1:0);
+const miniStars=n=>`<span class="ms" aria-label="${n} de 5">${'★'.repeat(n)}<span>${'★'.repeat(5-n)}</span></span>`;
+function starsInput(id){const v=S.ratings[id]||0;return`<div class="stars" data-for="${id}" role="group" aria-label="Tu puntaje">${[1,2,3,4,5].map(n=>`<button class="${v>=n?'on':''}" data-rate="${n}" data-id="${id}" aria-label="${n} de 5">${I.star}</button>`).join('')}</div>`}
+function updateStars(id){document.querySelectorAll(`.stars[data-for="${id}"]`).forEach(g=>g.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i<(S.ratings[id]||0))))}
+const AVC=[['#00A3D9','#fff'],['#D1006C','#fff'],['#FFD400','#14161B']];
+const av=u=>{const[b,f]=AVC[hash(u)%3];return`<span class="av" style="background:${b};color:${f}">${esc(u[0].toUpperCase())}</span>`};
+function reviewsFor(id){return[...(S.reviews[id]||[]).map(r=>({...r,d:ago(r.ts)})),...(SEED_REVIEWS[id]||[])]}
+function revHTML(r,withComic){const c=withComic&&get(withComic);return`<div class="rev"><div class="rev-h">${av(r.u)}<b>${esc(r.u)}</b>${r.s?miniStars(r.s):''}<span class="when">${esc(r.d)}</span></div><p>${esc(r.t)}</p>${c?`<button class="rev-c" data-open="${c.id}"><span class="cv">${cover(c)}</span>Sobre ${esc(c.title)}</button>`:''}</div>`}
+const threads=()=>[...S.threads.map(t=>({...t,d:ago(t.ts)})),...SEED_THREADS];
+const thread=id=>threads().find(t=>t.id===id);
+const postCount=t=>t.posts.length+(S.replies[t.id]||[]).length;
+function thrHTML(t){const c=t.comic&&get(t.comic);const n=postCount(t);return`<button class="thr" data-thread="${t.id}"><span><b>${esc(t.title)}</b><span class="sub">${c?esc(c.title):'Charla general'}. ${n} ${n===1?'mensaje':'mensajes'}, ${esc(t.d)}</span></span>${c?`<span class="cv">${cover(c)}</span>`:''}</button>`}
+function cardHTML(c){return`<button class="card" data-open="${c.id}"><span class="cv">${cover(c)}${badge(c)}</span><b>${esc(c.title)}</b><span class="sub">${esc(c.author)}</span><span class="sc"><span class="st">★</span> ${avg(c)}</span></button>`}
+
+/* ---------- Vistas ---------- */
+function gridHTML(){
+ const q=norm(UI.query);
+ const list=all().filter(c=>(UI.filter==='todos'||c.source===UI.filter)&&(!q||norm(c.title+' '+c.author+' '+c.genre).includes(q))).sort((a,b)=>avg(b)-avg(a));
+ if(!list.length)return`<p class="empty">${UI.filter==='propio'&&!q?'Todavía no importaste archivos. Podés hacerlo desde Biblioteca.':'No hay cómics que coincidan con la búsqueda.'}</p>`;
+ return list.map(cardHTML).join('');
+}
+function viewHome(){
+ const reading=all().filter(c=>S.status[c.id]==='leyendo');
+ const f=COMICS[0];
+ return`<header class="top"><h1 class="big-title">Cómic<br>Unlimited</h1><button class="avatar" data-tab="perfil" aria-label="Ir a tu perfil">${esc(me()[0].toUpperCase())}</button></header>
+ <label class="search">${I.search}<input id="q" type="search" placeholder="Buscar por título, autor o género" value="${esc(UI.query)}" autocomplete="off"></label>
+ ${reading.length?`<h2>Seguir leyendo</h2><div class="row">${reading.map(c=>{const n=pages(c),p=(S.progress[c.id]||0)+1;return`<button class="cont" data-read="${c.id}"><span class="cv">${cover(c)}</span><span class="grow"><b>${esc(c.title)}</b><span class="sub">Página ${p} de ${n}</span><span class="bar"><i style="width:${Math.round(p/n*100)}%"></i></span></span></button>`}).join('')}</div>`:''}
+ ${(()=>{const wk=REL.filter(r=>{const x=(pd(r.d)-t0())/864e5;return x>=0&&x<7}).length;return wk?`<button class="teaser" data-tab="proximos"><span class="tn">${wk}</span><span><b>${wk===1?'lanzamiento esta semana':'lanzamientos esta semana'}</b><span class="sub">Mirá el calendario completo</span></span></button>`:''})()}
+ <button class="feat" data-open="${f.id}"><span class="cv">${cover(f)}</span><span><span class="feat-k">Nuevo número</span><b>${esc(f.title)} ${f.issue}</b><span class="s">${esc(f.synopsis)}</span><span class="go">Ver cómic</span></span></button>
+ <h2>Catálogo</h2>
+ <div class="chips">${[['todos','Todos'],['editorial','Editoriales'],['indie','Independientes'],['propio','Tus archivos']].map(([v,l])=>`<button class="chip ${UI.filter===v?'on':''}" data-filter="${v}">${l}</button>`).join('')}</div>
+ <div class="grid" id="grid">${gridHTML()}</div>`;
+}
+function itemHTML(c){
+ const st=S.status[c.id],n=pages(c),p=(S.progress[c.id]||0)+1;let info;
+ if(st==='leyendo')info=`<span class="sub">Página ${p} de ${n}</span><span class="bar"><i style="width:${Math.round(p/n*100)}%"></i></span>`;
+ else if(st==='leido')info=`<span class="sub">${S.ratings[c.id]?miniStars(S.ratings[c.id]):'Sin puntaje todavía'}</span>`;
+ else info=`<span class="sub">${esc(c.author)}</span>`;
+ return`<div class="item"><button class="cv" data-open="${c.id}" aria-label="Ver ${esc(c.title)}">${cover(c)}</button><button class="item-t" data-open="${c.id}"><b>${esc(c.title)}</b>${info}</button>${st!=='leido'?`<button class="pill" data-read="${c.id}">${st==='leyendo'?'Seguir':'Leer'}</button>`:'<span></span>'}</div>`;
+}
+function viewLibrary(){
+ const by=s=>all().filter(c=>S.status[c.id]===s);
+ const tabs=[['leyendo','Leyendo'],['quiero','Quiero leer'],['leido','Leídos'],['colecciones','Colecciones']];
+ let body;
+ if(UI.lib==='colecciones'){
+  body=S.collections.map(col=>{const cs=col.ids.map(get).filter(Boolean);return`<div class="col"><button class="col-h" data-opencol="${col.id}" aria-expanded="${UI.openCol===col.id}"><span class="stack">${cs.slice(0,3).map(c=>`<span class="cv">${cover(c)}</span>`).join('')||'<span class="cv"></span>'}</span><span><b>${esc(col.name)}</b><span class="sub">${cs.length} ${cs.length===1?'cómic':'cómics'}</span></span></button>${UI.openCol===col.id?(cs.length?cs.map(itemHTML).join(''):'<p class="empty">Esta colección está vacía. Sumá cómics desde su ficha.</p>'):''}</div>`}).join('')+`<button class="newbtn" data-colsheet="">Nueva colección</button>`;
+ }else{
+  const list=by(UI.lib);
+  const empty={leyendo:'No tenés cómics empezados. Elegí uno en Inicio y tocá Empezar a leer.',quiero:'Tu lista de pendientes está vacía. Marcá “Quiero leer” en la ficha de un cómic.',leido:'Cuando termines un cómic va a aparecer acá, con tu puntaje.'}[UI.lib];
+  body=list.length?list.map(itemHTML).join(''):`<p class="empty">${empty}</p>`;
+ }
+ return`<h1 class="title">Biblioteca</h1>
+ <div class="seg" role="group" aria-label="Filtrar biblioteca">${tabs.map(([v,l])=>`<button class="${UI.lib===v?'on':''}" data-lib="${v}">${l}</button>`).join('')}</div>
+ <div style="margin-top:8px">${body}</div>
+ <button class="import" data-import>${I.up} Importar cómic (.cbz o .zip)</button>
+ <p class="note">Los archivos importados se abren en este celular y no se comparten. En este prototipo quedan disponibles mientras la app esté abierta.</p>`;
+}
+function viewCommunity(){
+ let body;
+ if(UI.com==='charlas')body=`<button class="newbtn" data-newthread>Abrir una charla</button>${threads().map(thrHTML).join('')}`;
+ else if(UI.com==='guias')body=guidesHTML();
+ else{const list=[];all().forEach(c=>reviewsFor(c.id).forEach(r=>list.push([r,c.id])));list.sort((a,b)=>(b[0].ts||0)-(a[0].ts||0));body=list.map(([r,id])=>revHTML(r,id)).join('')}
+ return`<h1 class="title">Comunidad</h1>
+ <h2 style="margin-top:0">Comunidades en la web</h2><div class="ext">${WEB.map(w=>`<a href="${w.url}" target="_blank" rel="noopener"><b>${esc(w.name)}<span class="open" aria-hidden="true">↗</span></b><span class="sub">${esc(w.what)}</span><span class="lang">${w.lang}</span></a>`).join('')}</div>
+ <div class="seg" role="group" aria-label="Sección">${[['charlas','Charlas'],['guias','Guías'],['resenas','Reseñas']].map(([v,l])=>`<button class="${UI.com===v?'on':''}" data-com="${v}">${l}</button>`).join('')}</div>
+ ${body}
+ <p class="note">En este prototipo, las charlas y reseñas de la app se guardan solo en este celular. Para charlar con más gente, entrá a las comunidades de arriba.</p>`;
+}
+function stats(){
+ const read=all().filter(c=>S.status[c.id]==='leido').length,reading=all().filter(c=>S.status[c.id]==='leyendo').length;
+ const pg=Object.entries(S.maxp).reduce((a,[id,v])=>a+(get(id)?v+1:0),0);
+ const rv=Object.values(S.reviews).reduce((a,l)=>a+l.length,0);
+ const rs=Object.values(S.ratings);const avgR=rs.length?(rs.reduce((a,b)=>a+b,0)/rs.length).toFixed(1):'–';
+ let streak=0;const d=new Date();if(!S.days.includes(today()))d.setDate(d.getDate()-1);
+ while(S.days.includes(d.toLocaleDateString('sv-SE'))){streak++;d.setDate(d.getDate()-1)}
+ return{read,reading,pg,rv,avgR,streak};
+}
+function viewProfile(){
+ const s=stats();const g={};all().filter(c=>['leido','leyendo'].includes(S.status[c.id])).forEach(c=>g[c.genre]=(g[c.genre]||0)+1);
+ const ge=Object.entries(g).sort((a,b)=>b[1]-a[1]),mx=Math.max(1,...ge.map(e=>e[1])),cols=['var(--magenta)','var(--cyan)','var(--star)'];
+ return`<h1 class="title">Perfil</h1>
+ <div class="me"><span class="avatar lg">${esc(me()[0].toUpperCase())}</span><label class="name"><span>Tu nombre en la comunidad</span><input id="name" value="${esc(S.name)}" placeholder="Por ejemplo: lector_del_sur" maxlength="24" autocomplete="nickname"></label></div>
+ <div class="stats">${[[s.read,'Leídos'],[s.reading,'Leyendo'],[s.pg,'Páginas leídas'],[s.streak,s.streak===1?'Día seguido':'Días seguidos'],[s.rv,'Reseñas'],[s.avgR,'Puntaje que das']].map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>
+ <h2>Lo que más leés</h2>${ge.length?ge.map(([k,v],i)=>`<div class="gen"><span>${esc(k)}</span><span class="bar"><i style="width:${v/mx*100}%;background:${cols[i%3]}"></i></span><span class="n">${v}</span></div>`).join(''):'<p class="empty">Empezá un cómic y acá vas a ver tus géneros favoritos.</p>'}
+ <h2>Apariencia</h2><div class="seg" role="group" aria-label="Apariencia">${[['auto','Automática'],['light','Clara'],['dark','Oscura']].map(([v,l])=>`<button class="${S.theme===v?'on':''}" data-themeset="${v}">${l}</button>`).join('')}</div>
+ <h2>Usarla como app</h2><p class="syn">Abrí esta página en Safari, tocá Compartir y elegí “Agregar a inicio”. Queda un ícono en tu pantalla y se abre a pantalla completa.</p>
+ <button class="danger" data-reset>Borrar mis datos de este celular</button>`;
+}
+function viewDetail(id){
+ const c=get(id);const nav=`<div class="nav"><button class="back" data-close>${I.chev}Volver</button>${c?`<button class="nav-act" data-colsheet="${id}">${I.plus}Colección</button>`:''}</div>`;
+ if(!c)return nav+`<div class="inner"><p class="empty">Este cómic ya no está disponible en este celular.</p></div>`;
+ const st=S.status[id],n=pages(c),p=S.progress[id]||0;
+ const label=st==='leido'?'Volver a leer':(p>0?`Seguir en la página ${p+1}`:'Empezar a leer');
+ const revs=reviewsFor(id),thr=threads().filter(t=>t.comic===id);
+ return nav+`<div class="inner">
+  <div class="d-hero"><span class="cv">${cover(c)}</span><div>${badge(c).replace('badge','tag')}<h1 class="d-title">${esc(c.title)}${c.issue?` <span class="iss">${c.issue}</span>`:''}</h1><p class="d-by">${esc(c.author)}</p>${c.publisher?`<p class="d-by">Editorial ${esc(c.publisher)}</p>`:''}<p class="d-score"><span class="st">★</span> <b>${avg(c)}</b> <span>${votes(c)} ${votes(c)===1?'voto':'votos'}</span></p></div></div>
+  <button class="primary" data-read="${id}">${label}</button>
+  <div class="seg" role="group" aria-label="Estado de lectura">${[['quiero','Quiero leer'],['leyendo','Leyendo'],['leido','Leído']].map(([v,l])=>`<button class="${st===v?'on':''}" data-status="${v}" data-id="${id}" aria-pressed="${st===v}">${l}</button>`).join('')}</div>
+  <p class="syn">${esc(c.synopsis)}</p>
+  <dl class="facts"><div><dt>Género</dt><dd>${esc(c.genre)}</dd></div><div><dt>Páginas</dt><dd>${n}</dd></div><div><dt>Origen</dt><dd>${SRC[c.source]}</dd></div></dl>
+  <h2>Tu puntaje</h2>${starsInput(id)}
+  <h2>Reseñas</h2>
+  <div class="composer"><textarea data-draft="rev-${id}" rows="3" placeholder="¿Qué te pareció? Contalo sin spoilers.">${esc(UI.drafts['rev-'+id]||'')}</textarea><button class="secondary" data-postrev="${id}">Publicar reseña</button></div>
+  ${revs.length?revs.map(r=>revHTML(r)).join(''):'<p class="empty">Todavía no hay reseñas. Escribí la primera.</p>'}
+  ${thr.length?`<h2>Charlas sobre este cómic</h2>${thr.map(thrHTML).join('')}`:''}
+ </div>`;
+}
+function viewThread(tid){
+ const t=thread(tid);const nav=`<div class="nav"><button class="back" data-close>${I.chev}Volver</button><span></span></div>`;
+ if(!t)return nav+'<div class="inner"><p class="empty">Esta charla ya no existe.</p></div>';
+ const c=t.comic&&get(t.comic);const posts=[...t.posts.map(p=>({...p,d:p.ts?ago(p.ts):''})),...(S.replies[tid]||[]).map(p=>({...p,d:ago(p.ts)}))];
+ return nav+`<div class="inner"><h1 class="t-title">${esc(t.title)}</h1>${c?`<button class="t-comic" data-open="${c.id}"><span class="cv">${cover(c)}</span><span>Sobre <b>${esc(c.title)}</b></span></button>`:''}
+ <div class="posts">${posts.map(p=>`<div class="post">${av(p.u)}<div><div class="rev-h"><b>${esc(p.u)}</b><span class="when">${esc(p.d)}</span></div><p>${esc(p.t)}</p></div></div>`).join('')}</div>
+ <div class="composer"><textarea data-draft="thr-${tid}" rows="3" placeholder="Sumate a la charla">${esc(UI.drafts['thr-'+tid]||'')}</textarea><button class="secondary" data-reply="${tid}">Responder</button></div></div>`;
+}
+
+function viewReleases(){
+ const now=t0();S.follow=S.follow||[];
+ const lines=[['todas','Todas'],['seguidos','Seguidos'],['Marvel','Marvel'],['DC','DC'],['Image','Image'],['Star Wars','Star Wars']];
+ const list=REL.filter(r=>pd(r.d)>=now).filter(r=>UI.rline==='todas'||(UI.rline==='seguidos'?S.follow.includes(rid(r)):r.l===UI.rline));
+ const days=[...new Set(list.map(r=>r.d))].sort();
+ const when=d=>{const n=Math.round((pd(d)-now)/864e5);return n===0?'hoy':n===1?'mañana':`en ${n} días`};
+ const lab=d=>{const s=pd(d).toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});return s[0].toUpperCase()+s.slice(1)};
+ const item=r=>{const on=S.follow.includes(rid(r));return`<div class="rel"><div><span class="rl l-${r.l.toLowerCase().replace(/\s/g,'')}">${esc(r.l)}</span><b>${esc(r.t)}</b><span class="sub">${esc(r.f)}${r.by?'. '+esc(r.by):''}</span>${r.n?`<span class="gn">${esc(r.n)}</span>`:''}</div><button class="bell ${on?'on':''}" data-follow="${esc(rid(r))}" aria-pressed="${on}">${on?'Siguiendo':'Seguir'}</button></div>`};
+ const empty=UI.rline==='seguidos'?'Todavía no seguís ningún lanzamiento. Tocá Seguir en los que te interesen.':'No hay lanzamientos anunciados para este filtro.';
+ return`<h1 class="title">Próximos</h1><p class="syn" style="margin:0 0 14px">Cómics anunciados para salir en las próximas semanas, día por día.</p>
+ <div class="chips">${lines.map(([v,l])=>`<button class="chip ${UI.rline===v?'on':''}" data-rline="${v}">${l}</button>`).join('')}</div>
+ ${days.length?days.map(d=>`<h2 class="rd">${lab(d)}<span>${when(d)}</span></h2>${list.filter(r=>r.d===d).map(item).join('')}`).join(''):`<p class="empty">${empty}</p>`}
+ <p class="note">Fechas de salida en comiquerías de Estados Unidos, relevadas el 17 de octubre de 2026. Pueden cambiar. Fuentes: <a href="https://leagueofcomicgeeks.com/solicitations/14793/marvel-comics-november-2026" target="_blank" rel="noopener">League of Comic Geeks</a>, <a href="https://www.comicshoplocator.com/comics/release-calendar/" target="_blank" rel="noopener">Comic Shop Locator</a>, <a href="https://starwars.fandom.com/wiki/List_of_future_comics" target="_blank" rel="noopener">Wookieepedia</a>, <a href="https://www.comicbooktreasury.com/upcoming-batman-comics/" target="_blank" rel="noopener">Comic Book Treasury</a> y <a href="https://en.wikipedia.org/wiki/X-Men:_Shadows_of_Tomorrow" target="_blank" rel="noopener">Wikipedia</a>. En este prototipo, seguir un lanzamiento lo guarda en tu lista; todavía no manda avisos.</p>
+ <h2>Ediciones en español</h2>
+ <a class="src" href="https://www.ovnipress.net/" target="_blank" rel="noopener">Ovni Press ↗<span class="sub" style="font-weight:400">Editorial argentina que anuncia sus novedades de cada mes.</span></a>
+ <a class="src" href="https://www.whakoom.com/publisher/15389/ovni_press" target="_blank" rel="noopener">Ovni Press en Whakoom ↗<span class="sub" style="font-weight:400">Series nuevas y en curso de la editorial.</span></a>`;
+}
+const gDone=g=>(S.guides[g.id]||[]).length;
+function guidesHTML(){return`<p class="syn" style="margin:16px 0">Órdenes de lectura para entrar en sagas y autores sin perderte. Marcá lo que vas leyendo y seguí tu avance.</p>${GUIDES.map(g=>{const d=gDone(g),n=g.steps.length;return`<button class="gcard" data-guide="${g.id}"><b>${esc(g.title)}</b><span class="sub">${esc(g.intro)}</span><span class="sub" style="margin-top:8px">${d} de ${n} leídos</span><span class="bar"><i style="width:${Math.round(d/n*100)}%"></i></span></button>`}).join('')}`}
+function viewGuide(gid){
+ const g=GUIDES.find(x=>x.id===gid),done=S.guides[gid]||[];
+ return`<div class="nav"><button class="back" data-close>${I.chev}Volver</button><span></span></div><div class="inner"><h1 class="t-title">${esc(g.title)}</h1><p class="syn" style="margin-top:0">${esc(g.intro)}</p><span class="sub">${done.length} de ${g.steps.length} leídos. Tocá cada obra para marcarla.</span><span class="bar"><i style="width:${Math.round(done.length/g.steps.length*100)}%"></i></span>
+ <ol class="steps">${g.steps.map((s,i)=>{const on=done.includes(i);return`<li><button class="step ${on?'on':''}" data-gstep="${gid}:${i}" aria-pressed="${on}"><span class="num">${on?I.check:i+1}</span><span><b>${esc(s.t)}</b><span class="sub">${esc(s.by)}, ${s.y}</span>${s.n?`<span class="gn">${esc(s.n)}</span>`:''}</span></button></li>`}).join('')}</ol>
+ <h2>Más guías y charlas</h2>${g.src.map(w=>`<a class="src" href="${w.url}" target="_blank" rel="noopener">${esc(w.name)} ↗<span class="sub" style="font-weight:400">${esc(w.why)}</span></a>`).join('')}</div>`;
+}
+
+/* ---------- Navegación ---------- */
+function render(){
+ const m=document.getElementById('main');
+ m.innerHTML=({inicio:viewHome,biblioteca:viewLibrary,proximos:viewReleases,comunidad:viewCommunity,perfil:viewProfile})[UI.tab]();
+ document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===UI.tab));
+}
+const stack=[];let sheet=null;
+function stash(el){el.querySelectorAll('textarea[data-draft]').forEach(t=>UI.drafts[t.dataset.draft]=t.value)}
+function refresh(){
+ stash(document.getElementById('main'));render();
+ stack.forEach(o=>o.refresh&&o.refresh());
+ if(sheet&&sheet.refresh)sheet.refresh();
+ save();
+}
+function pushScreen(type,id,build){
+ const el=document.createElement('div');el.className='screen';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');
+ el.innerHTML=build();document.body.appendChild(el);
+ const o={el,type,id,refresh(){const st=el.scrollTop;stash(el);el.innerHTML=build();el.scrollTop=st}};
+ stack.push(o);setTimeout(()=>{const b=el.querySelector('.back');b&&b.focus({preventScroll:true})},300);return o;
+}
+function closeTop(){const o=stack.pop();if(!o)return;o.cleanup&&o.cleanup();o.el.classList.add('out');setTimeout(()=>o.el.remove(),230);if(o.type==='reader')refresh()}
+const openDetail=id=>pushScreen('detail',id,()=>viewDetail(id));
+const openThread=id=>pushScreen('thread',id,()=>viewThread(id));
+const openGuide=id=>pushScreen('guide',id,()=>viewGuide(id));
+function openSheet(build){
+ closeSheet();const w=document.createElement('div');w.className='sheet-wrap';w.innerHTML=`<div class="sheet" role="dialog" aria-modal="true">${build()}</div>`;
+ w.addEventListener('click',e=>{if(e.target===w)closeSheet()});document.body.appendChild(w);
+ sheet={w,refresh(){const inp=w.querySelector('input');const v=inp?inp.value:'';w.firstElementChild.innerHTML=build();const n=w.querySelector('input');if(n)n.value=v}};
+}
+function closeSheet(){if(sheet){sheet.w.remove();sheet=null}}
+function colSheet(id){
+ openSheet(()=>`<div class="grab"></div><h3>${id?'Agregar a una colección':'Nueva colección'}</h3>
+ ${id?S.collections.map(col=>{const on=col.ids.includes(id);return`<button class="chk ${on?'on':''}" data-togglecol="${col.id}" data-id="${id}" aria-pressed="${on}"><span class="box">${on?I.check:''}</span>${esc(col.name)}<span class="n">${col.ids.length}</span></button>`}).join(''):''}
+ <div class="newcol"><input id="newcol" placeholder="Nombre de la colección" maxlength="40"><button class="secondary" data-createcol="${id}">Crear</button></div>`);
+ if(!id)setTimeout(()=>{const i=document.getElementById('newcol');i&&i.focus()},250);
+}
+function threadSheet(){
+ openSheet(()=>`<div class="grab"></div><h3>Abrir una charla</h3>
+ <label class="field">Tema<input id="nt-title" maxlength="90" placeholder="Por ejemplo: teorías sobre el final"></label>
+ <label class="field">Cómic (opcional)<select id="nt-comic"><option value="">Charla general</option>${COMICS.map(c=>`<option value="${c.id}">${esc(c.title)}</option>`).join('')}</select></label>
+ <label class="field">Primer mensaje<textarea id="nt-msg" rows="4" placeholder="Contá de qué querés hablar"></textarea></label>
+ <button class="primary" data-postthread>Publicar charla</button>`);
+}
+
+/* ---------- Lector ---------- */
+function endCard(c){return`<div class="end-card"><p class="k">Terminaste</p><h2>${esc(c.title)}</h2><p>¿Qué te pareció?</p>${starsInput(c.id)}<div class="end-actions"><button class="r-btn wide" data-reviewfrom="${c.id}">Escribir una reseña</button><button class="r-btn wide ghost" data-close>Cerrar</button></div></div>`}
+function openReader(id){
+ const c=get(id);if(!c)return;const n=pages(c);
+ let cur=S.progress[id]||0;if(S.status[id]==='leido'&&cur>=n-1)cur=0;
+ if(S.status[id]!=='leido')S.status[id]='leyendo';markDay();save();
+ const el=document.createElement('div');el.className='reader'+(S.mode==='vertical'?' vertical':'');el.setAttribute('role','dialog');el.setAttribute('aria-label','Lector: '+c.title);
+ const pg=i=>c.imgs?`<img src="${c.imgs[i]}" alt="Página ${i+1}" loading="lazy" draggable="false">`:pageSVG(c,i);
+ el.innerHTML=`<div class="r-track" tabindex="0">${Array.from({length:n},(_,i)=>`<div class="r-page">${pg(i)}</div>`).join('')}<div class="r-page r-end">${endCard(c)}</div></div>
+ <div class="r-top"><button class="r-btn" data-close aria-label="Cerrar lector">${I.x}</button><div class="r-title">${esc(c.title)}</div><button class="r-btn" data-rmode>${S.mode==='vertical'?'Páginas':'Vertical'}</button></div>
+ <div class="r-bottom"><input type="range" min="1" max="${n}" value="${cur+1}" aria-label="Ir a la página"><span class="r-count">${cur+1} / ${n}</span></div>`;
+ document.body.appendChild(el);
+ const track=el.querySelector('.r-track'),range=el.querySelector('input'),count=el.querySelector('.r-count'),pgs=[...el.querySelectorAll('.r-page')];
+ const vert=()=>el.classList.contains('vertical');
+ const idx=()=>{if(!vert())return Math.round(track.scrollLeft/track.clientWidth);const mid=track.scrollTop+track.clientHeight*.35;let k=0;pgs.forEach((p,i)=>{if(p.offsetTop<=mid)k=i});return k};
+ const goTo=(i,smooth)=>{i=Math.max(0,Math.min(n,i));const b=smooth?'smooth':'auto';vert()?track.scrollTo({top:pgs[i].offsetTop,behavior:b}):track.scrollTo({left:i*track.clientWidth,behavior:b})};
+ let ended=false,tm;
+ const onPos=()=>{const i=idx(),s=Math.min(i,n-1);count.textContent=`${s+1} / ${n}`;range.value=s+1;S.progress[id]=s;S.maxp[id]=Math.max(S.maxp[id]||0,s);
+  if(i>=n&&!ended){ended=true;S.maxp[id]=n-1;el.classList.remove('bare');if(S.status[id]!=='leido'){S.status[id]='leido';toast('Marcado como leído')}}save()};
+ track.addEventListener('scroll',()=>{clearTimeout(tm);tm=setTimeout(onPos,90)},{passive:true});
+ track.addEventListener('click',e=>{if(e.target.closest('button'))return;const x=e.clientX/window.innerWidth;if(!vert()&&x<.28)goTo(idx()-1,true);else if(!vert()&&x>.72)goTo(idx()+1,true);else el.classList.toggle('bare')});
+ range.addEventListener('input',()=>goTo(+range.value-1,false));
+ el.querySelector('[data-rmode]').addEventListener('click',ev=>{ev.stopPropagation();const i=idx();el.classList.toggle('vertical');S.mode=vert()?'vertical':'paginas';ev.currentTarget.textContent=vert()?'Páginas':'Vertical';save();requestAnimationFrame(()=>goTo(i,false))});
+ const onKey=e=>{if(e.key==='ArrowRight')goTo(idx()+1,true);else if(e.key==='ArrowLeft')goTo(idx()-1,true);else if(e.key==='Escape')closeTop()};
+ document.addEventListener('keydown',onKey);
+ stack.push({el,type:'reader',id,cleanup(){document.removeEventListener('keydown',onKey)}});
+ requestAnimationFrame(()=>{goTo(cur,false);track.focus({preventScroll:true})});
+ setTimeout(()=>{if(!ended)el.classList.add('bare')},2200);
+}
+
+/* ---------- Importar archivos propios ---------- */
+async function importFile(file){
+ if(!window.JSZip){toast('No se pudo cargar el lector de archivos. Revisá la conexión y probá de nuevo.');return}
+ toast('Abriendo '+file.name+'…');
+ try{
+  const zip=await JSZip.loadAsync(file);
+  const entries=Object.values(zip.files).filter(f=>!f.dir&&/\.(jpe?g|png|webp|gif)$/i.test(f.name)&&!/__MACOSX|\/\._/.test(f.name)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  if(!entries.length){toast('Ese archivo no tiene imágenes. Probá con un .cbz o .zip de páginas.');return}
+  const imgs=[];for(const e of entries)imgs.push(URL.createObjectURL(await e.async('blob')));
+  const id='u'+Date.now();
+  USER.push({id,title:file.name.replace(/\.(cbz|zip)$/i,'').replace(/[_]+/g,' '),author:'Archivo propio',source:'propio',genre:'Sin género',imgs,rating:0,votes:0,synopsis:'Lo importaste desde tu celular. Podés leerlo, puntuarlo y sumarlo a tus colecciones.'});
+  S.status[id]='quiero';toast(`Listo: ${imgs.length} páginas importadas`);refresh();openDetail(id);
+ }catch(err){toast('No se pudo abrir el archivo. Tiene que ser .cbz o .zip.')}
+}
+document.getElementById('file').addEventListener('change',e=>{const f=e.target.files[0];if(f)importFile(f);e.target.value=''});
+
+/* ---------- Eventos ---------- */
+function applyTheme(){if(S.theme==='auto')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=S.theme}
+document.addEventListener('input',e=>{
+ if(e.target.id==='q'){UI.query=e.target.value;document.getElementById('grid').innerHTML=gridHTML()}
+ if(e.target.id==='name'){S.name=e.target.value;save();const a=document.querySelector('.avatar.lg');if(a)a.textContent=me()[0].toUpperCase()}
+});
+document.addEventListener('click',e=>{
+ const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+ if(d.tab){UI.tab=d.tab;render();window.scrollTo(0,0);return}
+ if('close' in d){closeTop();return}
+ if(d.open){openDetail(d.open);return}
+ if(d.read){openReader(d.read);return}
+ if(d.status){if(S.status[d.id]===d.status)delete S.status[d.id];else{S.status[d.id]=d.status;if(d.status==='leido'){markDay();S.maxp[d.id]=pages(get(d.id))-1}}toast(S.status[d.id]?({quiero:'Agregado a Quiero leer',leyendo:'Agregado a Leyendo',leido:'Marcado como leído'})[d.status]:'Quitado de tu biblioteca');refresh();return}
+ if(d.rate){const v=+d.rate;if(S.ratings[d.id]===v)delete S.ratings[d.id];else S.ratings[d.id]=v;updateStars(d.id);refresh();return}
+ if(d.filter){UI.filter=d.filter;render();return}
+ if(d.lib){UI.lib=d.lib;render();return}
+ if(d.com){UI.com=d.com;render();return}
+ if(d.opencol){UI.openCol=UI.openCol===d.opencol?null:d.opencol;render();return}
+ if(d.rline){UI.rline=d.rline;render();return}
+ if(d.follow){S.follow=S.follow||[];const k=S.follow.indexOf(d.follow);if(k>=0)S.follow.splice(k,1);else{S.follow.push(d.follow);toast('Agregado a Seguidos')}refresh();return}
+ if(d.thread){openThread(d.thread);return}
+ if(d.guide){openGuide(d.guide);return}
+ if(d.gstep){const[g,i]=d.gstep.split(':');const a=S.guides[g]=S.guides[g]||[];const k=a.indexOf(+i);if(k>=0)a.splice(k,1);else{a.push(+i);if(a.length===GUIDES.find(x=>x.id===g).steps.length)toast('Completaste la guía')}refresh();return}
+ if(d.colsheet!==undefined){colSheet(d.colsheet);return}
+ if(d.togglecol){const col=S.collections.find(c=>c.id===d.togglecol);const i=col.ids.indexOf(d.id);i>=0?col.ids.splice(i,1):col.ids.push(d.id);toast(i>=0?`Quitado de ${col.name}`:`Agregado a ${col.name}`);refresh();return}
+ if(d.createcol!==undefined){const inp=document.getElementById('newcol');const name=inp.value.trim();if(!name){toast('Poné un nombre para la colección.');inp.focus();return}
+  const col={id:'c'+Date.now(),name,ids:d.createcol?[d.createcol]:[]};S.collections.push(col);inp.value='';toast(d.createcol?`Agregado a ${name}`:`Colección creada: ${name}`);if(!d.createcol){closeSheet();UI.openCol=col.id}refresh();return}
+ if(d.postrev){const id=d.postrev,ta=document.querySelector(`textarea[data-draft="rev-${id}"]`),txt=ta.value.trim();if(!txt){toast('Escribí algo antes de publicar.');ta.focus();return}
+  (S.reviews[id]=S.reviews[id]||[]).unshift({u:me(),s:S.ratings[id]||0,t:txt,ts:Date.now()});ta.value='';UI.drafts['rev-'+id]='';toast('Reseña publicada');refresh();return}
+ if(d.reply){const id=d.reply,ta=document.querySelector(`textarea[data-draft="thr-${id}"]`),txt=ta.value.trim();if(!txt){toast('Escribí algo antes de responder.');ta.focus();return}
+  (S.replies[id]=S.replies[id]||[]).push({u:me(),t:txt,ts:Date.now()});ta.value='';UI.drafts['thr-'+id]='';toast('Respuesta publicada');refresh();const top=stack[stack.length-1];if(top)top.el.scrollTo({top:top.el.scrollHeight,behavior:'smooth'});return}
+ if('newthread' in d){threadSheet();return}
+ if('postthread' in d){const title=document.getElementById('nt-title').value.trim(),comic=document.getElementById('nt-comic').value||null,msg=document.getElementById('nt-msg').value.trim();
+  if(!title||!msg){toast('Completá el tema y el primer mensaje.');return}
+  const now=Date.now(),th={id:'n'+now,title,comic,ts:now,posts:[{u:me(),t:msg,ts:now}]};S.threads.unshift(th);closeSheet();refresh();openThread(th.id);toast('Charla publicada');return}
+ if(d.reviewfrom){const id=d.reviewfrom;closeTop();const o=openDetail(id);setTimeout(()=>{const ta=o.el.querySelector('textarea');if(ta){ta.scrollIntoView({block:'center'});ta.focus()}},320);return}
+ if(d.themeset){S.theme=d.themeset;applyTheme();refresh();return}
+ if('reset' in d){if(confirm('¿Borrar tu biblioteca, puntajes, colecciones y mensajes de este celular?')){try{localStorage.removeItem(KEY)}catch(err){}S=defaults();S.status={};S.progress={};S.maxp={};S.ratings={};S.collections=[];applyTheme();refresh();toast('Datos borrados')}return}
+ if('import' in d){document.getElementById('file').click();return}
+});
+
+applyTheme();render();
+</script>
+</body>
+</html>
