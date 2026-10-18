@@ -52,7 +52,8 @@ struct ComicVineClient {
     }()
 
     /// Cómics con fecha de salida en comiquerías entre `from` y `to` (incluidos).
-    func issues(from: Date, to: Date) async throws -> [UpcomingIssue] {
+    /// `onProgress` recibe lo que va llegando, para mostrarlo de a poco.
+    func issues(from: Date, to: Date, onProgress: (@MainActor ([UpcomingIssue]) -> Void)? = nil) async throws -> [UpcomingIssue] {
         // Comic Vine no entiende bien los rangos de fechas, así que preguntamos día por día.
         var days: [Date] = []
         var day = Calendar.current.startOfDay(for: from)
@@ -78,8 +79,14 @@ struct ComicVineClient {
                 offset += 100
                 if page.results.count < 100 || offset >= (page.numberOfTotalResults ?? 0) { break }
             }
+            if let onProgress { await onProgress(convert(all)) }
         }
 
+        return convert(all)
+    }
+
+    /// Pasa los datos de Comic Vine al formato de la app (sin repetidos ni cómics sin fecha).
+    private func convert(_ all: [CVIssue]) -> [UpcomingIssue] {
         var seen = Set<Int>()
         return all.compactMap { issue in
             guard seen.insert(issue.id).inserted,

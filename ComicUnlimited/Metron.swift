@@ -62,7 +62,8 @@ struct MetronClient {
     ]
 
     /// Cómics que salen en comiquerías entre `from` y `to`. Si se pasa `publisher`, solo de esa editorial.
-    func issues(from: Date, to: Date, publisher: String?, maxPages: Int = 6) async throws -> [UpcomingIssue] {
+    func issues(from: Date, to: Date, publisher: String?, maxPages: Int = 6,
+                onProgress: (@MainActor ([UpcomingIssue]) -> Void)? = nil) async throws -> [UpcomingIssue] {
         let day = ComicVineClient.dayFormatter
         var components = URLComponents(string: "https://metron.cloud/api/issue/")!
         var items = [
@@ -81,8 +82,15 @@ struct MetronClient {
             all += page.results
             next = page.next.flatMap { URL(string: $0) }
             pages += 1
+            if let onProgress { await onProgress(convert(all)) }
         }
 
+        return convert(all)
+    }
+
+    /// Pasa los datos de Metron al formato de la app (sin repetidos ni cómics sin fecha).
+    private func convert(_ all: [MetronIssue]) -> [UpcomingIssue] {
+        let day = ComicVineClient.dayFormatter
         var seen = Set<Int>()
         return all.compactMap { issue in
             guard seen.insert(issue.id).inserted,
@@ -106,7 +114,7 @@ struct MetronClient {
 
     private func get<T: Decodable>(_ url: URL) async throws -> T {
         var request = URLRequest(url: url)
-        request.timeoutInterval = 30
+        request.timeoutInterval = 60
         let login = Data("\(user):\(password)".utf8).base64EncodedString()
         request.setValue("Basic \(login)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")

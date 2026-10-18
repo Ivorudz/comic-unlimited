@@ -52,6 +52,8 @@ final class UpcomingModel {
     /// Editorial elegida ("Todas" o el texto de un botón).
     var publisherFilter = "Todas"
     private(set) var state: LoadState = .idle
+    /// true mientras ya se muestran algunos cómics pero siguen llegando más.
+    private(set) var loadingMore = false
     /// Cambia cada vez que se guardan o se borran cuentas, para volver a cargar.
     private(set) var accountsVersion = 0
     /// Semanas ya cargadas, para no volver a pedirlas mientras la app está abierta.
@@ -111,11 +113,13 @@ final class UpcomingModel {
     func load(force: Bool = false) async {
         guard hasAnySource else { return }
         let key = loadKey
+        loadingMore = false
         if !force, let cached = cache[key] {
             state = .loaded(cached.0, cached.1)
             return
         }
         state = .loading
+        defer { if key == loadKey { loadingMore = false } }
         let range = self.range
         let filter = publisherFilter
         let isPast = index < 0
@@ -129,7 +133,7 @@ final class UpcomingModel {
 
         for source in order {
             do {
-                let issues = try await fetch(source, range: range, filter: filter, maxPages: maxPages)
+                let issues = try await fetch(source, range: range, filter: filter, maxPages: maxPages, key: key)
                 if source == .comicVine && !isPast && issues.isEmpty && !problems.isEmpty {
                     problems.append("Comic Vine solo tiene cómics que ya salieron, así que no puede mostrar los próximos. Probá más tarde, o tocá la flecha ← para ver lo que ya salió.")
                     break
@@ -149,19 +153,28 @@ final class UpcomingModel {
         if key == loadKey { state = .failed(problems.joined(separator: "\n\n"), badLogin: badLogin) }
     }
 
-    private func fetch(_ source: UpcomingSource, range: (start: Date, end: Date), filter: String, maxPages: Int) async throws -> [UpcomingIssue] {
+    private func fetch(_ source: UpcomingSource, range: (start: Date, end: Date), filter: String,
+                       maxPages: Int, key: String) async throws -> [UpcomingIssue] {
+        let publisher = source == .metron ? MetronClient.publishers.first(where: { $0.label == filter }) : nil
+        // Muestra lo que va llegando, sin esperar a que termine todo.
+        let show: @MainActor ([UpcomingIssue]) -> Void = { [weak self] partial in
+            guard let self, key == self.loadKey, !partial.isEmpty else { return }
+            var list = partial
+            if let publisher { for i in list.indices { list[i].publisher = publisher.label } }
+            self.state = .loaded(Self.sorted(list), source)
+            self.loadingMore = true
+        }
         switch source {
         case .metron:
-            let publisher = MetronClient.publishers.first { $0.label == filter }
             var issues = try await MetronClient(user: MetronAccount.user, password: MetronAccount.password)
-                .issues(from: range.start, to: range.end, publisher: publisher?.query, maxPages: maxPages)
+                .issues(from: range.start, to: range.end, publisher: publisher?.query, maxPages: maxPages, onProgress: show)
             if let publisher {
                 for i in issues.indices { issues[i].publisher = publisher.label }
             }
             return issues
         case .comicVine:
             let client = ComicVineKey.client
-            var issues = try await client.issues(from: range.start, to: range.end)
+            var issues = try await client.issues(from: range.start, to: range.end, onProgress: show)
             let publishers = await client.publishers(volumeIDs: issues.compactMap(\.volumeID))
             for i in issues.indices {
                 if let volume = issues[i].volumeID { issues[i].publisher = publishers[volume] }
@@ -170,8 +183,12 @@ final class UpcomingModel {
         }
     }
 
+    private static func sorted(_ issues: [UpcomingIssue]) -> [UpcomingIssue] {
+        issues.sorted { ($0.date, $0.title) < ($1.date, $1.title) }
+    }
+
     private func finish(_ issues: [UpcomingIssue], _ source: UpcomingSource, key: String) {
-        let sorted = issues.sorted { ($0.date, $0.title) < ($1.date, $1.title) }
+        let sorted = Self.sorted(issues)
         cache[key] = (sorted, source)
         // Si mientras cargaba se cambió de semana o de editorial, no pisamos la pantalla nueva.
         if key == loadKey { state = .loaded(sorted, source) }
@@ -268,6 +285,14 @@ struct UpcomingView: View {
             failure(message, badLogin: badLogin)
         case .loaded(let issues, let source):
             list(issues, source: source)
+            if model.loadingMore {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Buscando más…").font(.subheadline).foregroundStyle(Theme.ink2)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            }
             footer(source)
         }
         Button {
