@@ -10,6 +10,8 @@ enum LibraryRoute: Hashable {
     /// Una serie de Comic Vine. nil = los archivos sin ficha de Comic Vine.
     case series(Int?)
     case status(ReadState)
+    case arc(id: Int, name: String)
+    case publisher(String)
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.
@@ -59,6 +61,50 @@ enum LibraryGrouping {
             groups.append(SeriesGroup(seriesID: nil, name: "Sin ficha de Comic Vine", comics: unlinked))
         }
         return groups
+    }
+
+    /// Fecha para ordenar por publicación (sin fecha, al final).
+    static func byDate(_ a: LocalComic, _ b: LocalComic) -> Bool {
+        switch (a.publicationDate, b.publicationDate) {
+        case let (x?, y?) where x != y: return x < y
+        case (_?, nil): return true
+        case (nil, _?): return false
+        default: return byNumber(a, b)
+        }
+    }
+
+    struct ArcGroup: Identifiable {
+        let arc: ArcRef
+        let comics: [LocalComic]
+        var id: Int { arc.id }
+    }
+
+    /// Una carpeta por arco (A–Z), con tus cómics ordenados por fecha de publicación.
+    static func arcs(_ items: [LocalComic]) -> [ArcGroup] {
+        var byArc: [ArcRef: [LocalComic]] = [:]
+        for comic in items {
+            for arc in comic.cvArcs ?? [] { byArc[arc, default: []].append(comic) }
+        }
+        return byArc.map { ArcGroup(arc: $0.key, comics: $0.value.sorted(by: byDate)) }
+            .sorted { $0.arc.name.localizedStandardCompare($1.arc.name) == .orderedAscending }
+    }
+
+    static let noPublisher = "Sin editorial"
+
+    static func publisherName(_ comic: LocalComic) -> String {
+        guard let p = comic.cvPublisher, !p.isEmpty else { return noPublisher }
+        return p
+    }
+
+    /// Una carpeta por editorial (A–Z; "Sin editorial" al final).
+    static func publishers(_ items: [LocalComic]) -> [(name: String, comics: [LocalComic])] {
+        Dictionary(grouping: items, by: publisherName)
+            .map { (name: $0.key, comics: $0.value.sorted(by: byDate)) }
+            .sorted { a, b in
+                if a.name == noPublisher { return false }
+                if b.name == noPublisher { return true }
+                return a.name.localizedStandardCompare(b.name) == .orderedAscending
+            }
     }
 
     static func comics(in state: ReadState, _ items: [LocalComic]) -> [LocalComic] {

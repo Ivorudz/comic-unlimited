@@ -172,6 +172,30 @@ struct ComicVineClient {
         return page.results.first
     }
 
+    /// Ficha de un arco argumental (por ejemplo "Avengers Disassembled") con la lista de sus números.
+    func storyArc(id: Int) async throws -> CVArcDetail {
+        try await requestObject("story_arc/4045-\(id)", [
+            "field_list": "id,name,deck,description,issues,publisher,image,site_detail_url",
+        ])
+    }
+
+    /// Varios números a la vez, con su serie, portada y fecha (de a 100 por consulta).
+    func issues(ids: [Int]) async throws -> [CVIssueWithSeries] {
+        var result: [CVIssueWithSeries] = []
+        var start = 0
+        while start < ids.count {
+            let chunk = ids[start..<min(start + 100, ids.count)]
+            start += 100
+            let page: CVResponse<CVIssueWithSeries> = try await request("issues", [
+                "filter": "id:" + chunk.map(String.init).joined(separator: "|"),
+                "field_list": "id,name,issue_number,cover_date,store_date,image,volume",
+                "limit": "100",
+            ], cached: true)
+            result += page.results
+        }
+        return result
+    }
+
     /// Ficha de un número.
     func issue(id: Int) async throws -> CVIssueDetail {
         try await requestObject("issue/4000-\(id)", [
@@ -371,6 +395,33 @@ struct CVIssueDetail: Decodable {
     let storyArcCredits: [CVRef]?
     let volume: CVRef?
     let siteDetailUrl: String?
+}
+
+struct CVArcDetail: Decodable {
+    let id: Int
+    let name: String?
+    let deck: String?
+    let description: String?
+    let issues: [CVArcIssue]?
+    let publisher: CVRef?
+    let image: CVImage?
+    let siteDetailUrl: String?
+}
+
+struct CVArcIssue: Decodable {
+    let id: Int
+    let name: String?
+    let issueNumber: String?
+}
+
+struct CVIssueWithSeries: Decodable, Identifiable {
+    let id: Int
+    let name: String?
+    let issueNumber: String?
+    let coverDate: String?
+    let storeDate: String?
+    let image: CVImage?
+    let volume: CVRef?
 }
 
 struct CVCreditsDetail: Decodable {

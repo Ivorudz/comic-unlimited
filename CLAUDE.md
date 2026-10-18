@@ -35,8 +35,9 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ForYou.swift`: "Para vos" en Inicio; sugerencias de series reales según tus puntajes y listas.
   - `RealLibrary.swift`: tus cómics y series reales (Quiero leer / Leyendo / Leído y puntaje), guardados en el iPhone.
   - `ProfileView.swift`: pestaña Perfil; tus listas de cómics reales y números rápidos.
-  - `LibraryView.swift`: pestaña Biblioteca; importar archivos y elegir cómo verlos (Todos, Series, Estado).
+  - `LibraryView.swift`: pestaña Biblioteca; importar archivos y elegir cómo verlos (Todos, Series, Arcos, Editoriales, Estado).
   - `LibraryGroups.swift`: carpetas de la Biblioteca (serie con "Te faltan", estado), tarjeta y menú de cada cómic.
+  - `LibraryArcs.swift`: carpetas por arco (todos sus números por fecha, los que faltan en gris) y por editorial.
   - `LocalLibrary.swift`: guarda una copia de tus archivos, su portada, la página donde quedaste y su unión con Comic Vine.
   - `LocalReader.swift`: lector de tus archivos (páginas en segundo plano, zoom con dos dedos o doble toque).
   - `ComicVineMatch.swift`: lee el nombre del archivo (serie, número, año), busca su ficha en Comic Vine y permite elegirla a mano.

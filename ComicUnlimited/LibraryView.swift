@@ -11,6 +11,8 @@ struct LibraryView: View {
     enum Mode: String, CaseIterable, Identifiable {
         case all = "Todos"
         case series = "Series"
+        case arcs = "Arcos"
+        case publishers = "Editoriales"
         case status = "Estado"
         var id: String { rawValue }
     }
@@ -62,6 +64,8 @@ struct LibraryView: View {
                         switch mode {
                         case .all: allView
                         case .series: seriesView
+                        case .arcs: arcsView
+                        case .publishers: publishersView
                         case .status: statusView
                         }
                         Text("Tocá un cómic para leerlo. Mantenelo apretado para ver su ficha, cambiarle el nombre, elegir otra ficha de Comic Vine o borrarlo.")
@@ -82,6 +86,8 @@ struct LibraryView: View {
                 switch route {
                 case .series(let id): SeriesFolderView(seriesID: id)
                 case .status(let state): StatusFolderView(state: state)
+                case .arc(let id, let name): ArcFolderView(arcID: id, name: name)
+                case .publisher(let name): PublisherFolderView(name: name)
                 }
             }
             .navigationTitle("Biblioteca")
@@ -281,6 +287,56 @@ struct LibraryView: View {
                 NavigationLink(value: LibraryRoute.series(group.seriesID)) {
                     FolderCard(title: group.name, subtitle: countText(group.comics.count),
                                cover: group.comics.first, icon: "questionmark.folder")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 18)
+    }
+
+    private var arcsView: some View {
+        let groups = LibraryGrouping.arcs(library.items)
+        let unlinked = library.items.filter { $0.cvIssueID == nil }.count
+        return VStack(alignment: .leading, spacing: 12) {
+            if library.arcsPending > 0 {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Buscando arcos en Comic Vine… faltan \(library.arcsPending)")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.ink2)
+                }
+            }
+            if groups.isEmpty && library.arcsPending == 0 {
+                Text("Ninguno de tus cómics tiene un arco cargado en Comic Vine todavía.")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.ink2)
+            } else {
+                FolderGrid {
+                    ForEach(groups) { group in
+                        NavigationLink(value: LibraryRoute.arc(id: group.arc.id, name: group.arc.name)) {
+                            FolderCard(title: group.arc.name, subtitle: countText(group.comics.count),
+                                       cover: group.comics.first, icon: "point.3.connected.trianglepath.dotted")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            Text(unlinked > 0
+                 ? "Acá aparecen solo los cómics unidos a Comic Vine que pertenecen a un arco (\(unlinked) sin ficha)."
+                 : "Acá aparecen los cómics que pertenecen a un arco según Comic Vine.")
+                .font(.caption)
+                .foregroundStyle(Theme.ink2)
+        }
+        .padding(.top, 18)
+    }
+
+    private var publishersView: some View {
+        let groups = LibraryGrouping.publishers(library.items)
+        return FolderGrid {
+            ForEach(groups, id: \.name) { group in
+                NavigationLink(value: LibraryRoute.publisher(group.name)) {
+                    FolderCard(title: group.name, subtitle: countText(group.comics.count),
+                               cover: group.comics.first, icon: "building.2")
                 }
                 .buttonStyle(.plain)
             }

@@ -29,6 +29,10 @@ struct LocalComic: Codable, Identifiable, Hashable {
     var cvIssueNumber: String?
     /// Fecha de publicación (fecha de tapa) según Comic Vine, por ejemplo "2004-08-01". "" = no se sabe.
     var cvCoverDate: String?
+    /// Editorial según Comic Vine. "" = no se sabe.
+    var cvPublisher: String?
+    /// Arcos argumentales a los que pertenece. nil = todavía no se buscaron.
+    var cvArcs: [ArcRef]?
 
     /// Nombre que le pusiste vos (si lo cambiaste).
     var customTitle: String?
@@ -61,6 +65,12 @@ struct LocalComic: Codable, Identifiable, Hashable {
         if isFinished { return .finished }
         return hasStarted ? .reading : .unread
     }
+}
+
+/// Un arco argumental (por ejemplo "Avengers Disassembled").
+struct ArcRef: Codable, Hashable {
+    let id: Int
+    let name: String
 }
 
 /// En qué punto de la lectura está un cómic.
@@ -252,9 +262,13 @@ final class LocalLibrary {
             c.cvSeriesYear = series.startYear
             c.cvIssueNumber = issue.issueNumber
             c.cvCoverDate = issue.coverDate ?? issue.storeDate ?? ""
+            c.cvPublisher = series.publisher?.name
+            c.cvArcs = nil
             let name = issue.name?.trimmingCharacters(in: .whitespaces) ?? ""
             c.cvIssueName = name.isEmpty ? nil : name
         }
+        // Completa editorial y arcos sin hacer esperar.
+        Task { await completeSeriesInfo() }
     }
 
     func unlink(_ id: String) {
@@ -267,6 +281,8 @@ final class LocalLibrary {
             c.cvSeriesYear = nil
             c.cvIssueNumber = nil
             c.cvCoverDate = nil
+            c.cvPublisher = nil
+            c.cvArcs = nil
         }
     }
 
@@ -286,16 +302,36 @@ final class LocalLibrary {
         defer { completing = false }
         await completeSeriesYears()
         await completeCoverDates()
+        await completeArcs()
+    }
+
+    /// Cuántos cómics faltan revisar para saber sus arcos (se muestra en Biblioteca → Arcos).
+    private(set) var arcsPending = 0
+
+    /// Busca los arcos de cada número (una consulta por cómic, de a una, para cuidar el límite).
+    private func completeArcs() async {
+        let pending = items.filter { $0.cvIssueID != nil && $0.cvArcs == nil }
+        arcsPending = pending.count
+        defer { arcsPending = 0 }
+        for comic in pending {
+            guard let issueID = comic.cvIssueID else { continue }
+            guard let detail = try? await ComicVineKey.client.issue(id: issueID) else { break }
+            let arcs = (detail.storyArcCredits ?? []).compactMap { ref in ref.name.map { ArcRef(id: ref.id, name: $0) } }
+            update(comic.id) { c in c.cvArcs = arcs }
+            arcsPending = max(arcsPending - 1, 0)
+        }
     }
 
     private func completeSeriesYears() async {
-        let missing = Set(items.filter { $0.cvSeriesID != nil && $0.cvSeriesYear == nil }.compactMap(\.cvSeriesID))
+        let missing = Set(items.filter { $0.cvSeriesID != nil && ($0.cvSeriesYear == nil || $0.cvPublisher == nil) }
+            .compactMap(\.cvSeriesID))
         for seriesID in missing {
             guard let detail = try? await ComicVineKey.client.series(id: seriesID) else { continue }
             for comic in items where comic.cvSeriesID == seriesID {
                 update(comic.id) { c in
                     c.cvSeriesName = detail.name ?? c.cvSeriesName
                     c.cvSeriesYear = detail.startYear ?? ""
+                    c.cvPublisher = detail.publisher?.name ?? ""
                 }
             }
         }
