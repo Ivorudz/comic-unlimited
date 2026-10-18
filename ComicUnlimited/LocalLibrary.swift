@@ -27,6 +27,8 @@ struct LocalComic: Codable, Identifiable, Hashable {
     var cvSeriesName: String?
     var cvSeriesYear: String?
     var cvIssueNumber: String?
+    /// Fecha de publicación (fecha de tapa) según Comic Vine, por ejemplo "2004-08-01". "" = no se sabe.
+    var cvCoverDate: String?
 
     /// Nombre que le pusiste vos (si lo cambiaste).
     var customTitle: String?
@@ -48,6 +50,12 @@ struct LocalComic: Codable, Identifiable, Hashable {
 
     /// Para ordenar por número: 2 antes que 10, y 0.5 entre 0 y 1.
     var numberForSorting: Double { Double(issueNumber ?? "") ?? .greatestFiniteMagnitude }
+
+    /// Fecha de publicación para ordenar, o nil si no se sabe.
+    var publicationDate: String? {
+        guard let d = cvCoverDate, !d.isEmpty else { return nil }
+        return d
+    }
 
     var readState: ReadState {
         if isFinished { return .finished }
@@ -243,6 +251,7 @@ final class LocalLibrary {
             c.cvSeriesName = series.name
             c.cvSeriesYear = series.startYear
             c.cvIssueNumber = issue.issueNumber
+            c.cvCoverDate = issue.coverDate ?? issue.storeDate ?? ""
             let name = issue.name?.trimmingCharacters(in: .whitespaces) ?? ""
             c.cvIssueName = name.isEmpty ? nil : name
         }
@@ -257,6 +266,7 @@ final class LocalLibrary {
             c.cvSeriesName = nil
             c.cvSeriesYear = nil
             c.cvIssueNumber = nil
+            c.cvCoverDate = nil
         }
     }
 
@@ -266,10 +276,19 @@ final class LocalLibrary {
         update(id) { c in c.customTitle = clean.isEmpty ? nil : clean }
     }
 
-    /// Los archivos unidos antes de la versión 0.15 no tienen guardado el año de la serie:
-    /// lo busca en Comic Vine (una consulta por serie).
+    private var completing = false
+
+    /// Los archivos unidos con versiones anteriores no tienen guardados el año de la serie
+    /// ni la fecha de publicación: los busca en Comic Vine (pocas consultas por serie).
     func completeSeriesInfo() async {
-        guard !ComicVineKey.current.isEmpty else { return }
+        guard !ComicVineKey.current.isEmpty, !completing else { return }
+        completing = true
+        defer { completing = false }
+        await completeSeriesYears()
+        await completeCoverDates()
+    }
+
+    private func completeSeriesYears() async {
         let missing = Set(items.filter { $0.cvSeriesID != nil && $0.cvSeriesYear == nil }.compactMap(\.cvSeriesID))
         for seriesID in missing {
             guard let detail = try? await ComicVineKey.client.series(id: seriesID) else { continue }
@@ -278,6 +297,32 @@ final class LocalLibrary {
                     c.cvSeriesName = detail.name ?? c.cvSeriesName
                     c.cvSeriesYear = detail.startYear ?? ""
                 }
+            }
+        }
+    }
+
+    /// Busca la fecha de publicación de cada número revisando la lista de números de su serie.
+    private func completeCoverDates() async {
+        let pending = items.filter { $0.cvIssueID != nil && $0.cvCoverDate == nil }
+        let bySeries = Dictionary(grouping: pending.filter { $0.cvSeriesID != nil }, by: { $0.cvSeriesID! })
+        for (seriesID, comics) in bySeries {
+            var wanted = Set(comics.compactMap(\.cvIssueID))
+            var dates: [Int: String] = [:]
+            var offset = 0
+            // Como mucho 5 páginas de 100 números por serie, para cuidar el límite de Comic Vine.
+            for _ in 0..<5 where !wanted.isEmpty {
+                guard let page = try? await ComicVineKey.client.issues(ofSeries: seriesID, offset: offset, ascending: true)
+                else { break }
+                for issue in page.items where wanted.contains(issue.id) {
+                    dates[issue.id] = issue.coverDate ?? issue.storeDate ?? ""
+                    wanted.remove(issue.id)
+                }
+                offset += page.items.count
+                if page.items.isEmpty || offset >= page.total { break }
+            }
+            for comic in comics {
+                guard let issueID = comic.cvIssueID else { continue }
+                update(comic.id) { c in c.cvCoverDate = dates[issueID] ?? "" }
             }
         }
     }

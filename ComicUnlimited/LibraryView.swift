@@ -18,7 +18,19 @@ struct LibraryView: View {
     enum Sort: String, CaseIterable, Identifiable {
         case recent = "Recientes"
         case az = "A–Z"
+        case newest = "Más nuevos"
+        case oldest = "Más viejos"
         var id: String { rawValue }
+
+        /// Texto más largo para el menú.
+        var menuLabel: String {
+            switch self {
+            case .recent: return "Leídos o agregados recientemente"
+            case .az: return "A–Z"
+            case .newest: return "Más nuevos (fecha de publicación)"
+            case .oldest: return "Más viejos (fecha de publicación)"
+            }
+        }
     }
 
     private var library: LocalLibrary { LocalLibrary.shared }
@@ -208,6 +220,21 @@ struct LibraryView: View {
             sorted = filtered.sorted { ($0.lastOpened ?? $0.added) > ($1.lastOpened ?? $1.added) }
         case .az:
             sorted = filtered.sorted { $0.displayTitle.localizedStandardCompare($1.displayTitle) == .orderedAscending }
+        case .newest, .oldest:
+            // Los que no tienen fecha (sin ficha de Comic Vine) van al final, por nombre.
+            let newestFirst = sort == .newest
+            sorted = filtered.sorted { a, b in
+                switch (a.publicationDate, b.publicationDate) {
+                case let (x?, y?) where x != y: return newestFirst ? x > y : x < y
+                case (_?, nil): return true
+                case (nil, _?): return false
+                default:
+                    if a.cvSeriesID == b.cvSeriesID, a.cvSeriesID != nil {
+                        return newestFirst ? LibraryGrouping.byNumber(b, a) : LibraryGrouping.byNumber(a, b)
+                    }
+                    return a.displayTitle.localizedStandardCompare(b.displayTitle) == .orderedAscending
+                }
+            }
         }
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
@@ -223,7 +250,7 @@ struct LibraryView: View {
 
                 Menu {
                     Picker("Ordenar", selection: $sort) {
-                        ForEach(Sort.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(Sort.allCases) { Text($0.menuLabel).tag($0) }
                     }
                 } label: {
                     Label(sort.rawValue, systemImage: "arrow.up.arrow.down")
