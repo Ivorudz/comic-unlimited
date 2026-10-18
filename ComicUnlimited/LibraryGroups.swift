@@ -12,6 +12,9 @@ enum LibraryRoute: Hashable {
     case status(ReadState)
     case arc(id: Int, name: String)
     case publisher(String)
+    /// Biblioteca → Fuentes, y una fuente en particular (por su link).
+    case sources
+    case source(String)
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.

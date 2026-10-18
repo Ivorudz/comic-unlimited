@@ -23,6 +23,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - La clave de Comic Vine (API key) **nunca** va en el código ni en GitHub (el repositorio es público): se escribe en la app y queda guardada solo en el iPhone.
   - Límite de Comic Vine: unas 200 consultas por hora. No hacer pedidos de más.
 - Sin dependencias externas (sin paquetes de terceros dentro de la app).
+- **Fuentes** (Biblioteca → Fuentes): catálogos que se agregan con el link de un JSON (formato en `FUENTES.md`). La app **no trae fuentes incluidas**, **no ejecuta programas** de las fuentes (solo lee la lista y descarga links directos `https://`) y **no se arman fuentes de sitios sin permiso** para compartir esos cómics.
 - `comic-unlimited.html` es el prototipo web: es la referencia de diseño, textos y comportamiento.
 
 ## Cómo está armado
@@ -51,6 +52,8 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ComicVineBrowse.swift`: buscador de cómics reales, ficha de serie y ficha de número.
   - `ComicVineExtras.swift`: personajes y arcos con imagen; traducción automática de textos de Comic Vine (traductor de Apple, iOS 18+).
   - `LibraryActionsHost.swift`: ventanas del menú de cada cómic (elegir ficha, cambiar nombre, borrar), en la raíz de la app.
+  - `Sources.swift`: fuentes (formato del JSON, guardarlas, buscar versiones nuevas) y descargas con avance.
+  - `SourcesViews.swift`: pantallas de Fuentes (lista, agregar con link, catálogo con botón Descargar).
   - `Metron.swift`: conexión con Metron (lanzamientos de la semana).
   - `Diagnostics.swift`: "Revisar conexión" en Próximos; prueba Metron y Comic Vine y arma un texto para copiar.
   - `ReadingStore.swift`: guarda en el celular la página donde quedaste.
@@ -67,6 +70,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 - 0.16: Arcos y Editoriales. Al unir con Comic Vine se guardan editorial, arcos y fecha de publicación (los ya unidos se completan de a poco). Carpeta por arco (por fecha de publicación) con los números que te faltan en gris (misma configuración) y avance; carpeta por editorial.
 - 0.17: imágenes de personajes y arcos en la ficha (tocar un arco abre sus números) + traducción automática (Perfil → Configuración: prender/apagar e idioma).
 - 0.18: Inicio sin cómics de prueba. "De qué se trata": resumen corto de Comic Vine + solo la parte de la historia (sin listas de personajes, arcos relacionados, ediciones ni tablas).
+- 0.19: Fuentes: agregar catálogos con un link JSON (nombre, versión, autor, licencia, lista de cómics), ver sus cómics y descargarlos a la Biblioteca.
 - Más adelante: Colecciones propias: crear, renombrar, borrar, agregar desde el menú (un cómic puede estar en varias), ordenar arrastrando (orden de lectura) y "Crear colección con este arco" (ordenada por fecha, después se ajusta).
 - .cbr: los que por dentro son .zip se abren directo. Los que son RAR se convierten a .cbz al importarlos, con libarchive (viene dentro de iOS; Apple no la permite en el App Store, pero esta app es personal).
 - LiveContainer: el selector de archivos pide una COPIA (asCopy) porque leer el original puede fallar adentro de LiveContainer.
