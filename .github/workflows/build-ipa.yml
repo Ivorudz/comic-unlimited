@@ -7,6 +7,8 @@ on:
     branches:
       - main
       - "claude/**"
+    paths-ignore: # si solo cambian textos de ayuda, no hace falta compilar
+      - "**.md"
   workflow_dispatch: # permite lanzarlo a mano desde la pestaña Actions
 
 permissions:
