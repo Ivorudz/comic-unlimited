@@ -10,6 +10,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 ## Cómo trabajar
 
 - **Cambios chicos**: un paso a la vez. Nada de rehacer media app de golpe.
+- **Preguntar antes de compilar o deshacer**: antes de subir cambios que generen una versión nueva (build) o de revertir algo, escribir qué se va a hacer y preguntar si se hace. Recién con el "sí" se sube.
 - **Siempre decir cómo probar cada cambio**: qué tocar en el iPhone y qué se debería ver.
 - **Nunca usar contenido con derechos de autor**: no copiar dentro de la app portadas, logos, páginas, dibujos ni textos de obras ajenas. Los cómics de ejemplo para leer son inventados y los dibujos se generan con código (`Drawing.swift`).
 - **Sí se puede mencionar cómics reales como información**: título, número, fecha de salida, autores y editorial (como el catálogo de una comiquería). Para eso son **Próximos** (saber qué sale y cuándo comprarlo) y **Comunidad** (charlar sobre esos cómics). Para ver una portada oficial, se pone un enlace a la página de la editorial o de la tienda; no se copia la imagen.
