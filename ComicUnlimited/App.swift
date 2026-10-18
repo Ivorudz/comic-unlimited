@@ -20,7 +20,7 @@ struct ReaderSession: Identifiable {
     var id: String { comic.id }
 }
 
-// Las cinco pestañas de abajo. Funcionan Inicio, Próximos y Perfil.
+// Las cinco pestañas de abajo. Comunidad todavía dice "Próximamente".
 struct RootView: View {
     @Environment(ReadingStore.self) private var store
     @State private var session: ReaderSession?
@@ -29,8 +29,7 @@ struct RootView: View {
         TabView {
             HomeView(onRead: openReader)
                 .tabItem { Label("Inicio", systemImage: "house") }
-            ComingSoonView(title: "Biblioteca", icon: "books.vertical",
-                           message: "Acá van a estar los cómics que tengas en archivos (.cbz o .zip), para leerlos en la app.")
+            LibraryView()
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
             UpcomingView()
                 .tabItem { Label("Próximos", systemImage: "calendar") }

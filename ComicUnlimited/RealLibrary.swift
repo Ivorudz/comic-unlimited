@@ -48,6 +48,8 @@ final class RealLibrary {
         var status: Status?
         var rating: Int?
         var updated: Double
+        /// Puntaje con manitos: -1 = 👎, 1 = 👍, 2 = 👍👍. Se usa en lugar de las estrellas.
+        var thumbs: Int? = nil
 
         var isSeries: Bool { kind == .series }
         /// Clave única: un número y una serie pueden tener el mismo id en Comic Vine.
@@ -56,6 +58,13 @@ final class RealLibrary {
         /// Cuánto pesa este cómic en las sugerencias. Negativo = no te gustó.
         var weight: Double {
             if let rating { return Double(rating) - 2.5 }   // 5★ = 2.5 … 1★ = -1.5
+            if let thumbs {                                   // 👎 = 1★, 👍 = 4★, 👍👍 = 5★
+                switch thumbs {
+                case ..<0: return -1.5
+                case 1: return 1.5
+                default: return 2.5
+                }
+            }
             switch status {
             case .reading: return 1.5
             case .wantToRead: return 1.0
@@ -90,21 +99,35 @@ final class RealLibrary {
     func setRating(_ rating: Int, for template: Entry) {
         var entry = entries[template.key] ?? template
         entry.rating = entry.rating == rating ? nil : rating
-        if entry.rating != nil && entry.status == nil { entry.status = .read }
+        if entry.rating != nil {
+            entry.thumbs = nil   // un solo puntaje por cómic
+            if entry.status == nil { entry.status = .read }
+        }
+        save(entry)
+    }
+
+    /// Puntaje con manitos (-1, 1 o 2). Tocar la misma de nuevo lo borra; borra las estrellas.
+    func setThumbs(_ value: Int, for template: Entry) {
+        var entry = entries[template.key] ?? template
+        entry.thumbs = entry.thumbs == value ? nil : value
+        if entry.thumbs != nil {
+            entry.rating = nil
+            if entry.status == nil { entry.status = .read }
+        }
         save(entry)
     }
 
     /// Algo cambió en las listas o los puntajes (sirve para saber cuándo recalcular "Para vos").
     var signature: String {
         entries.values.sorted { $0.key < $1.key }
-            .map { "\($0.key):\($0.status?.rawValue ?? "-"):\($0.rating ?? 0)" }
+            .map { "\($0.key):\($0.status?.rawValue ?? "-"):\($0.rating ?? 0):\($0.thumbs ?? 0)" }
             .joined(separator: ",")
     }
 
     private func save(_ entry: Entry) {
         var entry = entry
         entry.updated = Date().timeIntervalSince1970
-        if entry.status == nil && entry.rating == nil {
+        if entry.status == nil && entry.rating == nil && entry.thumbs == nil {
             entries[entry.key] = nil
         } else {
             entries[entry.key] = entry
@@ -208,11 +231,39 @@ struct RealLibraryControls: View {
                         .accessibilityLabel("\(n) de 5")
                     }
                 }
-                Text("Tu puntaje y tus listas se usan para las sugerencias de \"Para vos\" en Inicio.")
+                HStack(spacing: 8) {
+                    Text("o con manitos:").font(.subheadline).foregroundStyle(Theme.ink2)
+                    thumbButton(-1, icons: ["hand.thumbsdown"], label: "No me gustó")
+                    thumbButton(1, icons: ["hand.thumbsup"], label: "Me gustó")
+                    thumbButton(2, icons: ["hand.thumbsup", "hand.thumbsup"], label: "Me encantó")
+                }
+                .padding(.top, 4)
+                Text("Usá estrellas o manitos: si elegís uno, el otro se borra. Tu puntaje y tus listas se usan para \"Para vos\" en Inicio.")
                     .font(.caption)
                     .foregroundStyle(Theme.ink2)
             }
         }
         .padding(.top, 16)
+    }
+
+    private func thumbButton(_ value: Int, icons: [String], label: String) -> some View {
+        let on = library.entry(template.key)?.thumbs == value
+        return Button {
+            library.setThumbs(value, for: template)
+        } label: {
+            HStack(spacing: 1) {
+                ForEach(Array(icons.enumerated()), id: \.offset) { _, icon in
+                    Image(systemName: on ? icon + ".fill" : icon)
+                }
+            }
+            .font(.system(size: 20))
+            .foregroundStyle(on ? Theme.paper : (value < 0 ? Theme.ink2 : Theme.magenta))
+            .padding(.horizontal, 10)
+            .frame(height: 38)
+            .background(on ? (value < 0 ? Theme.ink2 : Theme.magenta) : Theme.chip, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }

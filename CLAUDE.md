@@ -34,7 +34,9 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ForYou.swift`: "Para vos" en Inicio; sugerencias de series reales según tus puntajes y listas.
   - `RealLibrary.swift`: tus cómics y series reales (Quiero leer / Leyendo / Leído y puntaje), guardados en el iPhone.
   - `ProfileView.swift`: pestaña Perfil; tus listas de cómics reales y números rápidos.
-  - (Pendiente) Biblioteca: cómics que tengas en archivos .cbz o .zip, para leerlos en la app.
+  - `LibraryView.swift`: pestaña Biblioteca; importar tus cómics en archivo (.cbz, .zip o PDF).
+  - `LocalLibrary.swift`: guarda una copia de tus archivos y su portada en la carpeta privada de la app.
+  - `ComicArchive.swift`: abre .cbz/.zip (lector de zip hecho a mano con Compression de Apple) y PDF (PDFKit).
   - `DetailView.swift`: ficha de un cómic.
   - `ReaderView.swift`: lector a pantalla completa.
   - `UpcomingView.swift`: pestaña Próximos (lanzamientos por semana).
@@ -47,6 +49,13 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `Drawing.swift`: dibuja portadas y páginas.
   - `Theme.swift`: colores.
 - `.github/workflows/build-ipa.yml`: GitHub Actions compila en una Mac, arma `ComicUnlimited.ipa` sin firmar y lo publica como Release.
+
+## Plan de versiones
+
+- 0.13: manitos (👎 / 👍 / 👍👍) además de estrellas + importar archivos a la Biblioteca.
+- 0.14: leer tus archivos en el lector (guarda la página; aparecen en Seguir leyendo).
+- 0.15: ordenar la Biblioteca (buscar, ordenar, renombrar) y unir cada archivo con su ficha de Comic Vine.
+- Fuera del plan: .cbr (necesitaría un programa de terceros).
 
 ## Cómo se prueba
 
