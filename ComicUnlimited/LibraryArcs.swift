@@ -71,13 +71,20 @@ struct ArcFolderView: View {
         let have = Set(mine.compactMap(\.cvIssueID)).count
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(arc?.name ?? name)
-                    .font(.system(size: 26, weight: .black).width(.expanded))
-                    .foregroundStyle(Theme.ink)
-                    .padding(.top, 8)
-                Text("Arco argumental")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.ink2)
+                HStack(alignment: .bottom, spacing: 16) {
+                    if let image = arc?.image?.medium {
+                        RemoteCover(url: image).frame(width: 110)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(arc?.name ?? name)
+                            .font(.system(size: 24, weight: .black).width(.expanded))
+                            .foregroundStyle(Theme.ink)
+                        Text(CVText.join(["Arco argumental", arc?.publisher?.name]))
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.ink2)
+                    }
+                }
+                .padding(.top, 8)
 
                 if let total, total > 0 {
                     VStack(alignment: .leading, spacing: 6) {
@@ -89,10 +96,8 @@ struct ArcFolderView: View {
                     .padding(.top, 10)
                 }
 
-                if let text = CVText.plain(arc?.deck) {
-                    Text(text)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.ink)
+                if let text = CVText.plain(arc?.description) ?? CVText.plain(arc?.deck) {
+                    ComicVineText(text: text)
                         .padding(.top, 12)
                 }
 

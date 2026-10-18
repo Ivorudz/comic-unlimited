@@ -36,18 +36,12 @@ struct LibraryView: View {
     }
 
     private var library: LocalLibrary { LocalLibrary.shared }
-    @State private var actions: LibraryActions
     @AppStorage("library.mode") private var mode: Mode = .all
     @AppStorage("library.sort") private var sort: Sort = .recent
     @State private var query = ""
     @State private var showImporter = false
     @State private var problems: [String] = []
     @State private var showProblems = false
-    @State private var renameText = ""
-
-    init(onRead: @escaping (LocalComic) -> Void) {
-        _actions = State(initialValue: LibraryActions(onRead: onRead))
-    }
 
     var body: some View {
         NavigationStack {
@@ -93,11 +87,7 @@ struct LibraryView: View {
             .navigationTitle("Biblioteca")
             .toolbar(.hidden, for: .navigationBar)
         }
-        .environment(actions)
         .task { await library.completeSeriesInfo() }
-        .sheet(item: $actions.linking) { comic in
-            LinkPickerView(comic: comic)
-        }
         .sheet(isPresented: $showImporter) {
             DocumentPicker { urls in
                 showImporter = false
@@ -113,38 +103,6 @@ struct LibraryView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(problems.joined(separator: "\n\n"))
-        }
-        .alert("Cambiar nombre",
-               isPresented: Binding(get: { actions.renaming != nil }, set: { if !$0 { actions.renaming = nil } })) {
-            TextField("Nombre", text: $renameText)
-            Button("Guardar") {
-                if let comic = actions.renaming { library.rename(comic.id, to: renameText) }
-                actions.renaming = nil
-            }
-            if actions.renaming?.customTitle != nil {
-                Button("Volver al nombre original") {
-                    if let comic = actions.renaming { library.rename(comic.id, to: nil) }
-                    actions.renaming = nil
-                }
-            }
-            Button("Cancelar", role: .cancel) { actions.renaming = nil }
-        } message: {
-            Text("Es solo el nombre que se ve en la app. El archivo no cambia.")
-        }
-        .onChange(of: actions.renaming) { _, comic in
-            renameText = comic?.displayTitle ?? ""
-        }
-        .confirmationDialog("¿Borrar este cómic de la Biblioteca?",
-                            isPresented: Binding(get: { actions.toDelete != nil },
-                                                 set: { if !$0 { actions.toDelete = nil } }),
-                            titleVisibility: .visible) {
-            Button("Borrar", role: .destructive) {
-                if let comic = actions.toDelete { library.delete(comic) }
-                actions.toDelete = nil
-            }
-            Button("Cancelar", role: .cancel) { actions.toDelete = nil }
-        } message: {
-            Text("Se borra la copia guardada en la app. El archivo original sigue en la app Archivos.")
         }
     }
 

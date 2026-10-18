@@ -8,6 +8,7 @@ enum CVRoute: Hashable {
     case search
     case series(id: Int, name: String)
     case issue(id: Int, title: String)
+    case arc(id: Int, name: String)
 }
 
 /// La clave de Comic Vine guardada en este iPhone (se carga en la pestaña Próximos).
@@ -29,6 +30,8 @@ struct CVDestination: View {
             SeriesView(id: id, name: name)
         case .issue(let id, let title):
             IssueView(id: id, title: title)
+        case .arc(let id, let name):
+            ArcFolderView(arcID: id, name: name)
         }
     }
 }
@@ -164,7 +167,7 @@ struct SeriesView: View {
                     header(detail)
                     RealLibraryControls(series: detail)
                     if let text = CVText.plain(detail.description) ?? CVText.plain(detail.deck) {
-                        ExpandableText(text: text).padding(.top, 16)
+                        ComicVineText(text: text).padding(.top, 16)
                     }
                     SectionTitle("Números")
                     if issues.isEmpty {
@@ -359,11 +362,7 @@ struct IssueView: View {
 
         if let text = CVText.plain(d.description) ?? CVText.plain(d.deck) {
             SectionTitle("De qué se trata")
-            ExpandableText(text: text)
-            Text("El texto viene de Comic Vine, por eso está en inglés.")
-                .font(.caption)
-                .foregroundStyle(Theme.ink2)
-                .padding(.top, 6)
+            ComicVineText(text: text)
         }
 
         let credits = CVText.groupCredits(d.personCredits ?? [])
@@ -380,16 +379,16 @@ struct IssueView: View {
             }
         }
 
-        let characters = (d.characterCredits ?? []).compactMap(\.name)
+        let characters = d.characterCredits ?? []
         if !characters.isEmpty {
             SectionTitle("Personajes")
-            ChipCloud(items: characters)
+            CharacterStrip(refs: characters)
         }
 
-        let arcs = (d.storyArcCredits ?? []).compactMap(\.name)
+        let arcs = d.storyArcCredits ?? []
         if !arcs.isEmpty {
             SectionTitle("Forma parte de")
-            ChipCloud(items: arcs)
+            ArcStrip(refs: arcs)
         }
 
         AttributionFooter(link: d.siteDetailUrl.flatMap { URL(string: $0) })
@@ -409,48 +408,7 @@ struct IssueView: View {
 
 // MARK: - Piezas compartidas
 
-/// Texto largo que se puede abrir con "Leer más".
-private struct ExpandableText: View {
-    let text: String
-    @State private var expanded = false
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(Theme.ink)
-                .lineSpacing(2)
-                .lineLimit(expanded ? nil : 6)
-            if text.count > 300 {
-                Button(expanded ? "Leer menos" : "Leer más") {
-                    withAnimation { expanded.toggle() }
-                }
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(Theme.magenta)
-            }
-        }
-    }
-}
-
-/// Etiquetas una al lado de la otra (personajes, arcos).
-private struct ChipCloud: View {
-    let items: [String]
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                Text(item)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.chip, in: RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-}
 
 private struct LoadingRow: View {
     let text: String

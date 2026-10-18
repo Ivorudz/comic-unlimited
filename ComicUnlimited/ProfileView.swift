@@ -6,6 +6,8 @@ import SwiftUI
 struct ProfileView: View {
     @State private var selected: RealLibrary.Status = .reading
     @AppStorage(AppSettings.showMissingKey) private var showMissing = true
+    @AppStorage(TranslationSettings.enabledKey) private var translate = true
+    @AppStorage(TranslationSettings.languageKey) private var language = "es"
     private var library: RealLibrary { RealLibrary.shared }
 
     private static let tabs: [(status: RealLibrary.Status, label: String)] = [
@@ -70,7 +72,32 @@ struct ProfileView: View {
                                 .foregroundStyle(Theme.ink)
                         }
                         .tint(Theme.magenta)
-                        Text("En las carpetas de series de la Biblioteca, los números que te faltan aparecen en gris en su lugar.")
+                        Text("En las carpetas de series y arcos de la Biblioteca, los números que te faltan aparecen en gris en su lugar.")
+                            .font(.caption)
+                            .foregroundStyle(Theme.ink2)
+
+                        Divider().padding(.vertical, 8)
+
+                        Toggle(isOn: $translate) {
+                            Text("Traducir textos de Comic Vine")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .tint(Theme.magenta)
+                        HStack {
+                            Text("Idioma")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(translate ? Theme.ink : Theme.ink2)
+                            Spacer()
+                            Picker("Idioma", selection: $language) {
+                                ForEach(TranslationSettings.languages, id: \.code) { lang in
+                                    Text(lang.name).tag(lang.code)
+                                }
+                            }
+                            .tint(Theme.magenta)
+                            .disabled(!translate)
+                        }
+                        Text("Traduce \"De qué se trata\" de cómics, series y arcos con el traductor de Apple (viene en el iPhone). La primera vez puede pedir descargar el idioma.")
                             .font(.caption)
                             .foregroundStyle(Theme.ink2)
                     }

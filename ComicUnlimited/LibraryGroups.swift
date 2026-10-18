@@ -18,7 +18,7 @@ enum LibraryRoute: Hashable {
 @MainActor
 @Observable
 final class LibraryActions {
-    let onRead: (LocalComic) -> Void
+    var onRead: (LocalComic) -> Void
     var linking: LocalComic?
     var toDelete: LocalComic?
     var renaming: LocalComic?

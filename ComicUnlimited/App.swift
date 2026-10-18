@@ -33,12 +33,14 @@ struct RootView: View {
     @State private var session: ReaderSession?
     /// Archivo de la Biblioteca abierto en el lector (y en qué página arranca).
     @State private var localSession: LocalSession?
+    /// Menú de los cómics de tu Biblioteca (compartido por todas las pestañas).
+    @State private var libraryActions = LibraryActions(onRead: { _ in })
 
     var body: some View {
         TabView {
             HomeView(onRead: openReader, onReadLocal: openLocal)
                 .tabItem { Label("Inicio", systemImage: "house") }
-            LibraryView(onRead: openLocal)
+            LibraryView()
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
             UpcomingView()
                 .tabItem { Label("Próximos", systemImage: "calendar") }
@@ -49,6 +51,8 @@ struct RootView: View {
                 .tabItem { Label("Perfil", systemImage: "person.crop.circle") }
         }
         .tint(Theme.magenta)
+        .modifier(LibraryActionsHost(actions: libraryActions))
+        .onAppear { libraryActions.onRead = openLocal }
         .fullScreenCover(item: $session) { session in
             ReaderView(comic: session.comic, startPage: session.startPage)
                 .environment(store)

@@ -196,6 +196,27 @@ struct ComicVineClient {
         return result
     }
 
+    /// Imagen y enlace de varios personajes a la vez (una sola consulta).
+    func characters(ids: [Int]) async throws -> [CVImageItem] {
+        try await imageItems("characters", ids: ids)
+    }
+
+    /// Imagen y enlace de varios arcos a la vez (una sola consulta).
+    func storyArcs(ids: [Int]) async throws -> [CVImageItem] {
+        try await imageItems("story_arcs", ids: ids)
+    }
+
+    private func imageItems(_ resource: String, ids: [Int]) async throws -> [CVImageItem] {
+        guard !ids.isEmpty else { return [] }
+        let unique = Array(Set(ids)).sorted().prefix(100)
+        let page: CVResponse<CVImageItem> = try await request(resource, [
+            "filter": "id:" + unique.map(String.init).joined(separator: "|"),
+            "field_list": "id,name,image,site_detail_url",
+            "limit": "100",
+        ], cached: true)
+        return page.results
+    }
+
     /// Ficha de un número.
     func issue(id: Int) async throws -> CVIssueDetail {
         try await requestObject("issue/4000-\(id)", [
@@ -394,6 +415,14 @@ struct CVIssueDetail: Decodable {
     let characterCredits: [CVRef]?
     let storyArcCredits: [CVRef]?
     let volume: CVRef?
+    let siteDetailUrl: String?
+}
+
+/// Algo de Comic Vine con nombre, imagen y enlace (un personaje, un arco…).
+struct CVImageItem: Decodable, Identifiable {
+    let id: Int
+    let name: String?
+    let image: CVImage?
     let siteDetailUrl: String?
 }
 
