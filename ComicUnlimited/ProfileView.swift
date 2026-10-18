@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @State private var selected: RealLibrary.Status = .reading
+    @AppStorage(AppSettings.showMissingKey) private var showMissing = true
     private var library: RealLibrary { RealLibrary.shared }
 
     private static let tabs: [(status: RealLibrary.Status, label: String)] = [
@@ -60,6 +61,22 @@ struct ProfileView: View {
                             .buttonStyle(.plain)
                         }
                     }
+
+                    SectionTitle("Configuración")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $showMissing) {
+                            Text("Mostrar en gris los números que no tengo")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .tint(Theme.magenta)
+                        Text("En las carpetas de series de la Biblioteca, los números que te faltan aparecen en gris en su lugar.")
+                            .font(.caption)
+                            .foregroundStyle(Theme.ink2)
+                    }
+                    .padding(14)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
 
                     Text("Las listas y los puntajes quedan guardados solo en este iPhone. Datos y portadas: Comic Vine. Las portadas pertenecen a sus editoriales.")
                         .font(.footnote)

@@ -250,6 +250,7 @@ func countText(_ n: Int) -> String { "\(n) \(n == 1 ? "número" : "números")" }
 struct SeriesFolderView: View {
     let seriesID: Int?
     private var library: LocalLibrary { LocalLibrary.shared }
+    @AppStorage(AppSettings.showMissingKey) private var showMissing = true
 
     @State private var detail: CVVolumeDetail?
 
@@ -299,16 +300,15 @@ struct SeriesFolderView: View {
                         .padding(.top, 8)
                 }
 
-                SectionTitle("Los que tenés")
-                if mine.isEmpty {
-                    Text("No tenés archivos de esta serie.").font(.subheadline).foregroundStyle(Theme.ink2)
+                if let seriesID, showMissing {
+                    SeriesIssuesGrid(seriesID: seriesID, mine: mine)
                 } else {
-                    ComicGrid(comics: mine)
-                }
-
-                if let seriesID {
-                    MissingIssuesSection(seriesID: seriesID, owned: Set(mine.compactMap(\.cvIssueID)),
-                                         total: detail?.countOfIssues)
+                    SectionTitle("Los que tenés")
+                    if mine.isEmpty {
+                        Text("No tenés archivos de esta serie.").font(.subheadline).foregroundStyle(Theme.ink2)
+                    } else {
+                        ComicGrid(comics: mine)
+                    }
                 }
             }
             .padding(.horizontal, 18)
@@ -326,85 +326,96 @@ struct SeriesFolderView: View {
     }
 }
 
-/// "Te faltan": los números de la serie (según Comic Vine) que no están en tu Biblioteca.
-private struct MissingIssuesSection: View {
+/// Ajustes de la app (se cambian en Perfil → Configuración).
+enum AppSettings {
+    static let showMissingKey = "settings.showMissing"
+    /// Mostrar en gris los números que no tenés (en series y arcos). Prendido salvo que lo apagues.
+    static var showMissing: Bool {
+        UserDefaults.standard.object(forKey: showMissingKey) as? Bool ?? true
+    }
+}
+
+/// Todos los números de la serie en una grilla, en orden: los tuyos a color y los que te faltan en gris.
+private struct SeriesIssuesGrid: View {
     let seriesID: Int
-    let owned: Set<Int>
-    let total: Int?
+    let mine: [LocalComic]
 
     @State private var loaded: [CVIssueSummary] = []
     @State private var available = 0
     @State private var loading = false
     @State private var errorText: String?
 
-    private var missing: [CVIssueSummary] { loaded.filter { !owned.contains($0.id) } }
+    private enum Slot: Identifiable {
+        case owned(LocalComic)
+        case missing(CVIssueSummary)
+
+        var id: String {
+            switch self {
+            case .owned(let c): return "mio-\(c.id)"
+            case .missing(let i): return "falta-\(i.id)"
+            }
+        }
+
+        var sortKey: Double {
+            switch self {
+            case .owned(let c): return c.numberForSorting
+            case .missing(let i): return Double(i.issueNumber ?? "") ?? .greatestFiniteMagnitude
+            }
+        }
+    }
+
+    private var slots: [Slot] {
+        let owned = Set(mine.compactMap(\.cvIssueID))
+        let missing = loaded.filter { !owned.contains($0.id) }.map(Slot.missing)
+        return (mine.map(Slot.owned) + missing).sorted { $0.sortKey < $1.sortKey }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let total {
-                SectionTitle("Te faltan (\(max(total - owned.count, 0)))")
-            } else {
-                SectionTitle("Te faltan")
+            SectionTitle("Números")
+            if ComicVineKey.current.isEmpty {
+                Text("Cargá tu clave de Comic Vine en Próximos para ver también los números que te faltan.")
+                    .font(.subheadline).foregroundStyle(Theme.ink2).padding(.bottom, 12)
+            } else if let errorText {
+                Text(errorText).font(.subheadline).foregroundStyle(Theme.ink2).padding(.bottom, 12)
             }
 
-            if ComicVineKey.current.isEmpty {
-                Text("Cargá tu clave de Comic Vine en Próximos para ver qué números te faltan.")
-                    .font(.subheadline).foregroundStyle(Theme.ink2)
-            } else if let errorText {
-                Text(errorText).font(.subheadline).foregroundStyle(Theme.ink2)
-            } else if loaded.isEmpty && loading {
-                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
-            } else if missing.isEmpty && loaded.count >= available {
-                Text("¡Tenés la serie completa! 🎉").font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
-            } else {
-                ForEach(missing) { issue in
-                    NavigationLink(value: CVRoute.issue(id: issue.id,
-                                                        title: issue.issueNumber.map { "#\($0)" } ?? "Número")) {
-                        HStack(spacing: 12) {
-                            RemoteCover(url: issue.image?.small)
-                                .frame(width: 40)
-                                .opacity(0.55)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(issue.issueNumber.map { "#\($0)" } ?? "Sin número")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(Theme.ink)
-                                if let name = issue.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
-                                    Text(name).font(.footnote).foregroundStyle(Theme.ink2).lineLimit(1)
-                                }
-                                if let date = CVText.monthYear(issue.coverDate) {
-                                    Text(date).font(.caption).foregroundStyle(Theme.ink2)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.bold))
-                                .foregroundStyle(Theme.ink2)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
+                      alignment: .leading, spacing: 18) {
+                ForEach(slots) { slot in
+                    switch slot {
+                    case .owned(let comic):
+                        LocalComicTile(comic: comic)
+                    case .missing(let issue):
+                        NavigationLink(value: CVRoute.issue(id: issue.id,
+                                                            title: issue.issueNumber.map { "#\($0)" } ?? "Número")) {
+                            MissingIssueCard(issue: issue)
                         }
-                        .padding(.vertical, 6)
-                        .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
-                if loaded.count < available {
-                    Button {
-                        Task { await load() }
-                    } label: {
-                        Text(loading ? "Cargando…" : "Ver más números de la serie")
-                            .font(.subheadline.weight(.bold))
-                            .frame(maxWidth: .infinity)
-                            .padding(12)
-                            .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(loading)
-                    .padding(.top, 12)
-                }
-                Text("Tocá uno para ver su ficha y marcarlo \"Quiero leer\".")
-                    .font(.caption)
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.top, 8)
             }
+
+            if loading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 16)
+            } else if loaded.count < available {
+                Button {
+                    Task { await load() }
+                } label: {
+                    Text("Ver más números de la serie")
+                        .font(.subheadline.weight(.bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(12)
+                        .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 16)
+            }
+
+            Text("Los grises son los que no tenés: tocá uno para ver su ficha y marcarlo \"Quiero leer\". Podés ocultarlos en Perfil → Configuración.")
+                .font(.caption)
+                .foregroundStyle(Theme.ink2)
+                .padding(.top, 12)
         }
         .task {
             if loaded.isEmpty && !ComicVineKey.current.isEmpty { await load() }
@@ -423,6 +434,27 @@ private struct MissingIssuesSection: View {
             errorText = CVText.message(for: error)
         }
         loading = false
+    }
+}
+
+/// Un número que no tenés: portada en gris.
+private struct MissingIssueCard: View {
+    let issue: CVIssueSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            RemoteCover(url: issue.image?.small)
+                .grayscale(1)
+                .opacity(0.45)
+            Text(issue.issueNumber.map { "#\($0)" } ?? "Sin número")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.ink2)
+                .padding(.top, 6)
+            if let name = issue.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
+                Text(name).font(.caption).foregroundStyle(Theme.ink2).lineLimit(1)
+            }
+            Text("No lo tenés").font(.caption2).foregroundStyle(Theme.ink2)
+        }
     }
 }
 
