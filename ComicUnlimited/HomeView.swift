@@ -7,6 +7,7 @@ struct HomeView: View {
     let onRead: (Comic) -> Void
 
     @State private var discover = DiscoverModel()
+    @State private var forYou = ForYouModel()
 
     var body: some View {
         NavigationStack {
@@ -111,8 +112,11 @@ struct HomeView: View {
         RowTitle(title: "Recién salidos", subtitle: "Cómics reales de la última semana, desde Comic Vine")
         RecentReleasesRow(model: discover)
 
-        RowTitle(title: "Para vos",
-                 subtitle: store.hasHistory ? "Según los géneros que más leés" : "Los mejor puntuados de la app")
+        RowTitle(title: "Para vos", subtitle: "Series reales parecidas a las fichas que abriste")
+            .padding(.top, 22)
+        ForYouRow(model: forYou)
+
+        RowTitle(title: "Para leer en la app", subtitle: "Cómics de prueba, inventados, que se leen acá adentro")
             .padding(.top, 22)
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 12) {

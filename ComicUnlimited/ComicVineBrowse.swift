@@ -396,7 +396,10 @@ struct IssueView: View {
         loading = true
         errorText = nil
         do {
-            detail = try await ComicVineKey.client.issue(id: id)
+            let loaded = try await ComicVineKey.client.issue(id: id)
+            detail = loaded
+            // Se anota en el historial para las sugerencias de "Para vos".
+            RealHistory.record(loaded)
         } catch {
             errorText = CVText.message(for: error)
         }

@@ -169,6 +169,22 @@ struct ComicVineClient {
         ])
     }
 
+    /// Series en las que trabajó una persona (guionista, dibujante…).
+    func personSeries(id: Int) async throws -> [CVRef] {
+        let person: CVCreditsDetail = try await requestObject("person/4040-\(id)", [
+            "field_list": "id,name,volume_credits",
+        ])
+        return person.volumeCredits ?? []
+    }
+
+    /// Series en las que aparece un personaje.
+    func characterSeries(id: Int) async throws -> [CVRef] {
+        let character: CVCreditsDetail = try await requestObject("character/4005-\(id)", [
+            "field_list": "id,name,volume_credits",
+        ])
+        return character.volumeCredits ?? []
+    }
+
     // MARK: Pedidos a Comic Vine
 
     private static let decoder: JSONDecoder = {
@@ -319,6 +335,12 @@ struct CVIssueDetail: Decodable {
     let storyArcCredits: [CVRef]?
     let volume: CVRef?
     let siteDetailUrl: String?
+}
+
+struct CVCreditsDetail: Decodable {
+    let id: Int
+    let name: String?
+    let volumeCredits: [CVRef]?
 }
 
 struct CVCredit: Decodable, Identifiable {
