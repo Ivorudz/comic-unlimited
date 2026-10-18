@@ -53,21 +53,31 @@ struct ComicVineClient {
 
     /// Cómics con fecha de salida en comiquerías entre `from` y `to` (incluidos).
     func issues(from: Date, to: Date) async throws -> [UpcomingIssue] {
-        let range = "\(Self.dayFormatter.string(from: from))|\(Self.dayFormatter.string(from: to))"
+        // Comic Vine no entiende bien los rangos de fechas, así que preguntamos día por día.
+        var days: [Date] = []
+        var day = Calendar.current.startOfDay(for: from)
+        while day <= to {
+            days.append(day)
+            guard let next = Calendar.current.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+
         var all: [CVIssue] = []
-        var offset = 0
-        // Como mucho 5 pedidos de 100 cómics, para no pasarnos del límite de Comic Vine.
-        for _ in 0..<5 {
-            let page: CVResponse<CVIssue> = try await request("issues", [
-                "filter": "store_date:\(range)",
-                "sort": "id:asc",
-                "field_list": "id,name,issue_number,store_date,image,site_detail_url,volume",
-                "limit": "100",
-                "offset": "\(offset)",
-            ])
-            all += page.results
-            offset += 100
-            if page.results.count < 100 || offset >= (page.numberOfTotalResults ?? 0) { break }
+        for date in days {
+            var offset = 0
+            // Como mucho 2 pedidos de 100 cómics por día, para no pasarnos del límite de Comic Vine.
+            for _ in 0..<2 {
+                let page: CVResponse<CVIssue> = try await request("issues", [
+                    "filter": "store_date:\(Self.dayFormatter.string(from: date))",
+                    "sort": "id:asc",
+                    "field_list": "id,name,issue_number,store_date,image,site_detail_url,volume",
+                    "limit": "100",
+                    "offset": "\(offset)",
+                ])
+                all += page.results
+                offset += 100
+                if page.results.count < 100 || offset >= (page.numberOfTotalResults ?? 0) { break }
+            }
         }
 
         var seen = Set<Int>()
