@@ -3,7 +3,13 @@ import UIKit
 import Observation
 
 // Pestaña Próximos: qué cómics salen en las próximas semanas, día por día.
-// Datos y portadas: Comic Vine.
+// Usa Metron si está configurado; si Metron falla (o no está), usa Comic Vine.
+
+/// De dónde salieron los datos que se muestran.
+enum UpcomingSource: String {
+    case metron = "Metron"
+    case comicVine = "Comic Vine"
+}
 
 @MainActor
 @Observable
@@ -11,37 +17,55 @@ final class UpcomingModel {
     enum LoadState {
         case idle
         case loading
-        case loaded([UpcomingIssue])
-        case failed(ComicVineError)
+        case loaded([UpcomingIssue], UpcomingSource)
+        /// `badLogin` dice qué cuenta hay que revisar, si el problema es el usuario o la clave.
+        case failed(String, badLogin: UpcomingSource?)
     }
 
-    private static let keyStorage = ComicVineKey.storageKey
     /// Cuántas semanas hacia adelante se pueden mirar.
     static let maxWeek = 7
 
-    /// La clave de Comic Vine. Queda guardada solo en este iPhone.
-    private(set) var apiKey: String
     var weekIndex = 0
+    /// Editorial elegida ("Todas" o el texto de un botón).
+    var publisherFilter = "Todas"
     private(set) var state: LoadState = .idle
+    /// Cambia cada vez que se guardan o se borran cuentas, para volver a cargar.
+    private(set) var accountsVersion = 0
     /// Semanas ya cargadas, para no volver a pedirlas mientras la app está abierta.
-    private var cache: [Int: [UpcomingIssue]] = [:]
+    private var cache: [String: ([UpcomingIssue], UpcomingSource)] = [:]
 
-    init() {
-        apiKey = UserDefaults.standard.string(forKey: Self.keyStorage) ?? ""
+    var hasMetron: Bool { _ = accountsVersion; return MetronAccount.isSet }
+    var hasComicVine: Bool { _ = accountsVersion; return !ComicVineKey.current.isEmpty }
+    var hasAnySource: Bool { hasMetron || hasComicVine }
+
+    func saveMetron(user: String, password: String) {
+        MetronAccount.save(user: user, password: password)
+        accountsChanged()
     }
 
-    var hasKey: Bool { !apiKey.isEmpty }
+    func forgetMetron() {
+        MetronAccount.forget()
+        accountsChanged()
+    }
 
-    func saveKey(_ key: String) {
-        apiKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        UserDefaults.standard.set(apiKey, forKey: Self.keyStorage)
+    func saveComicVineKey(_ key: String) {
+        UserDefaults.standard.set(key.trimmingCharacters(in: .whitespacesAndNewlines), forKey: ComicVineKey.storageKey)
+        accountsChanged()
+    }
+
+    func forgetComicVineKey() {
+        UserDefaults.standard.removeObject(forKey: ComicVineKey.storageKey)
+        accountsChanged()
+    }
+
+    private func accountsChanged() {
         cache = [:]
         state = .idle
+        accountsVersion += 1
     }
 
-    func forgetKey() {
-        saveKey("")
-    }
+    /// Identifica lo que hay que mostrar: semana, editorial y cuentas.
+    var loadKey: String { "\(accountsVersion)|\(weekIndex)|\(publisherFilter)" }
 
     /// Primer y último día de la semana elegida (empieza hoy).
     var weekRange: (start: Date, end: Date) {
@@ -53,37 +77,70 @@ final class UpcomingModel {
     }
 
     func load(force: Bool = false) async {
-        guard hasKey else { return }
-        let week = weekIndex
-        if !force, let cached = cache[week] {
-            state = .loaded(cached)
+        guard hasAnySource else { return }
+        let key = loadKey
+        if !force, let cached = cache[key] {
+            state = .loaded(cached.0, cached.1)
             return
         }
         state = .loading
-        let client = ComicVineClient(apiKey: apiKey)
         let range = weekRange
+        let filter = publisherFilter
+        var metronProblem: String?
+
+        // 1. Metron
+        if hasMetron {
+            let publisher = MetronClient.publishers.first { $0.label == filter }
+            do {
+                var issues = try await MetronClient(user: MetronAccount.user, password: MetronAccount.password)
+                    .issues(from: range.start, to: range.end, publisher: publisher?.query)
+                if let publisher {
+                    for i in issues.indices { issues[i].publisher = publisher.label }
+                }
+                finish(issues, .metron, key: key)
+                return
+            } catch MetronError.badLogin {
+                if key == loadKey { state = .failed(MetronError.badLogin.errorDescription ?? "", badLogin: .metron) }
+                return
+            } catch {
+                metronProblem = (error as? MetronError)?.errorDescription ?? error.localizedDescription
+            }
+        }
+
+        // 2. Comic Vine (si no hay Metron o si Metron falló)
+        guard hasComicVine else {
+            if key == loadKey { state = .failed(metronProblem ?? "No hay ninguna cuenta cargada.", badLogin: nil) }
+            return
+        }
+        let client = ComicVineKey.client
         do {
             var issues = try await client.issues(from: range.start, to: range.end)
             let publishers = await client.publishers(volumeIDs: issues.compactMap(\.volumeID))
             for i in issues.indices {
                 if let volume = issues[i].volumeID { issues[i].publisher = publishers[volume] }
             }
-            issues.sort { ($0.date, $0.title) < ($1.date, $1.title) }
-            cache[week] = issues
-            // Si mientras cargaba se cambió de semana, no pisamos la pantalla nueva.
-            if week == weekIndex { state = .loaded(issues) }
-        } catch let error as ComicVineError {
-            if week == weekIndex { state = .failed(error) }
+            finish(issues, .comicVine, key: key)
         } catch {
-            if week == weekIndex { state = .failed(.network(error.localizedDescription)) }
+            let message = CVText.message(for: error)
+            let text = metronProblem.map { "\($0)\n\nTambién probé con Comic Vine: \(message)" } ?? message
+            var badLogin: UpcomingSource?
+            if let cvError = error as? ComicVineError, case .invalidKey = cvError { badLogin = .comicVine }
+            if key == loadKey { state = .failed(text, badLogin: badLogin) }
         }
+    }
+
+    private func finish(_ issues: [UpcomingIssue], _ source: UpcomingSource, key: String) {
+        let sorted = issues.sorted { ($0.date, $0.title) < ($1.date, $1.title) }
+        cache[key] = (sorted, source)
+        // Si mientras cargaba se cambió de semana o de editorial, no pisamos la pantalla nueva.
+        if key == loadKey { state = .loaded(sorted, source) }
     }
 }
 
 struct UpcomingView: View {
     @State private var model = UpcomingModel()
-    @State private var publisherFilter = "Todas"
     @State private var query = ""
+    @State private var showAccounts = false
 
     var body: some View {
         ScrollView {
@@ -95,10 +152,14 @@ struct UpcomingView: View {
                     .padding(.top, 20)
                     .padding(.bottom, 8)
 
-                if model.hasKey {
+                if model.hasAnySource {
                     content
                 } else {
-                    KeySetupView { model.saveKey($0) }
+                    Text("Para ver qué cómics salen, la app necesita una cuenta de Metron o una clave de Comic Vine. Con una alcanza.")
+                        .font(.body)
+                        .foregroundStyle(Theme.ink)
+                        .padding(.bottom, 12)
+                    AccountsForm(model: model)
                 }
             }
             .padding(.horizontal, 18)
@@ -106,15 +167,30 @@ struct UpcomingView: View {
         }
         .background(Theme.paper)
         .scrollDismissesKeyboard(.interactively)
-        .task(id: "\(model.apiKey)|\(model.weekIndex)") {
+        .task(id: model.loadKey) {
             await model.load()
         }
         .refreshable {
             await model.load(force: true)
         }
+        .sheet(isPresented: $showAccounts) {
+            NavigationStack {
+                ScrollView {
+                    AccountsForm(model: model).padding(18)
+                }
+                .background(Theme.paper)
+                .navigationTitle("Metron y Comic Vine")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Listo") { showAccounts = false }
+                    }
+                }
+            }
+        }
     }
 
-    // MARK: Contenido con la clave cargada
+    // MARK: Contenido con alguna cuenta cargada
 
     @ViewBuilder
     private var content: some View {
@@ -122,20 +198,32 @@ struct UpcomingView: View {
             .font(.subheadline)
             .foregroundStyle(Theme.ink2)
         weekPicker
+        if model.hasMetron {
+            // Con Metron, la editorial se elige antes de pedir los datos.
+            publisherChips(["Todas"] + MetronClient.publishers.map { $0.label })
+        }
         switch model.state {
         case .idle, .loading:
             HStack(spacing: 10) {
                 ProgressView()
-                Text("Buscando en Comic Vine…").foregroundStyle(Theme.ink2)
+                Text("Buscando lanzamientos…").foregroundStyle(Theme.ink2)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 40)
-        case .failed(let error):
-            failure(error)
-        case .loaded(let issues):
-            list(issues)
+        case .failed(let message, let badLogin):
+            failure(message, badLogin: badLogin)
+        case .loaded(let issues, let source):
+            list(issues, source: source)
+            footer(source)
         }
-        footer
+        Button {
+            showAccounts = true
+        } label: {
+            Label("Cuentas de Metron y Comic Vine", systemImage: "person.badge.key")
+                .font(.footnote.weight(.semibold))
+        }
+        .foregroundStyle(Theme.ink2)
+        .padding(.top, 14)
     }
 
     private var weekPicker: some View {
@@ -172,22 +260,47 @@ struct UpcomingView: View {
         .padding(.top, 14)
     }
 
+    private func publisherChips(_ options: [String]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(options, id: \.self) { option in
+                    Button { model.publisherFilter = option } label: {
+                        Text(option)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .foregroundStyle(model.publisherFilter == option ? Theme.paper : Theme.ink)
+                            .background(model.publisherFilter == option ? Theme.ink : Theme.chip, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 18)
+        }
+        .padding(.horizontal, -18)
+        .padding(.top, 12)
+    }
+
     @ViewBuilder
-    private func list(_ issues: [UpcomingIssue]) -> some View {
-        // Botones de editorial: "Todas" y las que más cómics tienen esta semana.
+    private func list(_ issues: [UpcomingIssue], source: UpcomingSource) -> some View {
+        let filterHere = source == .comicVine
+        // Con Comic Vine, los botones de editorial salen de lo que vino esta semana.
         let counts = Dictionary(grouping: issues.compactMap(\.publisher), by: { $0 }).mapValues(\.count)
         let top = counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.prefix(6).map(\.key)
-        let options = ["Todas"] + top
         let q = Self.normalize(query)
         let filtered = issues.filter { issue in
-            (publisherFilter == "Todas" || issue.publisher == publisherFilter)
+            (!filterHere || model.publisherFilter == "Todas" || issue.publisher == model.publisherFilter)
                 && (q.isEmpty || Self.normalize("\(issue.title) \(issue.issueName ?? "") \(issue.publisher ?? "")").contains(q))
         }
         let days = Dictionary(grouping: filtered, by: \.date).sorted { $0.key < $1.key }
 
+        if filterHere && !model.hasMetron && !top.isEmpty {
+            publisherChips(["Todas"] + top)
+        }
+
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
-            TextField("Buscar serie o editorial", text: $query)
+            TextField("Buscar serie", text: $query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
         }
@@ -196,30 +309,9 @@ struct UpcomingView: View {
         .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
         .padding(.top, 14)
 
-        if options.count > 1 {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(options, id: \.self) { option in
-                        Button { publisherFilter = option } label: {
-                            Text(option)
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .foregroundStyle(publisherFilter == option ? Theme.paper : Theme.ink)
-                                .background(publisherFilter == option ? Theme.ink : Theme.chip, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 18)
-            }
-            .padding(.horizontal, -18)
-            .padding(.top, 12)
-        }
-
         if days.isEmpty {
             Text(issues.isEmpty
-                 ? "Comic Vine todavía no tiene lanzamientos cargados para estas fechas."
+                 ? "\(source.rawValue) todavía no tiene lanzamientos cargados para estas fechas."
                  : "No hay cómics que coincidan con la búsqueda.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.ink2)
@@ -238,9 +330,9 @@ struct UpcomingView: View {
         }
     }
 
-    private func failure(_ error: ComicVineError) -> some View {
+    private func failure(_ message: String, badLogin: UpcomingSource?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(error.errorDescription ?? "Algo salió mal.")
+            Text(message)
                 .font(.subheadline)
                 .foregroundStyle(Theme.ink)
             HStack(spacing: 10) {
@@ -249,8 +341,8 @@ struct UpcomingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.magenta)
-                if case .invalidKey = error {
-                    Button("Cambiar la clave") { model.forgetKey() }
+                if badLogin != nil {
+                    Button("Revisar cuentas") { showAccounts = true }
                         .buttonStyle(.bordered)
                 }
             }
@@ -262,13 +354,16 @@ struct UpcomingView: View {
         .padding(.top, 16)
     }
 
-    private var footer: some View {
+    private func footer(_ source: UpcomingSource) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Las fechas pueden cambiar. Datos y portadas: Comic Vine. Las portadas pertenecen a sus editoriales.")
-            Link("Abrir Comic Vine", destination: URL(string: "https://comicvine.gamespot.com")!)
-                .foregroundStyle(Theme.magenta)
-            Button("Cambiar la clave de Comic Vine") { model.forgetKey() }
-                .foregroundStyle(Theme.ink2)
+            Text("Las fechas pueden cambiar. Datos y portadas: \(source.rawValue). Las portadas pertenecen a sus editoriales.")
+            if source == .comicVine {
+                Link("Abrir Comic Vine", destination: URL(string: "https://comicvine.gamespot.com")!)
+                    .foregroundStyle(Theme.magenta)
+            } else {
+                Link("Abrir Metron", destination: URL(string: "https://metron.cloud")!)
+                    .foregroundStyle(Theme.magenta)
+            }
         }
         .font(.footnote)
         .foregroundStyle(Theme.ink2)
@@ -428,52 +523,89 @@ struct RemoteCover: View {
     }
 }
 
-// MARK: - Pantalla para cargar la clave
+// MARK: - Cuentas de Metron y Comic Vine
 
-private struct KeySetupView: View {
-    let onSave: (String) -> Void
-    @State private var key = ""
+private struct AccountsForm: View {
+    let model: UpcomingModel
+    @State private var metronUser = ""
+    @State private var metronPassword = ""
+    @State private var comicVineKey = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Para ver qué cómics salen, la app usa Comic Vine. Necesita tu clave (un código que te identifica, como una contraseña).")
-                .font(.body)
-                .foregroundStyle(Theme.ink)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("1. Copiá tu clave desde la página de Comic Vine.")
-                Link("Abrir comicvine.gamespot.com/api", destination: URL(string: "https://comicvine.gamespot.com/api/")!)
-                    .foregroundStyle(Theme.magenta)
-                Text("2. Pegala acá abajo y tocá Guardar.")
+        VStack(alignment: .leading, spacing: 18) {
+            card {
+                Text("Metron").font(.headline).foregroundStyle(Theme.ink)
+                Text("Recomendado para Próximos: muestra lo que sale cada semana y se puede filtrar por editorial.")
+                    .font(.subheadline).foregroundStyle(Theme.ink2)
+                if model.hasMetron {
+                    Text("Conectado como \(MetronAccount.user)").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                    Button("Quitar cuenta de Metron", role: .destructive) { model.forgetMetron() }
+                        .font(.subheadline)
+                } else {
+                    Link("Crear cuenta en metron.cloud", destination: URL(string: "https://metron.cloud")!)
+                        .font(.subheadline).foregroundStyle(Theme.magenta)
+                    field(TextField("Usuario de Metron", text: $metronUser))
+                    field(SecureField("Contraseña de Metron", text: $metronPassword))
+                    saveButton(disabled: metronUser.trimmingCharacters(in: .whitespaces).isEmpty || metronPassword.isEmpty) {
+                        model.saveMetron(user: metronUser, password: metronPassword)
+                        metronPassword = ""
+                    }
+                }
             }
-            .font(.subheadline)
-            .foregroundStyle(Theme.ink2)
 
-            TextField("Pegá tu clave acá", text: $key)
-                .font(.system(.body, design: .monospaced))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(12)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line))
-
-            Button {
-                onSave(key)
-            } label: {
-                Text("Guardar")
-                    .font(.system(size: 17, weight: .heavy))
-                    .frame(maxWidth: .infinity)
-                    .padding(14)
-                    .foregroundStyle(Theme.paper)
-                    .background(Theme.ink, in: RoundedRectangle(cornerRadius: 14))
+            card {
+                Text("Comic Vine").font(.headline).foregroundStyle(Theme.ink)
+                Text("Se usa en el buscador de cómics reales, y en Próximos si Metron no anda.")
+                    .font(.subheadline).foregroundStyle(Theme.ink2)
+                if model.hasComicVine {
+                    Text("Clave guardada").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                    Button("Quitar clave de Comic Vine", role: .destructive) { model.forgetComicVineKey() }
+                        .font(.subheadline)
+                } else {
+                    Link("Conseguir clave en comicvine.gamespot.com/api", destination: URL(string: "https://comicvine.gamespot.com/api/")!)
+                        .font(.subheadline).foregroundStyle(Theme.magenta)
+                    field(TextField("Pegá tu clave acá", text: $comicVineKey).font(.system(.body, design: .monospaced)))
+                    saveButton(disabled: comicVineKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                        model.saveComicVineKey(comicVineKey)
+                        comicVineKey = ""
+                    }
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-            Text("La clave queda guardada solo en este iPhone. No se sube a ningún lado.")
+            Text("Los datos de las cuentas quedan guardados solo en este iPhone. No se suben a ningún lado. Para Metron conviene usar una contraseña que no uses en otros sitios.")
                 .font(.footnote)
                 .foregroundStyle(Theme.ink2)
         }
-        .padding(.top, 8)
+    }
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10, content: content)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+    }
+
+    private func field<F: View>(_ input: F) -> some View {
+        input
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .padding(12)
+            .background(Theme.paper, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line))
+    }
+
+    private func saveButton(disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text("Guardar")
+                .font(.system(size: 16, weight: .heavy))
+                .frame(maxWidth: .infinity)
+                .padding(12)
+                .foregroundStyle(Theme.paper)
+                .background(Theme.ink, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.5 : 1)
     }
 }
