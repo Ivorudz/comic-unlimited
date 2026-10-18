@@ -19,6 +19,8 @@ enum LibraryRoute: Hashable {
     case findInSources(series: String, number: String?)
     /// Revisar las fichas de Comic Vine que eligió la app sola.
     case reviewLinks
+    /// Ficha de un archivo tuyo que no tiene ficha de Comic Vine.
+    case localComic(String)
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.
@@ -136,15 +138,23 @@ struct ComicGrid: View {
     }
 }
 
-/// Un cómic: tocarlo lo abre; mantenerlo apretado muestra el menú.
+/// Un cómic: tocarlo abre su ficha (ahí está "Leer"); mantenerlo apretado muestra el menú.
 struct LocalComicTile: View {
     let comic: LocalComic
     @Environment(LibraryActions.self) private var actions
     private var library: LocalLibrary { LocalLibrary.shared }
 
     var body: some View {
-        Button { actions.onRead(comic) } label: {
-            LocalComicCard(comic: comic, matching: library.matching.contains(comic.id))
+        Group {
+            if let issueID = comic.cvIssueID {
+                NavigationLink(value: CVRoute.issue(id: issueID, title: comic.displayTitle)) {
+                    LocalComicCard(comic: comic, matching: library.matching.contains(comic.id))
+                }
+            } else {
+                NavigationLink(value: LibraryRoute.localComic(comic.id)) {
+                    LocalComicCard(comic: comic, matching: library.matching.contains(comic.id))
+                }
+            }
         }
         .buttonStyle(.plain)
         .contextMenu {

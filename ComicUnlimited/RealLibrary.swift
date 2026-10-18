@@ -94,6 +94,34 @@ final class RealLibrary {
         save(entry)
     }
 
+    /// Al leer un archivo tuyo unido a Comic Vine: pasa a "Leyendo"; al terminarlo, a "Leído".
+    /// Si ya estaba en "Leído", volver a abrirlo no lo cambia.
+    func updateFromReading(_ comic: LocalComic, finished: Bool) {
+        guard let issueID = comic.cvIssueID else { return }
+        let key = "issue-\(issueID)"
+        var entry = entries[key] ?? Entry(
+            id: issueID,
+            kind: .issue,
+            title: comic.cvTitle ?? comic.displayTitle,
+            coverURL: comic.cvCoverURL,
+            series: comic.cvSeriesID.map { Ref(id: $0, name: comic.cvSeriesName ?? comic.displayTitle) },
+            writers: [],
+            characters: [],
+            status: nil,
+            rating: nil,
+            updated: Date().timeIntervalSince1970
+        )
+        if finished {
+            guard entry.status != .read else { return }
+            entry.status = .read
+        } else {
+            guard entry.status != .read && entry.status != .reading else { return }
+            entry.status = .reading
+        }
+        if entry.coverURL == nil { entry.coverURL = comic.cvCoverURL }
+        save(entry)
+    }
+
     /// Cambia el puntaje. Tocar la misma estrella de nuevo lo borra.
     /// Puntuar un cómic lo pasa a "Leído" si no estaba en ninguna lista.
     func setRating(_ rating: Int, for template: Entry) {

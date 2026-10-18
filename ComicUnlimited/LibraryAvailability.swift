@@ -22,6 +22,7 @@ struct AppDestinations: ViewModifier {
                 case .findInSources(let series, let number):
                     FindInSourcesView(series: series, number: number)
                 case .reviewLinks: ReviewLinksView()
+                case .localComic(let id): LocalComicDetailView(comicID: id)
                 }
             }
     }

@@ -39,6 +39,8 @@ struct LocalComic: Codable, Identifiable, Hashable {
     /// Año del paquete de donde salió (por ejemplo "Avengers Disassembled (2004).zip"),
     /// para elegir bien la ficha cuando el archivo no dice el año.
     var packYear: Int?
+    /// Portada del número en Comic Vine (solo el link; la imagen se carga al verla).
+    var cvCoverURL: String?
     /// true = revisaste (o elegiste vos) su ficha de Comic Vine. Si la eligió la app sola, queda para revisar.
     var cvReviewed: Bool?
 
@@ -305,6 +307,8 @@ final class LocalLibrary {
             }
             start = c.lastPage ?? 0
         }
+        // Empezar a leer un cómic con ficha lo pasa a "Leyendo" (en Perfil).
+        if let comic = item(comic.id) { RealLibrary.shared.updateFromReading(comic, finished: false) }
         return start
     }
 
@@ -317,6 +321,8 @@ final class LocalLibrary {
             c.finished = true
             c.lastPage = c.pageCount - 1
         }
+        // Terminarlo lo pasa a "Leído" (en Perfil).
+        if let comic = item(id) { RealLibrary.shared.updateFromReading(comic, finished: true) }
     }
 
     /// Lo que empezaste a leer, lo último primero (para "Seguir leyendo").
@@ -331,6 +337,7 @@ final class LocalLibrary {
         update(id) { c in
             c.cvReviewed = reviewed
             c.cvIssueID = issue.id
+            c.cvCoverURL = issue.image?.smallUrl ?? issue.image?.thumbUrl
             c.cvSeriesID = series.id
             c.cvTitle = CVText.issueTitle(series: series.name ?? c.title, number: issue.issueNumber)
             c.cvSeriesName = series.name

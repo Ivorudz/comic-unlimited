@@ -19,9 +19,13 @@ final class DiscoverModel {
     /// Cuántos cómics mostrar en la fila.
     private static let limit = 20
 
-    /// Editoriales conocidas, que se muestran primero.
+    /// Editoriales de cómics (no manga ni ediciones de otros países): solo se muestran estas.
     private static let known = ["marvel", "dc comics", "image", "dark horse", "idw", "boom",
-                                "dynamite", "oni", "titan", "valiant", "mad cave", "ahoy", "vault", "archie"]
+                                "dynamite", "oni", "titan", "valiant", "mad cave", "ahoy", "vault", "archie",
+                                "aftershock", "awa", "artists writers", "skybound", "top cow", "zenescope",
+                                "black mask", "scout", "abstract studio", "humanoids", "fantagraphics",
+                                "drawn & quarterly", "dstlry", "tko", "massive", "rebellion", "2000 ad",
+                                "behemoth", "heavy metal", "source point", "bad idea", "magnetic", "first second"]
 
     func load() async {
         switch state {
@@ -39,10 +43,8 @@ final class DiscoverModel {
         let to = calendar.date(byAdding: .day, value: -1, to: today) ?? today
         let client = ComicVineKey.client
         do {
-            var issues = try await client.issues(from: from, to: to) { [weak self] partial in
-                guard let self, !partial.isEmpty else { return }
-                self.state = .loaded(Self.pick(partial))
-            }
+            // No mostramos nada hasta saber la editorial de cada uno: así no se cuelan mangas.
+            var issues = try await client.issues(from: from, to: to)
             let publishers = await client.publishers(volumeIDs: issues.compactMap(\.volumeID))
             for i in issues.indices {
                 if let volume = issues[i].volumeID { issues[i].publisher = publishers[volume] }
@@ -58,15 +60,16 @@ final class DiscoverModel {
         await load()
     }
 
-    /// Elige qué mostrar: los que tienen portada, de editoriales conocidas primero y los más nuevos antes.
+    /// Elige qué mostrar: solo editoriales de cómics, primero los que tienen portada y los más nuevos.
     private static func pick(_ issues: [UpcomingIssue]) -> [UpcomingIssue] {
-        func rank(_ issue: UpcomingIssue) -> Int {
-            var r = 0
-            if issue.coverURL != nil { r += 2 }
-            if let p = issue.publisher?.lowercased(), known.contains(where: { p.hasPrefix($0) }) { r += 4 }
-            return r
+        func isComics(_ issue: UpcomingIssue) -> Bool {
+            guard let p = issue.publisher?.lowercased() else { return false }
+            return known.contains { p.hasPrefix($0) }
         }
-        let sorted = issues.sorted {
+        // Si Comic Vine no dijo ninguna editorial (falló esa consulta), mostramos todo.
+        let candidates = issues.contains { $0.publisher != nil } ? issues.filter(isComics) : issues
+        func rank(_ issue: UpcomingIssue) -> Int { issue.coverURL != nil ? 2 : 0 }
+        let sorted = candidates.sorted {
             let a = rank($0), b = rank($1)
             return a != b ? a > b : $0.date > $1.date
         }
