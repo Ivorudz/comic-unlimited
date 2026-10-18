@@ -219,6 +219,8 @@ private struct PickIssueView: View {
     @State private var number: String
     @State private var loading = true
     @State private var errorText: String?
+    /// Elegiste un número que ya tenés en otro archivo.
+    @State private var repeated: (issue: CVIssueSummary, other: LocalComic)?
 
     init(comic: LocalComic, series: CVVolumeSummary, onDone: @escaping () -> Void) {
         self.comic = comic
@@ -249,8 +251,12 @@ private struct PickIssueView: View {
                 Section("Elegí el número") {
                     ForEach(filtered) { issue in
                         Button {
-                            LocalLibrary.shared.link(comic.id, series: series, issue: issue)
-                            onDone()
+                            if let other = LocalLibrary.shared.owner(ofIssue: issue.id, except: comic.id) {
+                                repeated = (issue, other)
+                            } else {
+                                LocalLibrary.shared.link(comic.id, series: series, issue: issue)
+                                onDone()
+                            }
                         } label: {
                             HStack(spacing: 12) {
                                 RemoteCover(url: issue.image?.small).frame(width: 36)
@@ -274,6 +280,17 @@ private struct PickIssueView: View {
         .navigationTitle(series.name ?? "Serie")
         .navigationBarTitleDisplayMode(.inline)
         .task { if issues.isEmpty { await load(more: false) } }
+        .alert("Ya tenés este cómic", isPresented: Binding(get: { repeated != nil },
+                                                          set: { if !$0 { repeated = nil } })) {
+            Button("Borrar este archivo repetido", role: .destructive) {
+                LocalLibrary.shared.delete(comic)
+                repeated = nil
+                onDone()
+            }
+            Button("Cancelar", role: .cancel) { repeated = nil }
+        } message: {
+            Text("Está en \"\(repeated?.other.displayTitle ?? "otro archivo")\". No puede haber dos archivos del mismo cómic.")
+        }
     }
 
     private func load(more: Bool) async {

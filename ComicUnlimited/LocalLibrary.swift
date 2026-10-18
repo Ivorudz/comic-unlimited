@@ -221,6 +221,14 @@ final class LocalLibrary {
                     skippedDuplicates.append(name)
                     continue
                 }
+                // Buscamos su ficha en Comic Vine antes de agregarlo: si ya tenés un archivo
+                // unido a esa misma ficha, es el mismo cómic (repetido con otro nombre).
+                let found = await findMatch(title: title, packYear: packYear)
+                if let found, items.contains(where: { $0.cvIssueID == found.issue.id }) {
+                    try? FileManager.default.removeItem(at: info.file)
+                    skippedDuplicates.append(name)
+                    continue
+                }
                 let comic = LocalComic(
                     id: id,
                     title: title,
@@ -232,8 +240,7 @@ final class LocalLibrary {
                 if let cover = info.cover { try? cover.write(to: coverURL(comic)) }
                 items.insert(comic, at: 0)
                 saveIndex()
-                // Buscamos su ficha en Comic Vine sin hacer esperar.
-                Task { await autoLink(comic.id) }
+                if let found { link(comic.id, series: found.series, issue: found.issue) }
                 if depth == 0 { importNotices.append("Se agregó \(name).") }
             case .failure(let error as ArchiveError) where [.noPages, .tooBig].contains(error) && ext != "pdf" && depth < 2:
                 // Sin páginas: puede ser un paquete con cómics enteros adentro.
@@ -432,11 +439,24 @@ final class LocalLibrary {
         guard let comic = item(id), !ComicVineKey.current.isEmpty, !matching.contains(id) else { return false }
         matching.insert(id)
         defer { matching.remove(id) }
-        var info = FileNameInfo(comic.title)
-        if info.year == nil { info.year = comic.packYear }
-        guard let found = try? await ComicVineMatcher.find(for: info) else { return false }
+        guard let found = await findMatch(title: comic.title, packYear: comic.packYear) else { return false }
+        // Si otro archivo ya está unido a esa ficha, este es un repetido: no lo unimos.
+        if items.contains(where: { $0.id != id && $0.cvIssueID == found.issue.id }) { return false }
         link(id, series: found.series, issue: found.issue)
         return true
+    }
+
+    /// Busca la ficha de Comic Vine según el nombre del archivo (y el año del paquete, si el nombre no lo dice).
+    private func findMatch(title: String, packYear: Int?) async -> (series: CVVolumeSummary, issue: CVIssueSummary)? {
+        guard !ComicVineKey.current.isEmpty else { return nil }
+        var info = FileNameInfo(title)
+        if info.year == nil { info.year = packYear }
+        return try? await ComicVineMatcher.find(for: info)
+    }
+
+    /// Otro archivo tuyo que ya está unido a esa ficha de Comic Vine (si hay).
+    func owner(ofIssue issueID: Int, except id: String) -> LocalComic? {
+        items.first { $0.id != id && $0.cvIssueID == issueID }
     }
 
     func delete(_ comic: LocalComic) {

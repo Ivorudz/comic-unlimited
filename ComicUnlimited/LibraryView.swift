@@ -145,7 +145,7 @@ struct LibraryView: View {
             if library.importing {
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text("Importando… los archivos grandes (y los .cbr, que se convierten a .cbz) pueden tardar un poco.")
+                    Text("Importando y buscando su ficha en Comic Vine… los archivos grandes (y los .cbr, que se convierten a .cbz) pueden tardar un poco.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.ink2)
                 }
