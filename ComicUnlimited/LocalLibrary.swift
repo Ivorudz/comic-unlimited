@@ -131,11 +131,22 @@ final class LocalLibrary {
 
     /// Importa archivos elegidos en la app Archivos. Devuelve los problemas que hubo (si hubo).
     /// Un .zip o .rar con cómics enteros adentro (un "paquete") se importa como varios cómics.
+    /// Archivos que no se agregaron porque ya los tenías.
+    private var skippedDuplicates: [String] = []
+
     func importFiles(_ urls: [URL]) async -> [String] {
         importing = true
         importNotices = []
+        skippedDuplicates = []
         defer { importing = false }
-        return await importBatch(urls, depth: 0, packYear: nil)
+        let problems = await importBatch(urls, depth: 0, packYear: nil)
+        switch skippedDuplicates.count {
+        case 0: break
+        case 1: importNotices.append("\(skippedDuplicates[0]) ya estaba en tu biblioteca: no se agregó de nuevo.")
+        case 2...3: importNotices.append("Ya estaban en tu biblioteca (no se agregaron de nuevo): \(skippedDuplicates.joined(separator: ", ")).")
+        default: importNotices.append("\(skippedDuplicates.count) cómics ya estaban en tu biblioteca: no se agregaron de nuevo.")
+        }
+        return problems
     }
 
     /// `depth`: cuántos paquetes hay "por encima" (un paquete adentro de otro). Hasta 2 niveles.
@@ -202,9 +213,17 @@ final class LocalLibrary {
 
             switch result {
             case .success(let info):
+                let title = Self.cleanTitle(url.deletingPathExtension().lastPathComponent)
+                // Repetido: mismo nombre de archivo y misma cantidad de páginas que uno que ya tenés.
+                if items.contains(where: { $0.title.caseInsensitiveCompare(title) == .orderedSame
+                                           && $0.pageCount == info.pages }) {
+                    try? FileManager.default.removeItem(at: info.file)
+                    skippedDuplicates.append(name)
+                    continue
+                }
                 let comic = LocalComic(
                     id: id,
-                    title: Self.cleanTitle(url.deletingPathExtension().lastPathComponent),
+                    title: title,
                     fileName: info.file.lastPathComponent,
                     pageCount: info.pages,
                     added: Date().timeIntervalSince1970,
