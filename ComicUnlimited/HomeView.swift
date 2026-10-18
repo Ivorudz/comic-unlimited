@@ -78,13 +78,11 @@ struct HomeView: View {
     /// Una sola fila con lo último que leíste (cómics de la app y tus archivos), lo más reciente primero.
     @ViewBuilder
     private var continueReading: some View {
-        let samples = store.recentlyRead(from: Catalog.comics)
-            .map { RecentItem.sample($0, store.lastOpened[$0.id] ?? 0) }
-        let files = LocalLibrary.shared.recentlyRead.map { RecentItem.local($0) }
-        let recent = (samples + files).sorted { $0.time > $1.time }
+        // Solo tus archivos de la Biblioteca (los cómics de prueba ya no se muestran en Inicio).
+        let recent = LocalLibrary.shared.recentlyRead.map { RecentItem.local($0) }
         SectionTitle("Seguir leyendo")
         if recent.isEmpty {
-            Text("Todavía no empezaste ningún cómic. Abrí uno de tu Biblioteca o de Descubrir, acá abajo.")
+            Text("Todavía no empezaste ningún cómic. Importá uno en la Biblioteca y abrilo: va a aparecer acá.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.ink2)
         } else {
@@ -129,21 +127,6 @@ struct HomeView: View {
         RowTitle(title: "Para vos", subtitle: "Series reales según tus puntajes y tus listas")
             .padding(.top, 22)
         ForYouRow(model: forYou)
-
-        RowTitle(title: "Para leer en la app", subtitle: "Cómics de prueba, inventados, que se leen acá adentro")
-            .padding(.top, 22)
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(store.recommended(from: Catalog.comics)) { comic in
-                    NavigationLink(value: comic) {
-                        CatalogCard(comic: comic).frame(width: 110)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 18)
-        }
-        .padding(.horizontal, -18)
     }
 }
 

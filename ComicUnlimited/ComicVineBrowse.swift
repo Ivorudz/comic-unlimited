@@ -166,9 +166,8 @@ struct SeriesView: View {
                 if let detail {
                     header(detail)
                     RealLibraryControls(series: detail)
-                    if let text = CVText.plain(detail.description) ?? CVText.plain(detail.deck) {
-                        ComicVineText(text: text).padding(.top, 16)
-                    }
+                    ComicVineSummary(deck: detail.deck, description: detail.description)
+                        .padding(.top, 16)
                     SectionTitle("Números")
                     if issues.isEmpty {
                         Text("Comic Vine no tiene números cargados para esta serie.")
@@ -360,9 +359,9 @@ struct IssueView: View {
 
         RealLibraryControls(detail: d)
 
-        if let text = CVText.plain(d.description) ?? CVText.plain(d.deck) {
+        if ComicVineSummary.hasContent(deck: d.deck, description: d.description) {
             SectionTitle("De qué se trata")
-            ComicVineText(text: text)
+            ComicVineSummary(deck: d.deck, description: d.description)
         }
 
         let credits = CVText.groupCredits(d.personCredits ?? [])
@@ -520,6 +519,40 @@ enum CVText {
     static func fullDate(_ text: String?) -> String? {
         guard let text, let date = apiDate.date(from: text) else { return nil }
         return fullFormatter.string(from: date)
+    }
+
+    /// Del artículo largo de Comic Vine, se queda solo con la parte de la historia
+    /// (el texto del principio y secciones como "Plot Summary"). Corta en la primera sección
+    /// que no es de la historia: listas de personajes, arcos relacionados, ediciones, portadas…
+    static func story(_ html: String?) -> String? {
+        guard var s = html, !s.isEmpty else { return nil }
+        // Fuera tablas e imágenes con epígrafe (por ejemplo, la lista de portadas).
+        s = s.replacingOccurrences(of: "<table[\\s\\S]*?</table>", with: " ", options: [.regularExpression, .caseInsensitive])
+        s = s.replacingOccurrences(of: "<figure[\\s\\S]*?</figure>", with: " ", options: [.regularExpression, .caseInsensitive])
+
+        guard let headingRegex = try? NSRegularExpression(pattern: "<h[1-6][^>]*>([\\s\\S]*?)</h[1-6]>",
+                                                          options: [.caseInsensitive]) else { return plain(s) }
+        let ns = s as NSString
+        let matches = headingRegex.matches(in: s, range: NSRange(location: 0, length: ns.length))
+
+        let storyWords = ["plot", "summary", "synopsis", "overview", "premise", "resumen"]
+        var kept: [String] = []
+        var cursor = 0
+        var currentIsStory = true   // el texto antes del primer título siempre cuenta
+        for match in matches {
+            if currentIsStory {
+                kept.append(ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor)))
+            } else {
+                break
+            }
+            let heading = (plain(ns.substring(with: match.range(at: 1))) ?? "").lowercased()
+            currentIsStory = storyWords.contains { heading.contains($0) }
+            cursor = match.range.location + match.range.length
+        }
+        if currentIsStory {
+            kept.append(ns.substring(from: cursor))
+        }
+        return plain(kept.joined(separator: "\n"))
     }
 
     /// Comic Vine manda los textos con formato de página web (HTML). Esto les saca las etiquetas.

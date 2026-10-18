@@ -133,9 +133,40 @@ enum TranslationMemory {
     static var cache: [String: String] = [:]
 }
 
+/// "De qué se trata" de Comic Vine: el resumen corto arriba y, abajo, solo la parte de la historia
+/// (sin las listas de personajes, arcos relacionados, ediciones, etc.).
+struct ComicVineSummary: View {
+    let deck: String?
+    let description: String?
+
+    static func hasContent(deck: String?, description: String?) -> Bool {
+        CVText.plain(deck) != nil || CVText.story(description) != nil
+    }
+
+    var body: some View {
+        let lead = CVText.plain(deck)
+        var story = CVText.story(description)
+        // Si la historia repite el resumen, no lo mostramos dos veces.
+        if let l = lead, let s = story, s.hasPrefix(l) { story = String(s.dropFirst(l.count)).trimmingCharacters(in: .whitespacesAndNewlines) }
+        if story?.isEmpty == true { story = nil }
+        return VStack(alignment: .leading, spacing: 12) {
+            if let lead {
+                ComicVineText(text: lead, isLead: true, showsFooter: story == nil)
+            }
+            if let story {
+                ComicVineText(text: story)
+            }
+        }
+    }
+}
+
 /// Texto largo de Comic Vine, con "Leer más" y traducción automática según Perfil → Configuración.
 struct ComicVineText: View {
     let text: String
+    /// Resumen corto: se muestra un poco más destacado y entero.
+    var isLead = false
+    /// Mostrar abajo "Traducido automáticamente · Ver original".
+    var showsFooter = true
     @AppStorage(TranslationSettings.enabledKey) private var enabled = true
     @AppStorage(TranslationSettings.languageKey) private var language = "es"
     @State private var translated: String?
@@ -150,18 +181,18 @@ struct ComicVineText: View {
         let shown = (wantsTranslation && !showOriginal ? translated : nil) ?? text
         VStack(alignment: .leading, spacing: 6) {
             Text(shown)
-                .font(.subheadline)
+                .font(isLead ? .subheadline.weight(.semibold) : .subheadline)
                 .foregroundStyle(Theme.ink)
                 .lineSpacing(2)
-                .lineLimit(expanded ? nil : 6)
-            if shown.count > 300 {
+                .lineLimit(expanded || isLead ? nil : 6)
+            if !isLead && shown.count > 300 {
                 Button(expanded ? "Leer menos" : "Leer más") {
                     withAnimation { expanded.toggle() }
                 }
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(Theme.magenta)
             }
-            footer
+            if showsFooter { footer }
         }
         .modifier(AutoTranslate(text: text, language: language,
                                 active: wantsTranslation && translated == nil && !failed) { result in

@@ -96,10 +96,8 @@ struct ArcFolderView: View {
                     .padding(.top, 10)
                 }
 
-                if let text = CVText.plain(arc?.description) ?? CVText.plain(arc?.deck) {
-                    ComicVineText(text: text)
-                        .padding(.top, 12)
-                }
+                ComicVineSummary(deck: arc?.deck, description: arc?.description)
+                    .padding(.top, 12)
 
                 SectionTitle("Números, por fecha de publicación")
                 if loading && arc == nil {
