@@ -33,6 +33,8 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `Discover.swift`: fila "Recién salidos" de Inicio (cómics reales de la última semana).
   - `ForYou.swift`: "Para vos" en Inicio; sugerencias de series reales según tus puntajes y listas.
   - `RealLibrary.swift`: tus cómics reales (Quiero leer / Leyendo / Leído y puntaje), guardados en el iPhone.
+  - `ProfileView.swift`: pestaña Perfil; tus listas de cómics reales y números rápidos.
+  - (Pendiente) Biblioteca: cómics que tengas en archivos .cbz o .zip, para leerlos en la app.
   - `DetailView.swift`: ficha de un cómic.
   - `ReaderView.swift`: lector a pantalla completa.
   - `UpcomingView.swift`: pestaña Próximos (lanzamientos por semana).
