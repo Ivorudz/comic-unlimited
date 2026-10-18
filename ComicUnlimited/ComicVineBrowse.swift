@@ -354,6 +354,8 @@ struct IssueView: View {
             .padding(.top, 10)
         }
 
+        RealLibraryControls(detail: d)
+
         if let text = CVText.plain(d.description) ?? CVText.plain(d.deck) {
             SectionTitle("De qué se trata")
             ExpandableText(text: text)
@@ -396,10 +398,7 @@ struct IssueView: View {
         loading = true
         errorText = nil
         do {
-            let loaded = try await ComicVineKey.client.issue(id: id)
-            detail = loaded
-            // Se anota en el historial para las sugerencias de "Para vos".
-            RealHistory.record(loaded)
+            detail = try await ComicVineKey.client.issue(id: id)
         } catch {
             errorText = CVText.message(for: error)
         }

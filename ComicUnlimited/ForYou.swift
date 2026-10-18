@@ -1,58 +1,9 @@
 import SwiftUI
 import Observation
 
-// "Para vos" en Inicio: sugerencias de cómics reales parecidos a los que venís mirando.
-// Cada vez que abrís la ficha de un cómic real, se anota la serie, los guionistas y los personajes.
-// Con eso se le piden a Comic Vine otras series del mismo guionista o con los mismos personajes.
-
-// MARK: - Historial de cómics reales
-
-/// Un cómic real cuya ficha abriste. Se guardan solo datos de texto (nada de imágenes).
-struct ViewedIssue: Codable {
-    struct Ref: Codable, Hashable {
-        let id: Int
-        let name: String
-    }
-
-    let id: Int
-    let title: String
-    let series: Ref?
-    let writers: [Ref]
-    let characters: [Ref]
-}
-
-enum RealHistory {
-    private static let storageKey = "real.history"
-    private static let maxItems = 30
-
-    /// Lo último que miraste primero.
-    static var items: [ViewedIssue] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let list = try? JSONDecoder().decode([ViewedIssue].self, from: data) else { return [] }
-        return list
-    }
-
-    static func record(_ d: CVIssueDetail) {
-        let writers = (d.personCredits ?? [])
-            .filter { ($0.role ?? "").lowercased().contains("writer") }
-            .compactMap { c in c.name.map { ViewedIssue.Ref(id: c.id, name: $0) } }
-        let characters = (d.characterCredits ?? []).prefix(3)
-            .compactMap { c in c.name.map { ViewedIssue.Ref(id: c.id, name: $0) } }
-        let series = d.volume.flatMap { v in v.name.map { ViewedIssue.Ref(id: v.id, name: $0) } }
-        let item = ViewedIssue(
-            id: d.id,
-            title: CVText.issueTitle(series: d.volume?.name ?? "Cómic", number: d.issueNumber),
-            series: series,
-            writers: Array(writers.prefix(3)),
-            characters: Array(characters)
-        )
-        var list = items.filter { $0.id != d.id }
-        list.insert(item, at: 0)
-        if let data = try? JSONEncoder().encode(Array(list.prefix(maxItems))) {
-            UserDefaults.standard.set(data, forKey: storageKey)
-        }
-    }
-}
+// "Para vos" en Inicio: sugerencias de cómics reales según tus puntajes y tus listas
+// (Quiero leer, Leyendo, Leído). Se busca qué guionistas y personajes te gustan más
+// y se le piden a Comic Vine otras series de ellos.
 
 // MARK: - Sugerencias
 
@@ -87,31 +38,44 @@ final class ForYouModel {
             state = .noKey
             return
         }
-        let history = RealHistory.items
-        guard !history.isEmpty else {
+        let library = RealLibrary.shared
+        let liked = library.entries.values.filter { $0.weight > 0 }
+        guard !liked.isEmpty else {
             state = .noHistory
             return
         }
-        let signature = history.prefix(10).map { String($0.id) }.joined(separator: ",")
+        let signature = library.signature
         if case .loading = state { return }
         if signature == lastSignature, case .loaded = state { return }
         lastSignature = signature
-        await load(history)
+        await load(Array(library.entries.values))
     }
 
-    private func load(_ history: [ViewedIssue]) async {
+    private func load(_ entries: [RealLibrary.Entry]) async {
         state = .loading
         let client = ComicVineKey.client
-        let seen = Set(history.compactMap { $0.series?.id })
+        // No sugerimos series que ya tenés en tus listas.
+        let mine = Set(entries.compactMap { $0.series?.id })
 
-        // Guionistas y personajes que más se repiten (los más recientes ganan en empate).
-        let writers = Self.top(history.map(\.writers), count: 2)
-        let characters = Self.top(history.map(\.characters), count: 2)
-        let seeds: [(ref: ViewedIssue.Ref, isWriter: Bool)] =
-            writers.map { (ref: $0, isWriter: true) } + characters.map { (ref: $0, isWriter: false) }
+        // Puntaje de cada guionista y personaje: suma lo que te gustó y resta lo que no.
+        var writerScore: [RealLibrary.Ref: Double] = [:]
+        var characterScore: [RealLibrary.Ref: Double] = [:]
+        var because: [RealLibrary.Ref: (title: String, weight: Double)] = [:]
+        for entry in entries {
+            for ref in entry.writers + entry.characters {
+                if entry.writers.contains(ref) { writerScore[ref, default: 0] += entry.weight }
+                if entry.characters.contains(ref) { characterScore[ref, default: 0] += entry.weight }
+                if entry.weight > (because[ref]?.weight ?? 0) { because[ref] = (entry.title, entry.weight) }
+            }
+        }
+        func best(_ scores: [RealLibrary.Ref: Double]) -> [RealLibrary.Ref] {
+            scores.filter { $0.value > 0 }.sorted { $0.value > $1.value }.prefix(2).map { $0.key }
+        }
+        let seeds: [(ref: RealLibrary.Ref, isWriter: Bool)] =
+            best(writerScore).map { (ref: $0, isWriter: true) } + best(characterScore).map { (ref: $0, isWriter: false) }
 
         var results: [Suggestion] = []
-        var used = seen
+        var used = mine
         var lastError: Error?
 
         for seed in seeds {
@@ -124,6 +88,8 @@ final class ForYouModel {
                 let picks = series.filter { !used.contains($0.id) }
                     .sorted { $0.id > $1.id }
                     .prefix(Self.perSeed)
+                let reason = seed.isWriter ? "Del guion de \(seed.ref.name)" : "Con \(seed.ref.name)"
+                let source = because[seed.ref].map { " · porque te gustó \($0.title)" } ?? ""
                 for pick in picks {
                     used.insert(pick.id)
                     let detail = try? await client.series(id: pick.id)
@@ -131,7 +97,7 @@ final class ForYouModel {
                         id: pick.id,
                         name: detail?.name ?? pick.name ?? "Serie",
                         coverURL: detail?.image?.small,
-                        reason: seed.isWriter ? "Del guion de \(seed.ref.name)" : "Con \(seed.ref.name)"
+                        reason: reason + source
                     ))
                     // Se muestran a medida que llegan.
                     state = .loaded(results)
@@ -154,16 +120,6 @@ final class ForYouModel {
         await loadIfNeeded()
     }
 
-    /// Los que más se repiten en el historial.
-    private static func top(_ lists: [[ViewedIssue.Ref]], count: Int) -> [ViewedIssue.Ref] {
-        var score: [ViewedIssue.Ref: Double] = [:]
-        for (index, list) in lists.enumerated() {
-            // Lo más reciente pesa un poquito más.
-            let weight = 1 + 1 / Double(index + 1)
-            for ref in list { score[ref, default: 0] += weight }
-        }
-        return score.sorted { $0.value > $1.value }.prefix(count).map(\.key)
-    }
 }
 
 // MARK: - Fila de "Para vos"
@@ -183,7 +139,7 @@ struct ForYouRow: View {
             case .noKey:
                 notice("Para sugerirte cómics reales, cargá tu clave de Comic Vine en la pestaña Próximos (abajo de todo, en \"Cuentas de Metron y Comic Vine\").")
             case .noHistory:
-                notice("Abrí la ficha de algunos cómics reales (tocá uno en Recién salidos o usá Buscar cómics reales) y acá te vamos a sugerir otros parecidos.")
+                notice("Puntuá cómics reales o sumalos a Leyendo o Quiero leer desde su ficha (tocá uno en Recién salidos o usá Buscar cómics reales), y acá te vamos a sugerir otros parecidos.")
             case .failed(let message):
                 VStack(alignment: .leading, spacing: 10) {
                     notice(message)
@@ -193,7 +149,7 @@ struct ForYouRow: View {
                 }
             case .loaded(let items):
                 if items.isEmpty {
-                    notice("No encontré series parecidas todavía. Abrí la ficha de algunos cómics reales más.")
+                    notice("No encontré series parecidas todavía. Puntuá o sumá a tus listas algunos cómics reales más.")
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 12) {

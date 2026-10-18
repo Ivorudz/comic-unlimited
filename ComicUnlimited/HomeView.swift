@@ -112,7 +112,7 @@ struct HomeView: View {
         RowTitle(title: "Recién salidos", subtitle: "Cómics reales de la última semana, desde Comic Vine")
         RecentReleasesRow(model: discover)
 
-        RowTitle(title: "Para vos", subtitle: "Series reales parecidas a las fichas que abriste")
+        RowTitle(title: "Para vos", subtitle: "Series reales según tus puntajes y tus listas")
             .padding(.top, 22)
         ForYouRow(model: forYou)
 
