@@ -141,6 +141,7 @@ struct UpcomingView: View {
     @State private var model = UpcomingModel()
     @State private var query = ""
     @State private var showAccounts = false
+    @State private var showDiagnostics = false
 
     var body: some View {
         ScrollView {
@@ -172,6 +173,18 @@ struct UpcomingView: View {
         }
         .refreshable {
             await model.load(force: true)
+        }
+        .sheet(isPresented: $showDiagnostics) {
+            NavigationStack {
+                DiagnosticsView()
+                    .navigationTitle("Revisar conexión")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Listo") { showDiagnostics = false }
+                        }
+                    }
+            }
         }
         .sheet(isPresented: $showAccounts) {
             NavigationStack {
@@ -224,6 +237,14 @@ struct UpcomingView: View {
         }
         .foregroundStyle(Theme.ink2)
         .padding(.top, 14)
+        Button {
+            showDiagnostics = true
+        } label: {
+            Label("Revisar conexión", systemImage: "stethoscope")
+                .font(.footnote.weight(.semibold))
+        }
+        .foregroundStyle(Theme.ink2)
+        .padding(.top, 8)
     }
 
     private var weekPicker: some View {
