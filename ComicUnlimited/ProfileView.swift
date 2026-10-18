@@ -114,9 +114,7 @@ struct ProfileView: View {
                 .padding(.bottom, 30)
             }
             .background(Theme.paper)
-            .navigationDestination(for: CVRoute.self) { route in
-                CVDestination(route: route)
-            }
+            .appDestinations()
             .navigationTitle("Perfil")
             .toolbar(.hidden, for: .navigationBar)
         }

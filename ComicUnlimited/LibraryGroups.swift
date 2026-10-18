@@ -15,6 +15,8 @@ enum LibraryRoute: Hashable {
     /// Biblioteca → Fuentes, y una fuente en particular (por su link).
     case sources
     case source(String)
+    /// "Descargar" desde una ficha: buscar ese cómic en tus fuentes.
+    case findInSources(series: String, number: String?)
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.
@@ -502,7 +504,7 @@ private struct MissingIssueCard: View {
             if let name = issue.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
                 Text(name).font(.caption).foregroundStyle(Theme.ink2).lineLimit(1)
             }
-            Text("No lo tenés").font(.caption2).foregroundStyle(Theme.ink2)
+            Label("Descargar", systemImage: "arrow.down.circle").font(.caption2.weight(.semibold)).foregroundStyle(Theme.magenta)
         }
     }
 }

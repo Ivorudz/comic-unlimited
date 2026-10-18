@@ -207,7 +207,7 @@ private struct ArcMissingCard: View {
             if let date {
                 Text(date).font(.caption2).foregroundStyle(Theme.ink2)
             }
-            Text("No lo tenés").font(.caption2).foregroundStyle(Theme.ink2)
+            Label("Descargar", systemImage: "arrow.down.circle").font(.caption2.weight(.semibold)).foregroundStyle(Theme.magenta)
         }
     }
 }

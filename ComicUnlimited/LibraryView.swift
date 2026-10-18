@@ -73,19 +73,7 @@ struct LibraryView: View {
             }
             .background(Theme.paper)
             .scrollDismissesKeyboard(.interactively)
-            .navigationDestination(for: CVRoute.self) { route in
-                CVDestination(route: route)
-            }
-            .navigationDestination(for: LibraryRoute.self) { route in
-                switch route {
-                case .series(let id): SeriesFolderView(seriesID: id)
-                case .status(let state): StatusFolderView(state: state)
-                case .arc(let id, let name): ArcFolderView(arcID: id, name: name)
-                case .publisher(let name): PublisherFolderView(name: name)
-                case .sources: SourcesView()
-                case .source(let url): SourceDetailView(url: url)
-                }
-            }
+            .appDestinations()
             .navigationTitle("Biblioteca")
             .toolbar(.hidden, for: .navigationBar)
         }

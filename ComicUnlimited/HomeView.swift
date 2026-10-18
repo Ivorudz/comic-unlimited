@@ -25,9 +25,7 @@ struct HomeView: View {
                 .padding(.bottom, 24)
             }
             .background(Theme.paper)
-            .navigationDestination(for: CVRoute.self) { route in
-                CVDestination(route: route)
-            }
+            .appDestinations()
             .navigationDestination(for: Comic.self) { comic in
                 DetailView(comic: comic, onRead: onRead)
             }

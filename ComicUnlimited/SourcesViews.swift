@@ -329,7 +329,7 @@ struct SourceDetailView: View {
 }
 
 /// Un cómic de una fuente, con su botón para descargarlo a la Biblioteca.
-private struct SourceComicRow: View {
+struct SourceComicRow: View {
     let comic: SourceComic
     private var store: SourceStore { SourceStore.shared }
 

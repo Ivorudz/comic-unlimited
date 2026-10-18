@@ -262,12 +262,20 @@ private struct IssueRow: View {
     let issue: CVIssueSummary
 
     var body: some View {
+        let owned = LocalLibrary.shared.items.contains { $0.cvIssueID == issue.id }
         HStack(alignment: .center, spacing: 12) {
             RemoteCover(url: issue.image?.small).frame(width: 44)
             VStack(alignment: .leading, spacing: 3) {
-                Text(issue.issueNumber.map { "#\($0)" } ?? "Sin número")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Theme.ink)
+                HStack(spacing: 6) {
+                    Text(issue.issueNumber.map { "#\($0)" } ?? "Sin número")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    if owned {
+                        Label("En biblioteca", systemImage: "checkmark.seal.fill")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Theme.magenta)
+                    }
+                }
                 if let name = issue.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
                     Text(name)
                         .font(.footnote)
@@ -356,6 +364,8 @@ struct IssueView: View {
             }
             .padding(.top, 10)
         }
+
+        LibraryAvailability(detail: d)
 
         RealLibraryControls(detail: d)
 
