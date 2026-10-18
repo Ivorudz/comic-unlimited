@@ -213,7 +213,9 @@ final class LocalLibrary {
                 Task { await autoLink(comic.id) }
             case .failure(let error as ArchiveError) where [.noPages, .tooBig].contains(error) && ext != "pdf" && depth < 2:
                 // Sin páginas: puede ser un paquete con cómics enteros adentro.
-                try? FileManager.default.removeItem(at: dest.deletingPathExtension().appendingPathExtension("cbz"))
+                // Si era un RAR, se borra el .cbz a medio convertir (nunca el paquete mismo).
+                let converted = dest.deletingPathExtension().appendingPathExtension("cbz")
+                if converted != dest { try? FileManager.default.removeItem(at: converted) }
                 let pack: Result<(folder: URL, files: [URL]), Error> = await Task.detached(priority: .userInitiated) {
                     Result { try PackExtractor.extractComics(from: dest) }
                 }.value
