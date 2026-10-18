@@ -123,15 +123,27 @@ final class LocalLibrary {
     func fileURL(_ comic: LocalComic) -> URL { Self.folder.appendingPathComponent(comic.fileName) }
     func coverURL(_ comic: LocalComic) -> URL { Self.folder.appendingPathComponent("\(comic.id)-portada.jpg") }
 
+    /// Avisos de la última importación (por ejemplo, "Se agregaron 12 cómics de Pack.zip").
+    var importNotices: [String] = []
+
     /// Importa archivos elegidos en la app Archivos. Devuelve los problemas que hubo (si hubo).
+    /// Un .zip o .rar con cómics enteros adentro (un "paquete") se importa como varios cómics.
     func importFiles(_ urls: [URL]) async -> [String] {
         importing = true
+        importNotices = []
         defer { importing = false }
+        return await importBatch(urls, depth: 0)
+    }
+
+    /// `depth`: cuántos paquetes hay "por encima" (un paquete adentro de otro). Hasta 2 niveles.
+    private func importBatch(_ urls: [URL], depth: Int) async -> [String] {
         var problems: [String] = []
 
         for url in urls {
             let name = url.lastPathComponent
-            let ext = url.pathExtension.lowercased()
+            var ext = url.pathExtension.lowercased()
+            // Un .rar se trata igual que un .cbr (puede ser un cómic o un paquete de cómics).
+            if ext == "rar" { ext = "cbr" }
             guard ["cbz", "zip", "cbr", "pdf"].contains(ext) else {
                 problems.append("\(name): \(ArchiveError.notSupported.errorDescription ?? "")")
                 continue
@@ -199,6 +211,27 @@ final class LocalLibrary {
                 saveIndex()
                 // Buscamos su ficha en Comic Vine sin hacer esperar.
                 Task { await autoLink(comic.id) }
+            case .failure(let error as ArchiveError) where [.noPages, .tooBig].contains(error) && ext != "pdf" && depth < 2:
+                // Sin páginas: puede ser un paquete con cómics enteros adentro.
+                try? FileManager.default.removeItem(at: dest.deletingPathExtension().appendingPathExtension("cbz"))
+                let pack: Result<(folder: URL, files: [URL]), Error> = await Task.detached(priority: .userInitiated) {
+                    Result { try PackExtractor.extractComics(from: dest) }
+                }.value
+                try? FileManager.default.removeItem(at: dest)   // el paquete ya no hace falta
+                switch pack {
+                case .success(let found) where !found.files.isEmpty:
+                    let before = items.count
+                    problems += await importBatch(found.files, depth: depth + 1)
+                    try? FileManager.default.removeItem(at: found.folder)
+                    let added = items.count - before
+                    if added > 0 { importNotices.append(added == 1 ? "Se agregó 1 cómic de \(name)."
+                                                    : "Se agregaron \(added) cómics de \(name).") }
+                case .success(let found):
+                    try? FileManager.default.removeItem(at: found.folder)
+                    problems.append("\(name): \(ArchiveError.noPages.errorDescription ?? "") Tampoco tiene cómics adentro.")
+                case .failure(let error):
+                    problems.append("\(name): \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
+                }
             case .failure(let error):
                 try? FileManager.default.removeItem(at: dest)
                 try? FileManager.default.removeItem(at: dest.deletingPathExtension().appendingPathExtension("cbz"))

@@ -41,6 +41,7 @@ struct LibraryView: View {
     @State private var query = ""
     @State private var showImporter = false
     @State private var problems: [String] = []
+    @State private var notices: [String] = []
     @State private var showProblems = false
 
     var body: some View {
@@ -84,15 +85,16 @@ struct LibraryView: View {
                 guard !urls.isEmpty else { return }
                 Task {
                     problems = await library.importFiles(urls)
-                    showProblems = !problems.isEmpty
+                    notices = library.importNotices
+                    showProblems = !problems.isEmpty || !notices.isEmpty
                 }
             }
             .ignoresSafeArea()
         }
-        .alert("Algunos archivos no se pudieron importar", isPresented: $showProblems) {
+        .alert(problems.isEmpty ? "Listo" : "Algunos archivos no se pudieron importar", isPresented: $showProblems) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(problems.joined(separator: "\n\n"))
+            Text((notices + problems).joined(separator: "\n\n"))
         }
     }
 
@@ -334,7 +336,7 @@ private struct DocumentPicker: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         var types: [UTType] = [.pdf, .zip, .data]
-        for ext in ["cbz", "cbr"] {
+        for ext in ["cbz", "cbr", "rar"] {
             if let type = UTType(filenameExtension: ext) { types.append(type) }
         }
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
