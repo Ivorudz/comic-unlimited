@@ -1,0 +1,91 @@
+import SwiftUI
+
+// Punto de partida de la app.
+@main
+struct ComicUnlimitedApp: App {
+    @State private var store = ReadingStore()
+
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+                .environment(store)
+        }
+    }
+}
+
+/// Lo que necesita el lector para abrirse: qué cómic y en qué página.
+struct ReaderSession: Identifiable {
+    let comic: Comic
+    let startPage: Int
+    var id: String { comic.id }
+}
+
+// Las cinco pestañas de abajo. Por ahora solo Inicio funciona del todo.
+struct RootView: View {
+    @Environment(ReadingStore.self) private var store
+    @State private var session: ReaderSession?
+
+    var body: some View {
+        TabView {
+            HomeView(onRead: openReader)
+                .tabItem { Label("Inicio", systemImage: "house") }
+            ComingSoonView(title: "Biblioteca", icon: "books.vertical",
+                           message: "Acá vas a ver lo que estás leyendo, lo que querés leer y tus colecciones.")
+                .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
+            ComingSoonView(title: "Próximos", icon: "calendar",
+                           message: "Acá va a estar el calendario de lanzamientos.")
+                .tabItem { Label("Próximos", systemImage: "calendar") }
+            ComingSoonView(title: "Comunidad", icon: "bubble.left",
+                           message: "Acá vas a poder charlar sobre cómics y leer reseñas.")
+                .tabItem { Label("Comunidad", systemImage: "bubble.left") }
+            ComingSoonView(title: "Perfil", icon: "person.crop.circle",
+                           message: "Acá vas a ver tu nombre, tus estadísticas y la apariencia de la app.")
+                .tabItem { Label("Perfil", systemImage: "person.crop.circle") }
+        }
+        .tint(Theme.magenta)
+        .fullScreenCover(item: $session) { session in
+            ReaderView(comic: session.comic, startPage: session.startPage)
+                .environment(store)
+        }
+    }
+
+    private func openReader(_ comic: Comic) {
+        session = ReaderSession(comic: comic, startPage: store.open(comic))
+    }
+}
+
+/// Pantalla provisoria para las pestañas que todavía no están hechas.
+struct ComingSoonView: View {
+    let title: String
+    let icon: String
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.system(size: 32, weight: .black).width(.expanded))
+                .foregroundStyle(Theme.ink)
+                .misprint(0.7)
+                .padding(.top, 20)
+            Spacer()
+            VStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 44))
+                    .foregroundStyle(Theme.magenta)
+                Text("Próximamente")
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(Theme.ink)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.ink2)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.paper)
+    }
+}

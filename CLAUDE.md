@@ -1,0 +1,39 @@
+# Cómic Unlimited — reglas del proyecto
+
+App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyecto **no sabe programar** y **no tiene computadora**: todo se hace desde el celular.
+
+## Cómo hablar
+
+- Explicá todo en **español simple**, sin jerga. Si usás una palabra técnica, explicala en una frase.
+- Respuestas cortas: primero el resultado, después los detalles.
+
+## Cómo trabajar
+
+- **Cambios chicos**: un paso a la vez. Nada de rehacer media app de golpe.
+- **Siempre decir cómo probar cada cambio**: qué tocar en el iPhone y qué se debería ver.
+- **Nunca usar contenido con derechos de autor**: ni personajes, ni logos, ni imágenes, ni textos de obras ajenas. Los cómics de ejemplo son inventados y los dibujos se generan con código (`Drawing.swift`).
+- Sin dependencias externas (sin paquetes de terceros dentro de la app).
+- `comic-unlimited.html` es el prototipo web: es la referencia de diseño, textos y comportamiento.
+
+## Cómo está armado
+
+- `project.yml`: receta de XcodeGen. El `.xcodeproj` **no** se guarda en el repo; se genera al compilar.
+- `ComicUnlimited/`: el código de la app (iOS 17 o superior).
+  - `App.swift`: arranque y las cinco pestañas.
+  - `HomeView.swift`: pestaña Inicio (catálogo).
+  - `DetailView.swift`: ficha de un cómic.
+  - `ReaderView.swift`: lector a pantalla completa.
+  - `ReadingStore.swift`: guarda en el celular la página donde quedaste.
+  - `Comic.swift`: los 6 cómics de ejemplo.
+  - `Drawing.swift`: dibuja portadas y páginas.
+  - `Theme.swift`: colores.
+- `.github/workflows/build-ipa.yml`: GitHub Actions compila en una Mac, arma `ComicUnlimited.ipa` sin firmar y lo publica como Release.
+
+## Cómo se prueba
+
+No hay computadora, así que no hay simulador. Cada cambio se prueba así:
+
+1. Se sube el cambio a GitHub (rama `main` o una rama `claude/...`).
+2. GitHub Actions compila solo (tarda unos 5–10 minutos). Si falla, hay que mirar el registro en la pestaña **Actions** y arreglarlo antes de pedir que se pruebe.
+3. El IPA nuevo aparece en **Releases**: https://github.com/ivorudz/comic-unlimited/releases/latest
+4. Se descarga desde Safari y se abre con **LiveContainer** (que lo firma con el Apple ID gratuito).

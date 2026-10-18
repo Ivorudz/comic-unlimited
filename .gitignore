@@ -1,0 +1,7 @@
+# Archivos que se generan solos al compilar (no se guardan en el repositorio)
+*.xcodeproj
+build/
+Payload/
+*.ipa
+ComicUnlimited/Info.plist
+.DS_Store

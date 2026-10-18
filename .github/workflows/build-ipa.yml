@@ -1,0 +1,73 @@
+# Compila la app en una Mac de GitHub, arma el archivo .ipa (sin firmar)
+# y lo publica en la sección "Releases" del repositorio.
+name: Compilar IPA
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+  workflow_dispatch: # permite lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: write # necesario para crear la Release
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+
+      - name: Generar el proyecto de Xcode
+        run: xcodegen generate
+
+      - name: Mostrar la versión de Xcode
+        run: xcodebuild -version
+
+      - name: Compilar para iPhone (sin firma)
+        run: |
+          xcodebuild \
+            -project ComicUnlimited.xcodeproj \
+            -scheme ComicUnlimited \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Armar el archivo .ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/ComicUnlimited.app Payload/
+          zip -qry ComicUnlimited.ipa Payload
+          ls -lh ComicUnlimited.ipa
+
+      - name: Guardar el .ipa como artefacto (copia de respaldo)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ComicUnlimited-ipa
+          path: ComicUnlimited.ipa
+
+      - name: Publicar la Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v0.1.${{ github.run_number }}"
+          gh release create "$TAG" ComicUnlimited.ipa \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Cómic Unlimited 0.1 (compilación ${{ github.run_number }})" \
+            --notes "Archivo para instalar con LiveContainer. Rama: ${{ github.ref_name }}. Descargá ComicUnlimited.ipa desde Safari y abrilo con LiveContainer." \
+            --latest

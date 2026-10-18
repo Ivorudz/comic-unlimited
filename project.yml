@@ -1,0 +1,39 @@
+# Receta para que XcodeGen arme el proyecto de Xcode.
+# El proyecto (.xcodeproj) no se guarda en el repositorio: se genera en cada compilación.
+name: ComicUnlimited
+options:
+  bundleIdPrefix: com.ivorudz
+  developmentLanguage: es
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  ComicUnlimited:
+    type: application
+    platform: iOS
+    sources:
+      - path: ComicUnlimited
+    info:
+      path: ComicUnlimited/Info.plist
+      properties:
+        CFBundleDisplayName: "Cómic Unlimited"
+        CFBundleDevelopmentRegion: es
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ivorudz.comicunlimited
+        PRODUCT_NAME: ComicUnlimited
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: NO
