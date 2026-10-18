@@ -381,6 +381,12 @@ struct SeriesFolderView: View {
 
 /// Ajustes de la app (se cambian en Perfil → Configuración).
 enum AppSettings {
+    static let autoLinkKey = "settings.autoLink"
+    /// Buscar sola la ficha de Comic Vine de cada archivo que importás o descargás. Prendido salvo que lo apagues.
+    static var autoLink: Bool {
+        UserDefaults.standard.object(forKey: autoLinkKey) as? Bool ?? true
+    }
+
     static let showMissingKey = "settings.showMissing"
     /// Mostrar en gris los números que no tenés (en series y arcos). Prendido salvo que lo apagues.
     static var showMissing: Bool {

@@ -6,6 +6,7 @@ import SwiftUI
 struct ProfileView: View {
     @State private var selected: RealLibrary.Status = .reading
     @AppStorage(AppSettings.showMissingKey) private var showMissing = true
+    @AppStorage(AppSettings.autoLinkKey) private var autoLink = true
     @AppStorage(TranslationSettings.enabledKey) private var translate = true
     @AppStorage(TranslationSettings.languageKey) private var language = "es"
     private var library: RealLibrary { RealLibrary.shared }
@@ -66,6 +67,20 @@ struct ProfileView: View {
 
                     SectionTitle("Configuración")
                     VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $autoLink) {
+                            Text("Buscar la ficha de Comic Vine al importar")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .tint(Theme.magenta)
+                        Text(autoLink
+                             ? "Cada archivo que importás o descargás se une solo con su ficha (después la podés revisar en Biblioteca → Revisar fichas)."
+                             : "Los archivos se agregan sin ficha. La elegís vos: mantené apretado el cómic → Elegir ficha, o desde la ficha de Comic Vine → ¿Ya lo tenés?")
+                            .font(.caption)
+                            .foregroundStyle(Theme.ink2)
+
+                        Divider().padding(.vertical, 8)
+
                         Toggle(isOn: $showMissing) {
                             Text("Mostrar en gris los números que no tengo")
                                 .font(.subheadline.weight(.semibold))

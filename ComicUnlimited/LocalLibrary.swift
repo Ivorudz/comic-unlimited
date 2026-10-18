@@ -228,7 +228,8 @@ final class LocalLibrary {
                 }
                 // Buscamos su ficha en Comic Vine antes de agregarlo: si ya tenés un archivo
                 // unido a esa misma ficha, es el mismo cómic (repetido con otro nombre).
-                let found = await findMatch(title: title, packYear: packYear)
+                var found: (series: CVVolumeSummary, issue: CVIssueSummary)?
+                if AppSettings.autoLink { found = await findMatch(title: title, packYear: packYear) }
                 if let found, items.contains(where: { $0.cvIssueID == found.issue.id }) {
                     try? FileManager.default.removeItem(at: info.file)
                     skippedDuplicates.append(name)
