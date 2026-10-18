@@ -26,8 +26,29 @@ final class UpcomingModel {
     static let maxWeek = 7
     /// Cuántas semanas hacia atrás ("Recién salidos").
     static let minWeek = -2
+    /// Cuántos meses hacia adelante y hacia atrás.
+    static let maxMonth = 3
+    static let minMonth = -2
 
+    /// Ver de a una semana o de a un mes.
+    enum Period: String, CaseIterable, Identifiable {
+        case week = "Por semana"
+        case month = "Por mes"
+        var id: String { rawValue }
+    }
+
+    var period: Period = .week
+    /// 0 = esta semana (o este mes); 1 = la que viene; -1 = la pasada.
     var weekIndex = 0
+    var monthIndex = 0
+
+    var index: Int { period == .week ? weekIndex : monthIndex }
+    var canGoBack: Bool { index > (period == .week ? Self.minWeek : Self.minMonth) }
+    var canGoForward: Bool { index < (period == .week ? Self.maxWeek : Self.maxMonth) }
+
+    func step(_ delta: Int) {
+        if period == .week { weekIndex += delta } else { monthIndex += delta }
+    }
     /// Editorial elegida ("Todas" o el texto de un botón).
     var publisherFilter = "Todas"
     private(set) var state: LoadState = .idle
@@ -67,15 +88,24 @@ final class UpcomingModel {
     }
 
     /// Identifica lo que hay que mostrar: semana, editorial y cuentas.
-    var loadKey: String { "\(accountsVersion)|\(weekIndex)|\(publisherFilter)" }
+    var loadKey: String { "\(accountsVersion)|\(period.rawValue)|\(index)|\(publisherFilter)" }
 
-    /// Primer y último día de la semana elegida (empieza hoy).
-    var weekRange: (start: Date, end: Date) {
+    /// Primer y último día de lo elegido. La semana empieza hoy; el mes, el día 1.
+    var range: (start: Date, end: Date) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let start = calendar.date(byAdding: .day, value: 7 * weekIndex, to: today) ?? today
-        let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
-        return (start, end)
+        switch period {
+        case .week:
+            let start = calendar.date(byAdding: .day, value: 7 * weekIndex, to: today) ?? today
+            let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
+            return (start, end)
+        case .month:
+            let thisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
+            let start = calendar.date(byAdding: .month, value: monthIndex, to: thisMonth) ?? thisMonth
+            let next = calendar.date(byAdding: .month, value: 1, to: start) ?? start
+            let end = calendar.date(byAdding: .day, value: -1, to: next) ?? start
+            return (start, end)
+        }
     }
 
     func load(force: Bool = false) async {
@@ -86,9 +116,10 @@ final class UpcomingModel {
             return
         }
         state = .loading
-        let range = weekRange
+        let range = self.range
         let filter = publisherFilter
-        let isPast = weekIndex < 0
+        let isPast = index < 0
+        let maxPages = period == .month ? 20 : 6
         // Para semanas que ya pasaron, Comic Vine primero (siempre las tiene).
         // Para las que vienen, Metron primero (Comic Vine no tiene cómics futuros).
         let order: [UpcomingSource] = (isPast ? [.comicVine, .metron] : [.metron, .comicVine])
@@ -98,9 +129,9 @@ final class UpcomingModel {
 
         for source in order {
             do {
-                let issues = try await fetch(source, range: range, filter: filter)
+                let issues = try await fetch(source, range: range, filter: filter, maxPages: maxPages)
                 if source == .comicVine && !isPast && issues.isEmpty && !problems.isEmpty {
-                    problems.append("Comic Vine solo tiene cómics que ya salieron, así que no puede mostrar los próximos. Probá más tarde, o tocá la flecha ← para ver lo que salió la semana pasada.")
+                    problems.append("Comic Vine solo tiene cómics que ya salieron, así que no puede mostrar los próximos. Probá más tarde, o tocá la flecha ← para ver lo que ya salió.")
                     break
                 }
                 finish(issues, source, key: key)
@@ -118,12 +149,12 @@ final class UpcomingModel {
         if key == loadKey { state = .failed(problems.joined(separator: "\n\n"), badLogin: badLogin) }
     }
 
-    private func fetch(_ source: UpcomingSource, range: (start: Date, end: Date), filter: String) async throws -> [UpcomingIssue] {
+    private func fetch(_ source: UpcomingSource, range: (start: Date, end: Date), filter: String, maxPages: Int) async throws -> [UpcomingIssue] {
         switch source {
         case .metron:
             let publisher = MetronClient.publishers.first { $0.label == filter }
             var issues = try await MetronClient(user: MetronAccount.user, password: MetronAccount.password)
-                .issues(from: range.start, to: range.end, publisher: publisher?.query)
+                .issues(from: range.start, to: range.end, publisher: publisher?.query, maxPages: maxPages)
             if let publisher {
                 for i in issues.indices { issues[i].publisher = publisher.label }
             }
@@ -220,7 +251,7 @@ struct UpcomingView: View {
         Text("Cómics que salen en comiquerías de Estados Unidos, día por día.")
             .font(.subheadline)
             .foregroundStyle(Theme.ink2)
-        weekPicker
+        periodPicker
         if model.hasMetron {
             // Con Metron, la editorial se elige antes de pedir los datos.
             publisherChips(["Todas"] + MetronClient.publishers.map { $0.label })
@@ -257,43 +288,67 @@ struct UpcomingView: View {
         .padding(.top, 8)
     }
 
-    private var weekPicker: some View {
-        let range = model.weekRange
+    private var periodPicker: some View {
+        let range = model.range
         let label: String
-        switch model.weekIndex {
-        case 0: label = "Esta semana"
-        case -1: label = "Semana pasada"
-        case ..<(-1): label = "Hace \(-model.weekIndex) semanas"
-        default: label = "Semana del \(Self.shortDay.string(from: range.start))"
+        let detail: String
+        switch model.period {
+        case .week:
+            switch model.weekIndex {
+            case 0: label = "Esta semana"
+            case -1: label = "Semana pasada"
+            case ..<(-1): label = "Hace \(-model.weekIndex) semanas"
+            default: label = "Semana del \(Self.shortDay.string(from: range.start))"
+            }
+            detail = "\(Self.shortDay.string(from: range.start)) al \(Self.shortDay.string(from: range.end))"
+        case .month:
+            let name = Self.monthName.string(from: range.start)
+            label = name.prefix(1).uppercased() + name.dropFirst()
+            switch model.monthIndex {
+            case 0: detail = "Este mes"
+            case -1: detail = "Mes pasado"
+            case ..<(-1): detail = "Hace \(-model.monthIndex) meses"
+            case 1: detail = "El mes que viene"
+            default: detail = "En \(model.monthIndex) meses"
+            }
         }
-        return HStack {
-            Button {
-                model.weekIndex -= 1
-            } label: {
-                Image(systemName: "chevron.left").frame(width: 40, height: 40)
+        let unit = model.period == .week ? "Semana" : "Mes"
+        return VStack(spacing: 10) {
+            Picker("Ver", selection: Binding(get: { model.period }, set: { model.period = $0 })) {
+                ForEach(UpcomingModel.Period.allCases) { option in
+                    Text(option.rawValue).tag(option)
+                }
             }
-            .disabled(model.weekIndex <= UpcomingModel.minWeek)
-            .accessibilityLabel("Semana anterior")
-            Spacer()
-            VStack(spacing: 2) {
-                Text(label).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
-                Text("\(Self.shortDay.string(from: range.start)) al \(Self.shortDay.string(from: range.end))")
-                    .font(.caption).foregroundStyle(Theme.ink2)
+            .pickerStyle(.segmented)
+
+            HStack {
+                Button {
+                    model.step(-1)
+                } label: {
+                    Image(systemName: "chevron.left").frame(width: 40, height: 40)
+                }
+                .disabled(!model.canGoBack)
+                .accessibilityLabel("\(unit) anterior")
+                Spacer()
+                VStack(spacing: 2) {
+                    Text(label).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
+                    Text(detail).font(.caption).foregroundStyle(Theme.ink2)
+                }
+                Spacer()
+                Button {
+                    model.step(1)
+                } label: {
+                    Image(systemName: "chevron.right").frame(width: 40, height: 40)
+                }
+                .disabled(!model.canGoForward)
+                .accessibilityLabel("\(unit) siguiente")
             }
-            Spacer()
-            Button {
-                model.weekIndex += 1
-            } label: {
-                Image(systemName: "chevron.right").frame(width: 40, height: 40)
-            }
-            .disabled(model.weekIndex >= UpcomingModel.maxWeek)
-            .accessibilityLabel("Semana siguiente")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Theme.magenta)
+            .padding(6)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
         }
-        .font(.system(size: 17, weight: .semibold))
-        .foregroundStyle(Theme.magenta)
-        .padding(6)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
         .padding(.top, 14)
     }
 
@@ -348,8 +403,8 @@ struct UpcomingView: View {
 
         if days.isEmpty {
             Text(issues.isEmpty
-                 ? (source == .comicVine && model.weekIndex >= 0
-                    ? "Comic Vine solo tiene cómics que ya salieron. Para ver los próximos hace falta Metron. Con la flecha ← podés ver lo que salió la semana pasada."
+                 ? (source == .comicVine && model.index >= 0
+                    ? "Comic Vine solo tiene cómics que ya salieron. Para ver los próximos hace falta Metron. Con la flecha ← podés ver lo que ya salió."
                     : "\(source.rawValue) todavía no tiene lanzamientos cargados para estas fechas.")
                  : "No hay cómics que coincidan con la búsqueda.")
                 .font(.subheadline)
@@ -410,6 +465,13 @@ struct UpcomingView: View {
     }
 
     // MARK: Utilidades
+
+    static let monthName: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_AR")
+        f.dateFormat = "MMMM 'de' yyyy"
+        return f
+    }()
 
     static let shortDay: DateFormatter = {
         let f = DateFormatter()

@@ -62,7 +62,7 @@ struct MetronClient {
     ]
 
     /// Cómics que salen en comiquerías entre `from` y `to`. Si se pasa `publisher`, solo de esa editorial.
-    func issues(from: Date, to: Date, publisher: String?) async throws -> [UpcomingIssue] {
+    func issues(from: Date, to: Date, publisher: String?, maxPages: Int = 6) async throws -> [UpcomingIssue] {
         let day = ComicVineClient.dayFormatter
         var components = URLComponents(string: "https://metron.cloud/api/issue/")!
         var items = [
@@ -74,9 +74,9 @@ struct MetronClient {
 
         var next: URL? = components.url
         var all: [MetronIssue] = []
-        // Como mucho 6 páginas, para cuidar el límite de Metron.
+        // Un máximo de páginas, para cuidar el límite de Metron.
         var pages = 0
-        while let url = next, pages < 6 {
+        while let url = next, pages < maxPages {
             let page: MetronPage = try await get(url)
             all += page.results
             next = page.next.flatMap { URL(string: $0) }
