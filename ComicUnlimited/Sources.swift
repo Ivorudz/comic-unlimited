@@ -85,6 +85,19 @@ struct SourceComic: Decodable, Identifiable, Hashable {
         size = try? c.decode(Int.self, forKey: .size)
     }
 
+    /// Para armar un cómic a mano (por ejemplo, desde una publicación de WordPress).
+    init(title: String, download: String, format: String? = nil, year: String? = nil, cover: String? = nil) {
+        self.title = title
+        self.download = download
+        self.format = format
+        self.year = year
+        self.cover = cover
+        series = nil
+        number = nil
+        publisher = nil
+        size = nil
+    }
+
     var coverURL: URL? { cover.flatMap { URL(string: $0) } }
 
     /// Extensión del archivo: la de "format" o la del link.
@@ -335,8 +348,13 @@ final class FileDownloader: NSObject, URLSessionDownloadDelegate {
             return
         }
         // El archivo temporal se borra al salir de esta función: lo movemos ya.
+        // Si el nombre no dice bien qué es, lo averiguamos mirando los primeros bytes del archivo.
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let dest = folder.appendingPathComponent(fileName)
+        var name = fileName
+        if let real = Self.detectExtension(location) {
+            name = (fileName as NSString).deletingPathExtension + "." + real
+        }
+        let dest = folder.appendingPathComponent(name)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try FileManager.default.moveItem(at: location, to: dest)
@@ -345,6 +363,18 @@ final class FileDownloader: NSObject, URLSessionDownloadDelegate {
             continuation?.resume(throwing: error)
         }
         continuation = nil
+    }
+
+    /// "PK" = zip/cbz, "Rar!" = rar/cbr, "%PDF" = pdf. nil si no se reconoce.
+    static func detectExtension(_ url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let head = try? handle.read(upToCount: 4), head.count >= 4 else { return nil }
+        let bytes = [UInt8](head)
+        if bytes[0] == 0x50 && bytes[1] == 0x4B { return "cbz" }
+        if bytes == [0x52, 0x61, 0x72, 0x21] { return "cbr" }
+        if bytes == [0x25, 0x50, 0x44, 0x46] { return "pdf" }
+        return nil
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

@@ -54,6 +54,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `LibraryActionsHost.swift`: ventanas del menú de cada cómic (elegir ficha, cambiar nombre, borrar), en la raíz de la app.
   - `Sources.swift`: fuentes (formato del JSON, guardarlas, buscar versiones nuevas) y descargas con avance.
   - `SourcesViews.swift`: pantallas de Fuentes (lista, agregar con link, catálogo con botón Descargar).
+  - `WordPress.swift`: "Mi página WordPress": lee las publicaciones de tu página y descarga sus archivos.
   - `Metron.swift`: conexión con Metron (lanzamientos de la semana).
   - `Diagnostics.swift`: "Revisar conexión" en Próximos; prueba Metron y Comic Vine y arma un texto para copiar.
   - `ReadingStore.swift`: guarda en el celular la página donde quedaste.
@@ -71,8 +72,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 - 0.17: imágenes de personajes y arcos en la ficha (tocar un arco abre sus números) + traducción automática (Perfil → Configuración: prender/apagar e idioma).
 - 0.18: Inicio sin cómics de prueba. "De qué se trata": resumen corto de Comic Vine + solo la parte de la historia (sin listas de personajes, arcos relacionados, ediciones ni tablas).
 - 0.19: Fuentes: agregar catálogos con un link JSON (nombre, versión, autor, licencia, lista de cómics), ver sus cómics y descargarlos a la Biblioteca.
-- Fuentes: queda como en la 0.19. Leer páginas WordPress queda como posibilidad a futuro (idealmente un WordPress autohospedado, con links directos a los archivos).
-- 0.20: manitos al costado de las estrellas (misma fila; si no entran, bajan solas).
+- 0.20: manitos al costado de las estrellas (misma fila; si no entran, bajan solas) + "Mi página WordPress" (Biblioteca → Fuentes): se configura UNA página propia, se ven sus publicaciones y se descargan sus archivos (links directos, Pixeldrain con su link oficial, Google Drive y Dropbox; los demás links se abren en Safari). No se saltean logins ni protecciones de ningún servicio.
 - Más adelante: Colecciones propias: crear, renombrar, borrar, agregar desde el menú (un cómic puede estar en varias), ordenar arrastrando (orden de lectura) y "Crear colección con este arco" (ordenada por fecha, después se ajusta).
 - .cbr: los que por dentro son .zip se abren directo. Los que son RAR se convierten a .cbz al importarlos, con libarchive (viene dentro de iOS; Apple no la permite en el App Store, pero esta app es personal).
 - LiveContainer: el selector de archivos pide una COPIA (asCopy) porque leer el original puede fallar adentro de LiveContainer.

@@ -26,10 +26,13 @@ struct SourcesView: View {
                     .foregroundStyle(Theme.ink2)
                     .padding(.top, 6)
 
+                WordPressSiteCard()
+                    .padding(.top, 16)
+
                 Button {
                     showAdd = true
                 } label: {
-                    Label("Agregar fuente", systemImage: "plus.circle.fill")
+                    Label("Agregar fuente (JSON)", systemImage: "plus.circle.fill")
                         .font(.system(size: 16, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .padding(14)
