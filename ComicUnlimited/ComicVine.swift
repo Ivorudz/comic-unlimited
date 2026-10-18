@@ -123,17 +123,91 @@ struct ComicVineClient {
         return result
     }
 
-    private func request<T: Decodable>(_ resource: String, _ params: [String: String]) async throws -> CVResponse<T> {
+    // MARK: Buscador y fichas
+
+    /// Busca series (por ejemplo "Batman") por nombre.
+    func searchSeries(_ query: String) async throws -> [CVVolumeSummary] {
+        let page: CVResponse<CVVolumeSummary> = try await request("search", [
+            "query": query,
+            "resources": "volume",
+            "field_list": "id,name,start_year,count_of_issues,publisher,image",
+            "limit": "30",
+        ], cached: true)
+        return page.results
+    }
+
+    /// Ficha de una serie.
+    func series(id: Int) async throws -> CVVolumeDetail {
+        try await requestObject("volume/4050-\(id)", [
+            "field_list": "id,name,start_year,count_of_issues,publisher,image,deck,description,site_detail_url",
+        ])
+    }
+
+    /// Números de una serie, del más nuevo al más viejo, de a 100.
+    func issues(ofSeries id: Int, offset: Int) async throws -> (items: [CVIssueSummary], total: Int) {
+        let page: CVResponse<CVIssueSummary> = try await request("issues", [
+            "filter": "volume:\(id)",
+            "sort": "cover_date:desc",
+            "field_list": "id,name,issue_number,cover_date,store_date,image",
+            "limit": "100",
+            "offset": "\(offset)",
+        ], cached: true)
+        return (page.results, page.numberOfTotalResults ?? page.results.count)
+    }
+
+    /// Ficha de un número.
+    func issue(id: Int) async throws -> CVIssueDetail {
+        try await requestObject("issue/4000-\(id)", [
+            "field_list": "id,name,issue_number,cover_date,store_date,image,deck,description,person_credits,character_credits,story_arc_credits,volume,site_detail_url",
+        ])
+    }
+
+    // MARK: Pedidos a Comic Vine
+
+    private static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        return d
+    }()
+
+    /// Respuestas ya pedidas, guardadas solo en memoria mientras la app está abierta,
+    /// para no gastar consultas del límite por hora.
+    private static let memory = NSCache<NSString, NSData>()
+
+    private func request<T: Decodable>(_ resource: String, _ params: [String: String], cached: Bool = false) async throws -> CVResponse<T> {
+        let data = try await fetch(resource, params, cached: cached)
+        do {
+            return try Self.decoder.decode(CVResponse<T>.self, from: data)
+        } catch {
+            throw ComicVineError.server("no se pudo leer la respuesta")
+        }
+    }
+
+    private func requestObject<T: Decodable>(_ resource: String, _ params: [String: String]) async throws -> T {
+        let data = try await fetch(resource, params, cached: true)
+        guard let body = try? Self.decoder.decode(CVObjectResponse<T>.self, from: data),
+              let result = body.results else {
+            throw ComicVineError.server("no se encontró esa ficha")
+        }
+        return result
+    }
+
+    private func fetch(_ resource: String, _ params: [String: String], cached: Bool) async throws -> Data {
         var components = URLComponents(string: "https://comicvine.gamespot.com/api/\(resource)/")!
         components.queryItems = [
             URLQueryItem(name: "api_key", value: apiKey),
             URLQueryItem(name: "format", value: "json"),
         ] + params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        let url = components.url!
+        let cacheKey = url.absoluteString as NSString
+        if cached, let saved = Self.memory.object(forKey: cacheKey) {
+            return saved as Data
+        }
 
-        var request = URLRequest(url: components.url!)
+        var request = URLRequest(url: url)
         request.timeoutInterval = 30
         // Comic Vine pide que cada app se identifique.
-        request.setValue("ComicUnlimited/0.1 (app personal, uso no comercial)", forHTTPHeaderField: "User-Agent")
+        request.setValue("ComicUnlimited/0.3 (app personal, uso no comercial)", forHTTPHeaderField: "User-Agent")
 
         let fetched: (Data, URLResponse)
         do {
@@ -143,16 +217,15 @@ struct ComicVineClient {
         }
         let (data, response) = fetched
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        guard let body = try? decoder.decode(CVResponse<T>.self, from: data) else {
+        guard let status = try? Self.decoder.decode(CVStatus.self, from: data) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             if code == 401 { throw ComicVineError.invalidKey }
             throw ComicVineError.server("respuesta inesperada (código \(code))")
         }
-        if body.statusCode == 100 { throw ComicVineError.invalidKey }
-        if body.statusCode != 1 { throw ComicVineError.server(body.error) }
-        return body
+        if status.statusCode == 100 { throw ComicVineError.invalidKey }
+        if status.statusCode != 1 { throw ComicVineError.server(status.error ?? "error desconocido") }
+        if cached { Self.memory.setObject(data as NSData, forKey: cacheKey) }
+        return data
     }
 }
 
@@ -178,6 +251,75 @@ struct CVResponse<T: Decodable>: Decodable {
     }
 }
 
+struct CVStatus: Decodable {
+    let error: String?
+    let statusCode: Int
+}
+
+/// Respuesta de Comic Vine cuando se pide una sola ficha.
+struct CVObjectResponse<T: Decodable>: Decodable {
+    let results: T?
+
+    enum CodingKeys: String, CodingKey { case results }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        results = try? c.decode(T.self, forKey: .results)
+    }
+}
+
+struct CVVolumeSummary: Decodable, Identifiable {
+    let id: Int
+    let name: String?
+    let startYear: String?
+    let countOfIssues: Int?
+    let publisher: CVRef?
+    let image: CVImage?
+}
+
+struct CVVolumeDetail: Decodable {
+    let id: Int
+    let name: String?
+    let startYear: String?
+    let countOfIssues: Int?
+    let publisher: CVRef?
+    let image: CVImage?
+    let deck: String?
+    let description: String?
+    let siteDetailUrl: String?
+}
+
+struct CVIssueSummary: Decodable, Identifiable {
+    let id: Int
+    let name: String?
+    let issueNumber: String?
+    let coverDate: String?
+    let storeDate: String?
+    let image: CVImage?
+}
+
+struct CVIssueDetail: Decodable {
+    let id: Int
+    let name: String?
+    let issueNumber: String?
+    let coverDate: String?
+    let storeDate: String?
+    let image: CVImage?
+    let deck: String?
+    let description: String?
+    let personCredits: [CVCredit]?
+    let characterCredits: [CVRef]?
+    let storyArcCredits: [CVRef]?
+    let volume: CVRef?
+    let siteDetailUrl: String?
+}
+
+struct CVCredit: Decodable, Identifiable {
+    let id: Int
+    let name: String?
+    let role: String?
+}
+
 struct CVIssue: Decodable {
     let id: Int
     let name: String?
@@ -191,6 +333,10 @@ struct CVIssue: Decodable {
 struct CVImage: Decodable {
     let smallUrl: String?
     let thumbUrl: String?
+    let mediumUrl: String?
+
+    var small: URL? { (smallUrl ?? thumbUrl).flatMap { URL(string: $0) } }
+    var medium: URL? { (mediumUrl ?? smallUrl).flatMap { URL(string: $0) } }
 }
 
 struct CVRef: Decodable {
@@ -220,7 +366,7 @@ final class CoverLoader {
     func image(for url: URL) async -> UIImage? {
         if let cached = memory.object(forKey: url as NSURL) { return cached }
         var request = URLRequest(url: url)
-        request.setValue("ComicUnlimited/0.1 (app personal, uso no comercial)", forHTTPHeaderField: "User-Agent")
+        request.setValue("ComicUnlimited/0.3 (app personal, uso no comercial)", forHTTPHeaderField: "User-Agent")
         guard let fetched = try? await session.data(for: request),
               let image = UIImage(data: fetched.0) else { return nil }
         memory.setObject(image, forKey: url as NSURL)

@@ -31,6 +31,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ReaderView.swift`: lector a pantalla completa.
   - `UpcomingView.swift`: pestaña Próximos (lanzamientos por semana).
   - `ComicVine.swift`: conexión con Comic Vine y carga de portadas.
+  - `ComicVineBrowse.swift`: buscador de cómics reales, ficha de serie y ficha de número.
   - `ReadingStore.swift`: guarda en el celular la página donde quedaste.
   - `Comic.swift`: los 6 cómics de ejemplo.
   - `Drawing.swift`: dibuja portadas y páginas.

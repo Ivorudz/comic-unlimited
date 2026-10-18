@@ -36,6 +36,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
                     searchField
+                    realComicsLink
                     continueReading
                     featured
                     catalogSection
@@ -44,6 +45,9 @@ struct HomeView: View {
                 .padding(.bottom, 24)
             }
             .background(Theme.paper)
+            .navigationDestination(for: CVRoute.self) { route in
+                CVDestination(route: route)
+            }
             .navigationDestination(for: Comic.self) { comic in
                 DetailView(comic: comic, onRead: onRead)
             }
@@ -61,6 +65,34 @@ struct HomeView: View {
             .foregroundStyle(Theme.ink)
             .misprint()
             .padding(.top, 10)
+    }
+
+    /// Entrada al buscador de cómics reales (Comic Vine).
+    private var realComicsLink: some View {
+        NavigationLink(value: CVRoute.search) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkle.magnifyingglass")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Theme.magenta)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Buscar cómics reales")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Series, números, autores y personajes, desde Comic Vine")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.ink2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Theme.ink2)
+            }
+            .padding(14)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 14)
     }
 
     private var searchField: some View {

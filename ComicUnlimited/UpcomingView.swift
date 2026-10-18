@@ -15,7 +15,7 @@ final class UpcomingModel {
         case failed(ComicVineError)
     }
 
-    private static let keyStorage = "comicvine.apiKey"
+    private static let keyStorage = ComicVineKey.storageKey
     /// Cuántas semanas hacia adelante se pueden mirar.
     static let maxWeek = 7
 
