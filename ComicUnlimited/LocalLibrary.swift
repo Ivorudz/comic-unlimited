@@ -211,6 +211,7 @@ final class LocalLibrary {
                 saveIndex()
                 // Buscamos su ficha en Comic Vine sin hacer esperar.
                 Task { await autoLink(comic.id) }
+                if depth == 0 { importNotices.append("Se agregó \(name).") }
             case .failure(let error as ArchiveError) where [.noPages, .tooBig].contains(error) && ext != "pdf" && depth < 2:
                 // Sin páginas: puede ser un paquete con cómics enteros adentro.
                 // Si era un RAR, se borra el .cbz a medio convertir (nunca el paquete mismo).

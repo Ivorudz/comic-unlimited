@@ -42,7 +42,6 @@ struct LibraryView: View {
     @State private var showImporter = false
     @State private var problems: [String] = []
     @State private var notices: [String] = []
-    @State private var showProblems = false
 
     var body: some View {
         NavigationStack {
@@ -84,17 +83,13 @@ struct LibraryView: View {
                 showImporter = false
                 guard !urls.isEmpty else { return }
                 Task {
+                    problems = []
+                    notices = []
                     problems = await library.importFiles(urls)
                     notices = library.importNotices
-                    showProblems = !problems.isEmpty || !notices.isEmpty
                 }
             }
             .ignoresSafeArea()
-        }
-        .alert(problems.isEmpty ? "Listo" : "Algunos archivos no se pudieron importar", isPresented: $showProblems) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text((notices + problems).joined(separator: "\n\n"))
         }
     }
 
@@ -155,8 +150,36 @@ struct LibraryView: View {
                         .foregroundStyle(Theme.ink2)
                 }
                 .padding(.top, 14)
+            } else if !notices.isEmpty || !problems.isEmpty {
+                importResult
             }
         }
+    }
+
+    /// Resultado del último importe: queda a la vista hasta que lo cerrás.
+    private var importResult: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: problems.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(problems.isEmpty ? Theme.ink : Theme.magenta)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(notices, id: \.self) { Text($0) }
+                ForEach(problems, id: \.self) { Text($0).foregroundStyle(Theme.magenta) }
+            }
+            .font(.subheadline)
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .textSelection(.enabled)
+            Button {
+                notices = []
+                problems = []
+            } label: {
+                Image(systemName: "xmark").font(.footnote.weight(.bold)).foregroundStyle(Theme.ink2)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.top, 14)
     }
 
     private var modePicker: some View {
@@ -336,7 +359,7 @@ private struct DocumentPicker: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         var types: [UTType] = [.pdf, .zip, .data]
-        for ext in ["cbz", "cbr", "rar"] {
+        for ext in ["cbz", "cbr"] {
             if let type = UTType(filenameExtension: ext) { types.append(type) }
         }
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
