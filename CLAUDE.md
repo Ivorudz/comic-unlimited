@@ -22,6 +22,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - Se muestra "Datos y portadas: Comic Vine (o Metron). Las portadas pertenecen a sus editoriales." y, cuando se puede, un enlace a la ficha del cómic.
   - La clave de Comic Vine (API key) **nunca** va en el código ni en GitHub (el repositorio es público): se escribe en la app y queda guardada solo en el iPhone.
   - Límite de Comic Vine: unas 200 consultas por hora. No hacer pedidos de más.
+- **Órdenes de lectura**: de las listas .cbl de la colección pública github.com/DieselTech/CBL-ReadingLists (hecha para apps de cómics; órdenes de CBRO, CMRO, League of Comic Geeks, Marvel Guides…, con el código de Comic Vine de cada número) o de Metron. Solo se bajan los nombres de las listas (índice, 1 vez por semana) y la lista elegida; no se leen páginas web.
 - Sin dependencias externas (sin paquetes de terceros dentro de la app).
 - **Fuentes** (Biblioteca → Fuentes): catálogos que se agregan con el link de un JSON (formato en `FUENTES.md`). La app **no trae fuentes incluidas**, **no ejecuta programas** de las fuentes (solo lee la lista y descarga links directos `https://`) y **no se arman fuentes de sitios sin permiso** para compartir esos cómics.
 - `comic-unlimited.html` es el prototipo web: es la referencia de diseño, textos y comportamiento.
@@ -59,7 +60,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `LibraryAvailability.swift`: botón En biblioteca / Descargar de cada ficha, "Buscar en tus fuentes" y destinos de navegación compartidos.
   - `LinkReview.swift`: Revisar fichas que eligió la app y unir un archivo desde la ficha de Comic Vine.
   - `Metron.swift`: conexión con Metron (lanzamientos de la semana).
-  - `ReadingOrders.swift`: listas de lectura de Metron (buscar, elegir y guardar el orden de un arco).
+  - `ReadingOrders.swift`: órdenes de lectura: buscar en la colección de listas .cbl y en Metron, leer .cbl, elegir y guardar el orden de un arco.
   - `Diagnostics.swift`: "Revisar conexión" en Próximos; prueba Metron y Comic Vine y arma un texto para copiar.
   - `ReadingStore.swift`: guarda en el celular la página donde quedaste.
   - `Comic.swift`: los 6 cómics de ejemplo.
@@ -81,6 +82,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 - 0.22: paquetes: un .zip o .rar que adentro tiene cómics enteros (.cbz, .cbr, .zip, .rar, PDF, también en carpetas) se importa como varios cómics separados (al importar y al descargar de fuentes). Avisa cuántos se agregaron.
 - 0.22.3: mejor unión con Comic Vine: los cómics de un paquete usan el año del paquete si su archivo no lo dice; no se une a un número de otra época (más de 2 años de diferencia); "34 Fantastic Four 519" prueba también sin el número de orden del principio. Sin repetidos: si importás o descargás un archivo con el mismo nombre y la misma cantidad de páginas que uno que ya tenés, no se agrega de nuevo (avisa cuáles). También es repetido si queda unido a la misma ficha de Comic Vine que otro archivo: al importar se busca la ficha antes de agregarlo, y al elegir la ficha a mano avisa y ofrece borrar el repetido. "Revisar fichas de Comic Vine" (Biblioteca): las fichas que eligió la app sola, con tu portada al lado de la de Comic Vine, "Es correcta" / "Cambiar" / "Todas están bien". En la ficha de un número que no tenés: "¿Ya lo tenés? Elegí el archivo" (sugiere los parecidos). Perfil → Configuración → "Buscar la ficha de Comic Vine al importar" (prendido de entrada): si se apaga, los archivos se agregan sin ficha (los repetidos por nombre se siguen evitando).
 - 0.23: orden de lectura desde Metron: en la carpeta de un arco, "Orden de lectura (buscar en Metron)" muestra las listas de lectura de Metron (con su fuente: CBRO, CMRO, Comic Book Herald…); la elegida se guarda en el iPhone y el arco se ordena por esa lista (une por el código de Comic Vine de cada número). Botón Orden de lectura / Por fecha y "Cambiar lista". Mensaje claro cuando un .cbr no se puede abrir.
+- 0.23.1: "Orden de lectura (buscar listas)" busca solo, por el nombre del arco, en la colección pública de listas .cbl (y en Metron si anda). También se puede pegar el link de una lista .cbl.
 - Más adelante: Colecciones propias: crear, renombrar, borrar, agregar desde el menú (un cómic puede estar en varias), ordenar arrastrando (orden de lectura) y "Crear colección con este arco" (ordenada por fecha, después se ajusta).
 - .cbr: los que por dentro son .zip se abren directo. Los que son RAR se convierten a .cbz al importarlos, con libarchive (viene dentro de iOS; Apple no la permite en el App Store, pero esta app es personal).
 - LiveContainer: el selector de archivos pide una COPIA (asCopy) porque leer el original puede fallar adentro de LiveContainer.

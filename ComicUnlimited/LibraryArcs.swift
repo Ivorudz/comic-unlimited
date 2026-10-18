@@ -176,7 +176,9 @@ struct ArcFolderView: View {
                     .padding(.top, 12)
 
                 if let order {
-                    Text("Orden de lectura: lista \"\(order.name)\" de Metron. Datos: Metron y Comic Vine.")
+                    Text(order.origin == "cbl"
+                         ? "Orden de lectura: lista \"\(order.name)\" (colección pública de listas .cbl, github.com/DieselTech/CBL-ReadingLists)."
+                         : "Orden de lectura: lista \"\(order.name)\" de Metron. Datos: Metron y Comic Vine.")
                         .font(.caption)
                         .foregroundStyle(Theme.ink2)
                         .padding(.top, 8)
@@ -270,7 +272,7 @@ struct ArcFolderView: View {
             Button {
                 choosingOrder = true
             } label: {
-                Label("Orden de lectura (buscar en Metron)", systemImage: "list.number")
+                Label("Orden de lectura (buscar listas)", systemImage: "list.number")
                     .font(.system(size: 15, weight: .bold))
                     .frame(maxWidth: .infinity)
                     .padding(12)
