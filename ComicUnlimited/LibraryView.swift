@@ -2,17 +2,21 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-// Pestaña Biblioteca: los cómics que tenés en archivos (.cbz, .zip o PDF).
-// Por ahora se importan y se ven; leerlos llega en la próxima versión.
+// Pestaña Biblioteca: los cómics que tenés en archivos (.cbz, .zip, .cbr o PDF).
+// Tocar uno lo abre en el lector. Mantenerlo apretado muestra más opciones.
 
 struct LibraryView: View {
+    /// Abre un cómic en el lector.
+    let onRead: (LocalComic) -> Void
     private var library: LocalLibrary { LocalLibrary.shared }
+    @State private var linking: LocalComic?
     @State private var showImporter = false
     @State private var problems: [String] = []
     @State private var showProblems = false
     @State private var toDelete: LocalComic?
 
     var body: some View {
+        NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Biblioteca")
@@ -59,19 +63,42 @@ struct LibraryView: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
                               alignment: .leading, spacing: 18) {
                         ForEach(library.items) { comic in
-                            LocalComicCard(comic: comic)
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        toDelete = comic
+                            Button { onRead(comic) } label: {
+                                LocalComicCard(comic: comic, matching: library.matching.contains(comic.id))
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button { onRead(comic) } label: {
+                                    Label("Leer", systemImage: "book")
+                                }
+                                if let issueID = comic.cvIssueID {
+                                    NavigationLink(value: CVRoute.issue(id: issueID, title: comic.displayTitle)) {
+                                        Label("Ver ficha en Comic Vine", systemImage: "info.circle")
+                                    }
+                                } else {
+                                    Button {
+                                        Task {
+                                            let found = await library.autoLink(comic.id)
+                                            if !found { linking = comic }
+                                        }
                                     } label: {
-                                        Label("Borrar de la Biblioteca", systemImage: "trash")
+                                        Label("Buscar su ficha en Comic Vine", systemImage: "sparkle.magnifyingglass")
                                     }
                                 }
+                                Button { linking = comic } label: {
+                                    Label("Elegir ficha de Comic Vine", systemImage: "list.bullet.rectangle")
+                                }
+                                Button(role: .destructive) {
+                                    toDelete = comic
+                                } label: {
+                                    Label("Borrar de la Biblioteca", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .padding(.top, 20)
 
-                    Text("Para borrar un cómic, mantenelo apretado. Leer tus archivos llega en la próxima versión.")
+                    Text("Tocá un cómic para leerlo. Mantenelo apretado para ver su ficha, elegir otra ficha de Comic Vine o borrarlo.")
                         .font(.footnote)
                         .foregroundStyle(Theme.ink2)
                         .padding(.top, 20)
@@ -81,6 +108,15 @@ struct LibraryView: View {
             .padding(.bottom, 30)
         }
         .background(Theme.paper)
+        .navigationDestination(for: CVRoute.self) { route in
+            CVDestination(route: route)
+        }
+        .navigationTitle("Biblioteca")
+        .toolbar(.hidden, for: .navigationBar)
+        }
+        .sheet(item: $linking) { comic in
+            LinkPickerView(comic: comic)
+        }
         .sheet(isPresented: $showImporter) {
             DocumentPicker { urls in
                 showImporter = false
@@ -114,6 +150,7 @@ struct LibraryView: View {
 /// Portada (primera página) y nombre de un cómic importado.
 private struct LocalComicCard: View {
     let comic: LocalComic
+    let matching: Bool
     @State private var cover: UIImage?
 
     var body: some View {
@@ -130,14 +167,36 @@ private struct LocalComicCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
 
-            Text(comic.title)
+            Text(comic.displayTitle)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
+                .multilineTextAlignment(.leading)
                 .padding(.top, 6)
-            Text("\(comic.pageCount) \(comic.pageCount == 1 ? "página" : "páginas")")
-                .font(.caption)
-                .foregroundStyle(Theme.ink2)
+            if let name = comic.cvIssueName {
+                Text(name)
+                    .font(.caption)
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+            }
+            Group {
+                if comic.isFinished {
+                    Text("Leído ✓")
+                } else if let page = comic.lastPage {
+                    Text("Página \(page + 1) de \(comic.pageCount)")
+                } else {
+                    Text("\(comic.pageCount) \(comic.pageCount == 1 ? "página" : "páginas")")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(Theme.ink2)
+            if matching {
+                Text("Buscando ficha…").font(.caption2).foregroundStyle(Theme.magenta)
+            } else if comic.cvIssueID != nil {
+                Label("Comic Vine", systemImage: "checkmark.seal.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.magenta)
+            }
         }
         .task(id: comic.id) {
             cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)

@@ -162,6 +162,16 @@ struct ComicVineClient {
         return (page.results, page.numberOfTotalResults ?? page.results.count)
     }
 
+    /// Busca un número exacto dentro de una serie (por ejemplo, el #500 de Avengers).
+    func findIssue(seriesID: Int, number: String) async throws -> CVIssueSummary? {
+        let page: CVResponse<CVIssueSummary> = try await request("issues", [
+            "filter": "volume:\(seriesID),issue_number:\(number)",
+            "field_list": "id,name,issue_number,cover_date,store_date,image",
+            "limit": "5",
+        ], cached: true)
+        return page.results.first
+    }
+
     /// Ficha de un número.
     func issue(id: Int) async throws -> CVIssueDetail {
         try await requestObject("issue/4000-\(id)", [

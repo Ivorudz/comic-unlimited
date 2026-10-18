@@ -1,10 +1,13 @@
 import SwiftUI
+import UIKit
 
 // Pestaña Inicio: acceso al buscador de cómics reales, "Seguir leyendo" y "Descubrir".
 struct HomeView: View {
     @Environment(ReadingStore.self) private var store
     /// Se usa para abrir el lector desde cualquier pantalla.
     let onRead: (Comic) -> Void
+    /// Abre un cómic de tu Biblioteca (archivo).
+    let onReadLocal: (LocalComic) -> Void
 
     @State private var discover = DiscoverModel()
     @State private var forYou = ForYouModel()
@@ -72,27 +75,38 @@ struct HomeView: View {
         .padding(.top, 18)
     }
 
-    /// Una sola fila con lo último que leíste (lo más reciente primero).
+    /// Una sola fila con lo último que leíste (cómics de la app y tus archivos), lo más reciente primero.
     @ViewBuilder
     private var continueReading: some View {
-        let recent = store.recentlyRead(from: Catalog.comics)
+        let samples = store.recentlyRead(from: Catalog.comics)
+            .map { RecentItem.sample($0, store.lastOpened[$0.id] ?? 0) }
+        let files = LocalLibrary.shared.recentlyRead.map { RecentItem.local($0) }
+        let recent = (samples + files).sorted { $0.time > $1.time }
         SectionTitle("Seguir leyendo")
         if recent.isEmpty {
-            Text("Todavía no empezaste ningún cómic. Elegí uno en Descubrir, acá abajo.")
+            Text("Todavía no empezaste ningún cómic. Abrí uno de tu Biblioteca o de Descubrir, acá abajo.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.ink2)
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(recent) { comic in
-                        if store.isFinished(comic) {
-                            NavigationLink(value: comic) {
-                                ContinueCard(comic: comic, page: store.savedPage(for: comic), finished: true)
+                    ForEach(recent) { item in
+                        switch item {
+                        case .sample(let comic, _):
+                            if store.isFinished(comic) {
+                                NavigationLink(value: comic) {
+                                    ContinueCard(comic: comic, page: store.savedPage(for: comic), finished: true)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Button { onRead(comic) } label: {
+                                    ContinueCard(comic: comic, page: store.savedPage(for: comic), finished: false)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
-                        } else {
-                            Button { onRead(comic) } label: {
-                                ContinueCard(comic: comic, page: store.savedPage(for: comic), finished: false)
+                        case .local(let comic):
+                            Button { onReadLocal(comic) } label: {
+                                LocalContinueCard(comic: comic)
                             }
                             .buttonStyle(.plain)
                         }
@@ -130,6 +144,63 @@ struct HomeView: View {
             .padding(.horizontal, 18)
         }
         .padding(.horizontal, -18)
+    }
+}
+
+/// Algo que empezaste a leer: un cómic de la app o un archivo tuyo.
+private enum RecentItem: Identifiable {
+    case sample(Comic, Double)
+    case local(LocalComic)
+
+    var id: String {
+        switch self {
+        case .sample(let c, _): return "app-\(c.id)"
+        case .local(let c): return "file-\(c.id)"
+        }
+    }
+
+    var time: Double {
+        switch self {
+        case .sample(_, let t): return t
+        case .local(let c): return c.lastOpened ?? 0
+        }
+    }
+}
+
+/// Tarjeta de "Seguir leyendo" para un archivo de tu Biblioteca.
+private struct LocalContinueCard: View {
+    let comic: LocalComic
+    @State private var cover: UIImage?
+
+    var body: some View {
+        let progress = comic.isFinished ? 1 : Double((comic.lastPage ?? 0) + 1) / Double(max(comic.pageCount, 1))
+        HStack(spacing: 12) {
+            ZStack {
+                Theme.chip
+                if let cover { Image(uiImage: cover).resizable().scaledToFill() }
+            }
+            .frame(width: 62, height: 93)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(comic.displayTitle)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(2)
+                Text(comic.isFinished ? "Terminado" : "Página \((comic.lastPage ?? 0) + 1) de \(comic.pageCount)")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.ink2)
+                ProgressBar(value: progress).padding(.top, 5)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(width: 290)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+        .task(id: comic.id) {
+            cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)
+        }
     }
 }
 

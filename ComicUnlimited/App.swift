@@ -20,16 +20,25 @@ struct ReaderSession: Identifiable {
     var id: String { comic.id }
 }
 
+/// Lo que necesita el lector de archivos para abrirse.
+struct LocalSession: Identifiable {
+    let comic: LocalComic
+    let startPage: Int
+    var id: String { comic.id }
+}
+
 // Las cinco pestañas de abajo. Comunidad todavía dice "Próximamente".
 struct RootView: View {
     @Environment(ReadingStore.self) private var store
     @State private var session: ReaderSession?
+    /// Archivo de la Biblioteca abierto en el lector (y en qué página arranca).
+    @State private var localSession: LocalSession?
 
     var body: some View {
         TabView {
-            HomeView(onRead: openReader)
+            HomeView(onRead: openReader, onReadLocal: openLocal)
                 .tabItem { Label("Inicio", systemImage: "house") }
-            LibraryView()
+            LibraryView(onRead: openLocal)
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
             UpcomingView()
                 .tabItem { Label("Próximos", systemImage: "calendar") }
@@ -44,6 +53,16 @@ struct RootView: View {
             ReaderView(comic: session.comic, startPage: session.startPage)
                 .environment(store)
         }
+        .background {
+            // Un segundo lector, para tus archivos. Va en otra vista para no chocar con el primero.
+            Color.clear.fullScreenCover(item: $localSession) { session in
+                LocalReaderView(comic: session.comic, startPage: session.startPage)
+            }
+        }
+    }
+
+    private func openLocal(_ comic: LocalComic) {
+        localSession = LocalSession(comic: comic, startPage: LocalLibrary.shared.open(comic))
     }
 
     private func openReader(_ comic: Comic) {

@@ -8,10 +8,27 @@ import UIKit
 
 struct LocalComic: Codable, Identifiable, Hashable {
     let id: String
+    /// Nombre sacado del archivo.
     var title: String
     let fileName: String
     var pageCount: Int
     let added: Double
+
+    // Lectura
+    var lastPage: Int?
+    var finished: Bool?
+    var lastOpened: Double?
+
+    // Unión con Comic Vine
+    var cvIssueID: Int?
+    var cvSeriesID: Int?
+    var cvTitle: String?
+    var cvIssueName: String?
+
+    /// El nombre que se muestra: el de Comic Vine si está unido; si no, el del archivo.
+    var displayTitle: String { cvTitle ?? title }
+    var isFinished: Bool { finished ?? false }
+    var hasStarted: Bool { lastPage != nil }
 }
 
 @MainActor
@@ -117,6 +134,8 @@ final class LocalLibrary {
                 if let cover = info.cover { try? cover.write(to: coverURL(comic)) }
                 items.insert(comic, at: 0)
                 saveIndex()
+                // Buscamos su ficha en Comic Vine sin hacer esperar.
+                Task { await autoLink(comic.id) }
             case .failure(let error):
                 try? FileManager.default.removeItem(at: dest)
                 try? FileManager.default.removeItem(at: dest.deletingPathExtension().appendingPathExtension("cbz"))
@@ -124,6 +143,84 @@ final class LocalLibrary {
             }
         }
         return problems
+    }
+
+    func item(_ id: String) -> LocalComic? { items.first { $0.id == id } }
+
+    private func update(_ id: String, _ change: (inout LocalComic) -> Void) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        change(&items[index])
+        saveIndex()
+    }
+
+    // MARK: Lectura
+
+    /// Se llama al abrir el lector. Devuelve la página donde arrancar.
+    func open(_ comic: LocalComic) -> Int {
+        var start = 0
+        update(comic.id) { c in
+            c.lastOpened = Date().timeIntervalSince1970
+            if c.isFinished {
+                // Si ya lo terminaste, empieza de nuevo.
+                c.finished = false
+                c.lastPage = 0
+            } else {
+                c.lastPage = min(c.lastPage ?? 0, max(c.pageCount - 1, 0))
+            }
+            start = c.lastPage ?? 0
+        }
+        return start
+    }
+
+    func setPage(_ page: Int, for id: String) {
+        update(id) { c in c.lastPage = max(0, min(page, c.pageCount - 1)) }
+    }
+
+    func markFinished(_ id: String) {
+        update(id) { c in
+            c.finished = true
+            c.lastPage = c.pageCount - 1
+        }
+    }
+
+    /// Lo que empezaste a leer, lo último primero (para "Seguir leyendo").
+    var recentlyRead: [LocalComic] {
+        items.filter(\.hasStarted).sorted { ($0.lastOpened ?? 0) > ($1.lastOpened ?? 0) }
+    }
+
+    // MARK: Comic Vine
+
+    func link(_ id: String, series: CVVolumeSummary, issue: CVIssueSummary) {
+        update(id) { c in
+            c.cvIssueID = issue.id
+            c.cvSeriesID = series.id
+            c.cvTitle = CVText.issueTitle(series: series.name ?? c.title, number: issue.issueNumber)
+            let name = issue.name?.trimmingCharacters(in: .whitespaces) ?? ""
+            c.cvIssueName = name.isEmpty ? nil : name
+        }
+    }
+
+    func unlink(_ id: String) {
+        update(id) { c in
+            c.cvIssueID = nil
+            c.cvSeriesID = nil
+            c.cvTitle = nil
+            c.cvIssueName = nil
+        }
+    }
+
+    /// Ids que se están buscando en Comic Vine ahora mismo.
+    private(set) var matching: Set<String> = []
+
+    /// Busca sola la ficha en Comic Vine a partir del nombre del archivo. Devuelve true si la encontró.
+    @discardableResult
+    func autoLink(_ id: String) async -> Bool {
+        guard let comic = item(id), !ComicVineKey.current.isEmpty, !matching.contains(id) else { return false }
+        matching.insert(id)
+        defer { matching.remove(id) }
+        guard let found = try? await ComicVineMatcher.find(for: FileNameInfo(comic.title)) else { return false }
+        link(id, series: found.series, issue: found.issue)
+        return true
     }
 
     func delete(_ comic: LocalComic) {
