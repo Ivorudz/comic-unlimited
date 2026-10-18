@@ -3,7 +3,7 @@ import UIKit
 import Observation
 
 // Pestaña Próximos: qué cómics salen en las próximas semanas, día por día.
-// Usa Metron si está configurado; si Metron falla (o no está), usa Comic Vine.
+// Semanas que vienen: Metron primero. Semanas pasadas ("Recién salidos"): Comic Vine primero.
 
 /// De dónde salieron los datos que se muestran.
 enum UpcomingSource: String {
@@ -24,6 +24,8 @@ final class UpcomingModel {
 
     /// Cuántas semanas hacia adelante se pueden mirar.
     static let maxWeek = 7
+    /// Cuántas semanas hacia atrás ("Recién salidos").
+    static let minWeek = -2
 
     var weekIndex = 0
     /// Editorial elegida ("Todas" o el texto de un botón).
@@ -86,46 +88,54 @@ final class UpcomingModel {
         state = .loading
         let range = weekRange
         let filter = publisherFilter
-        var metronProblem: String?
+        let isPast = weekIndex < 0
+        // Para semanas que ya pasaron, Comic Vine primero (siempre las tiene).
+        // Para las que vienen, Metron primero (Comic Vine no tiene cómics futuros).
+        let order: [UpcomingSource] = (isPast ? [.comicVine, .metron] : [.metron, .comicVine])
+            .filter { $0 == .metron ? hasMetron : hasComicVine }
+        var problems: [String] = []
+        var badLogin: UpcomingSource?
 
-        // 1. Metron
-        if hasMetron {
-            let publisher = MetronClient.publishers.first { $0.label == filter }
+        for source in order {
             do {
-                var issues = try await MetronClient(user: MetronAccount.user, password: MetronAccount.password)
-                    .issues(from: range.start, to: range.end, publisher: publisher?.query)
-                if let publisher {
-                    for i in issues.indices { issues[i].publisher = publisher.label }
+                let issues = try await fetch(source, range: range, filter: filter)
+                if source == .comicVine && !isPast && issues.isEmpty && !problems.isEmpty {
+                    problems.append("Comic Vine solo tiene cómics que ya salieron, así que no puede mostrar los próximos. Probá más tarde, o tocá la flecha ← para ver lo que salió la semana pasada.")
+                    break
                 }
-                finish(issues, .metron, key: key)
-                return
-            } catch MetronError.badLogin {
-                if key == loadKey { state = .failed(MetronError.badLogin.errorDescription ?? "", badLogin: .metron) }
+                finish(issues, source, key: key)
                 return
             } catch {
-                metronProblem = (error as? MetronError)?.errorDescription ?? error.localizedDescription
+                if let e = error as? MetronError, case .badLogin = e { badLogin = .metron }
+                if let e = error as? ComicVineError, case .invalidKey = e { badLogin = .comicVine }
+                var message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                if source == .metron, let e = error as? MetronError, case .network = e {
+                    message = "Metron no responde (se agotó el tiempo de espera). Puede estar caído o muy lento."
+                }
+                problems.append(message)
             }
         }
+        if key == loadKey { state = .failed(problems.joined(separator: "\n\n"), badLogin: badLogin) }
+    }
 
-        // 2. Comic Vine (si no hay Metron o si Metron falló)
-        guard hasComicVine else {
-            if key == loadKey { state = .failed(metronProblem ?? "No hay ninguna cuenta cargada.", badLogin: nil) }
-            return
-        }
-        let client = ComicVineKey.client
-        do {
+    private func fetch(_ source: UpcomingSource, range: (start: Date, end: Date), filter: String) async throws -> [UpcomingIssue] {
+        switch source {
+        case .metron:
+            let publisher = MetronClient.publishers.first { $0.label == filter }
+            var issues = try await MetronClient(user: MetronAccount.user, password: MetronAccount.password)
+                .issues(from: range.start, to: range.end, publisher: publisher?.query)
+            if let publisher {
+                for i in issues.indices { issues[i].publisher = publisher.label }
+            }
+            return issues
+        case .comicVine:
+            let client = ComicVineKey.client
             var issues = try await client.issues(from: range.start, to: range.end)
             let publishers = await client.publishers(volumeIDs: issues.compactMap(\.volumeID))
             for i in issues.indices {
                 if let volume = issues[i].volumeID { issues[i].publisher = publishers[volume] }
             }
-            finish(issues, .comicVine, key: key)
-        } catch {
-            let message = CVText.message(for: error)
-            let text = metronProblem.map { "\($0)\n\nTambién probé con Comic Vine: \(message)" } ?? message
-            var badLogin: UpcomingSource?
-            if let cvError = error as? ComicVineError, case .invalidKey = cvError { badLogin = .comicVine }
-            if key == loadKey { state = .failed(text, badLogin: badLogin) }
+            return issues
         }
     }
 
@@ -249,14 +259,20 @@ struct UpcomingView: View {
 
     private var weekPicker: some View {
         let range = model.weekRange
-        let label = model.weekIndex == 0 ? "Esta semana" : "Semana del \(Self.shortDay.string(from: range.start))"
+        let label: String
+        switch model.weekIndex {
+        case 0: label = "Esta semana"
+        case -1: label = "Semana pasada"
+        case ..<(-1): label = "Hace \(-model.weekIndex) semanas"
+        default: label = "Semana del \(Self.shortDay.string(from: range.start))"
+        }
         return HStack {
             Button {
                 model.weekIndex -= 1
             } label: {
                 Image(systemName: "chevron.left").frame(width: 40, height: 40)
             }
-            .disabled(model.weekIndex == 0)
+            .disabled(model.weekIndex <= UpcomingModel.minWeek)
             .accessibilityLabel("Semana anterior")
             Spacer()
             VStack(spacing: 2) {
@@ -332,7 +348,9 @@ struct UpcomingView: View {
 
         if days.isEmpty {
             Text(issues.isEmpty
-                 ? "\(source.rawValue) todavía no tiene lanzamientos cargados para estas fechas."
+                 ? (source == .comicVine && model.weekIndex >= 0
+                    ? "Comic Vine solo tiene cómics que ya salieron. Para ver los próximos hace falta Metron. Con la flecha ← podés ver lo que salió la semana pasada."
+                    : "\(source.rawValue) todavía no tiene lanzamientos cargados para estas fechas.")
                  : "No hay cómics que coincidan con la búsqueda.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.ink2)
