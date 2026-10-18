@@ -39,6 +39,11 @@ struct LocalComic: Codable, Identifiable, Hashable {
     /// Año del paquete de donde salió (por ejemplo "Avengers Disassembled (2004).zip"),
     /// para elegir bien la ficha cuando el archivo no dice el año.
     var packYear: Int?
+    /// true = revisaste (o elegiste vos) su ficha de Comic Vine. Si la eligió la app sola, queda para revisar.
+    var cvReviewed: Bool?
+
+    /// Tiene ficha elegida por la app que todavía no revisaste.
+    var needsReview: Bool { cvIssueID != nil && cvReviewed != true }
 
     /// El nombre que se muestra: el tuyo, o el de Comic Vine, o el del archivo.
     var displayTitle: String { customTitle ?? cvTitle ?? title }
@@ -320,8 +325,10 @@ final class LocalLibrary {
 
     // MARK: Comic Vine
 
-    func link(_ id: String, series: CVVolumeSummary, issue: CVIssueSummary) {
+    /// `reviewed`: true si la ficha la elegiste vos; false si la eligió la app (queda para revisar).
+    func link(_ id: String, series: CVVolumeSummary, issue: CVIssueSummary, reviewed: Bool = false) {
         update(id) { c in
+            c.cvReviewed = reviewed
             c.cvIssueID = issue.id
             c.cvSeriesID = series.id
             c.cvTitle = CVText.issueTitle(series: series.name ?? c.title, number: issue.issueNumber)
@@ -338,8 +345,18 @@ final class LocalLibrary {
         Task { await completeSeriesInfo() }
     }
 
+    /// Marca como correctas las fichas que eligió la app.
+    func confirmLinks(_ ids: [String]) {
+        for id in ids {
+            guard let index = items.firstIndex(where: { $0.id == id }) else { continue }
+            items[index].cvReviewed = true
+        }
+        saveIndex()
+    }
+
     func unlink(_ id: String) {
         update(id) { c in
+            c.cvReviewed = nil
             c.cvIssueID = nil
             c.cvSeriesID = nil
             c.cvTitle = nil

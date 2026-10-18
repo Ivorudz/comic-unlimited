@@ -21,6 +21,7 @@ struct AppDestinations: ViewModifier {
                 case .source(let url): SourceDetailView(url: url)
                 case .findInSources(let series, let number):
                     FindInSourcesView(series: series, number: number)
+                case .reviewLinks: ReviewLinksView()
                 }
             }
     }
@@ -35,6 +36,7 @@ extension View {
 struct LibraryAvailability: View {
     let detail: CVIssueDetail
     @Environment(LibraryActions.self) private var actions: LibraryActions?
+    @State private var choosingFile = false
     private var library: LocalLibrary { LocalLibrary.shared }
 
     var body: some View {
@@ -82,9 +84,23 @@ struct LibraryAvailability: View {
                     .font(.caption)
                     .foregroundStyle(Theme.ink2)
                     .padding(.top, 6)
+                if detail.volume != nil && !library.items.isEmpty {
+                    Button {
+                        choosingFile = true
+                    } label: {
+                        Label("¿Ya lo tenés? Elegí el archivo", systemImage: "link")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Theme.magenta)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 10)
+                }
             }
         }
         .padding(.top, 14)
+        .sheet(isPresented: $choosingFile) {
+            PickLocalFileView(detail: detail)
+        }
     }
 }
 

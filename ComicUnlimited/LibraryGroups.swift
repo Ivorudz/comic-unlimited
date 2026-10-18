@@ -17,6 +17,8 @@ enum LibraryRoute: Hashable {
     case source(String)
     /// "Descargar" desde una ficha: buscar ese cómic en tus fuentes.
     case findInSources(series: String, number: String?)
+    /// Revisar las fichas de Comic Vine que eligió la app sola.
+    case reviewLinks
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.

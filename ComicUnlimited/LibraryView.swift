@@ -122,6 +122,8 @@ struct LibraryView: View {
             .disabled(library.importing)
             .padding(.top, 16)
 
+            ReviewLinksCard()
+
             NavigationLink(value: LibraryRoute.sources) {
                 HStack(spacing: 12) {
                     Image(systemName: "antenna.radiowaves.left.and.right")

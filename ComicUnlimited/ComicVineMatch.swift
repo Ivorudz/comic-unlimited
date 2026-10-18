@@ -254,7 +254,7 @@ private struct PickIssueView: View {
                             if let other = LocalLibrary.shared.owner(ofIssue: issue.id, except: comic.id) {
                                 repeated = (issue, other)
                             } else {
-                                LocalLibrary.shared.link(comic.id, series: series, issue: issue)
+                                LocalLibrary.shared.link(comic.id, series: series, issue: issue, reviewed: true)
                                 onDone()
                             }
                         } label: {
