@@ -61,6 +61,8 @@ final class ForYouModel {
         var writerScore: [RealLibrary.Ref: Double] = [:]
         var characterScore: [RealLibrary.Ref: Double] = [:]
         var because: [RealLibrary.Ref: (title: String, weight: Double)] = [:]
+        // Personas que figuran como guionistas en algún número (en las series no se sabe el rol).
+        let knownWriters = Set(entries.filter { !$0.isSeries }.flatMap(\.writers))
         for entry in entries {
             for ref in entry.writers + entry.characters {
                 if entry.writers.contains(ref) { writerScore[ref, default: 0] += entry.weight }
@@ -88,7 +90,8 @@ final class ForYouModel {
                 let picks = series.filter { !used.contains($0.id) }
                     .sorted { $0.id > $1.id }
                     .prefix(Self.perSeed)
-                let reason = seed.isWriter ? "Del guion de \(seed.ref.name)" : "Con \(seed.ref.name)"
+                let reason = !seed.isWriter ? "Con \(seed.ref.name)"
+                    : knownWriters.contains(seed.ref) ? "Del guion de \(seed.ref.name)" : "De \(seed.ref.name)"
                 let source = because[seed.ref].map { " · porque te gustó \($0.title)" } ?? ""
                 for pick in picks {
                     used.insert(pick.id)

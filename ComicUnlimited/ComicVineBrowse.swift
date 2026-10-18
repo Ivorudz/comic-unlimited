@@ -162,6 +162,7 @@ struct SeriesView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let detail {
                     header(detail)
+                    RealLibraryControls(series: detail)
                     if let text = CVText.plain(detail.description) ?? CVText.plain(detail.deck) {
                         ExpandableText(text: text).padding(.top, 16)
                     }

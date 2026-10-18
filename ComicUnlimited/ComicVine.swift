@@ -146,7 +146,7 @@ struct ComicVineClient {
     /// Ficha de una serie.
     func series(id: Int) async throws -> CVVolumeDetail {
         try await requestObject("volume/4050-\(id)", [
-            "field_list": "id,name,start_year,count_of_issues,publisher,image,deck,description,site_detail_url",
+            "field_list": "id,name,start_year,count_of_issues,publisher,image,deck,description,site_detail_url,person_credits,character_credits",
         ])
     }
 
@@ -310,6 +310,32 @@ struct CVVolumeDetail: Decodable {
     let deck: String?
     let description: String?
     let siteDetailUrl: String?
+    /// Personas que trabajaron en la serie, con cuántos números hicieron.
+    let personCredits: [CVCountRef]?
+    /// Personajes que aparecen, con en cuántos números.
+    let characterCredits: [CVCountRef]?
+}
+
+/// Un nombre con un número de apariciones (Comic Vine a veces lo manda como texto).
+struct CVCountRef: Decodable {
+    let id: Int
+    let name: String?
+    let count: Int
+
+    enum CodingKeys: String, CodingKey { case id, name, count }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        name = try? c.decode(String.self, forKey: .name)
+        if let n = try? c.decode(Int.self, forKey: .count) {
+            count = n
+        } else if let text = try? c.decode(String.self, forKey: .count), let n = Int(text) {
+            count = n
+        } else {
+            count = 0
+        }
+    }
 }
 
 struct CVIssueSummary: Decodable, Identifiable {

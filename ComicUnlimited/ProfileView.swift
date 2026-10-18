@@ -51,8 +51,10 @@ struct ProfileView: View {
                             .foregroundStyle(Theme.ink2)
                             .padding(.vertical, 18)
                     } else {
-                        ForEach(list) { entry in
-                            NavigationLink(value: CVRoute.issue(id: entry.id, title: entry.title)) {
+                        ForEach(list, id: \.key) { entry in
+                            NavigationLink(value: entry.isSeries
+                                           ? CVRoute.series(id: entry.id, name: entry.title)
+                                           : CVRoute.issue(id: entry.id, title: entry.title)) {
                                 EntryRow(entry: entry)
                             }
                             .buttonStyle(.plain)
@@ -79,7 +81,7 @@ struct ProfileView: View {
     private var emptyText: String {
         switch selected {
         case .reading:
-            return "No tenés cómics en Leyendo. Abrí la ficha de un cómic real (desde Inicio) y tocá Leyendo."
+            return "No tenés cómics en Leyendo. Abrí la ficha de un cómic o de una serie real (desde Inicio) y tocá Leyendo."
         case .wantToRead:
             return "Tu lista de pendientes está vacía. En la ficha de un cómic real, tocá Quiero leer."
         case .read:
@@ -119,6 +121,14 @@ private struct EntryRow: View {
             RemoteCover(url: entry.coverURL.flatMap { URL(string: $0) })
                 .frame(width: 52)
             VStack(alignment: .leading, spacing: 4) {
+                if entry.isSeries {
+                    Text("Serie")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .foregroundStyle(.white)
+                        .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 4))
+                }
                 Text(entry.title)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Theme.ink)
@@ -128,7 +138,7 @@ private struct EntryRow: View {
                         + Text(String(repeating: "★", count: 5 - rating)).foregroundStyle(Theme.line))
                         .font(.footnote)
                 } else if let writer = entry.writers.first {
-                    Text("Guion: \(writer.name)")
+                    Text(entry.isSeries ? "De \(writer.name)" : "Guion: \(writer.name)")
                         .font(.footnote)
                         .foregroundStyle(Theme.ink2)
                 }
