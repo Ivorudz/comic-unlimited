@@ -36,6 +36,8 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ProfileView.swift`: pestaña Perfil; tus listas de cómics reales y números rápidos.
   - `LibraryView.swift`: pestaña Biblioteca; importar tus cómics en archivo (.cbz, .zip o PDF).
   - `LocalLibrary.swift`: guarda una copia de tus archivos y su portada en la carpeta privada de la app.
+  - `CbrConverter.swift`: convierte .cbr (RAR) a .cbz con libarchive; escribe .zip sin comprimir.
+  - `ComicUnlimited-Bridging-Header.h`: declara las funciones de libarchive que usa Swift.
   - `ComicArchive.swift`: abre .cbz/.zip/.cbr-que-es-zip (lector de zip hecho a mano con Compression de Apple) y PDF (PDFKit).
   - `DetailView.swift`: ficha de un cómic.
   - `ReaderView.swift`: lector a pantalla completa.
@@ -55,7 +57,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 - 0.13: manitos (👎 / 👍 / 👍👍) además de estrellas + importar archivos a la Biblioteca.
 - 0.14: leer tus archivos en el lector (guarda la página; aparecen en Seguir leyendo).
 - 0.15: ordenar la Biblioteca (buscar, ordenar, renombrar) y unir cada archivo con su ficha de Comic Vine.
-- .cbr: solo los que por dentro son .zip (muchos lo son). Los .cbr que son RAR de verdad quedan fuera (necesitarían un programa de terceros).
+- .cbr: los que por dentro son .zip se abren directo. Los que son RAR se convierten a .cbz al importarlos, con libarchive (viene dentro de iOS; Apple no la permite en el App Store, pero esta app es personal).
 - LiveContainer: el selector de archivos pide una COPIA (asCopy) porque leer el original puede fallar adentro de LiveContainer.
 
 ## Cómo se prueba

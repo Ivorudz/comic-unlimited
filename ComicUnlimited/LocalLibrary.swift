@@ -79,11 +79,27 @@ final class LocalLibrary {
             if access { url.stopAccessingSecurityScopedResource() }
 
             // Abrimos la copia (fuera de la pantalla, para que no se trabe) y sacamos la portada.
-            let result: Result<(pages: Int, cover: Data?), Error> = await Task.detached(priority: .userInitiated) {
+            // Si es un .cbr de tipo RAR, lo convertimos a .cbz (con libarchive, que viene en iOS).
+            let result: Result<(pages: Int, cover: Data?, file: URL), Error> = await Task.detached(priority: .userInitiated) {
                 do {
-                    let file = try ComicFile(url: dest)
+                    var fileURL = dest
+                    let file: ComicFile
+                    do {
+                        file = try ComicFile(url: dest)
+                    } catch ArchiveError.rar {
+                        let converted = dest.deletingPathExtension().appendingPathExtension("cbz")
+                        do {
+                            _ = try CbrConverter.convert(dest, to: converted)
+                        } catch {
+                            try? FileManager.default.removeItem(at: converted)
+                            throw error
+                        }
+                        try? FileManager.default.removeItem(at: dest)
+                        fileURL = converted
+                        file = try ComicFile(url: converted)
+                    }
                     let cover = file.page(0, maxWidth: 400)?.jpegData(compressionQuality: 0.8)
-                    return .success((pages: file.pageCount, cover: cover))
+                    return .success((pages: file.pageCount, cover: cover, file: fileURL))
                 } catch {
                     return .failure(error)
                 }
@@ -94,7 +110,7 @@ final class LocalLibrary {
                 let comic = LocalComic(
                     id: id,
                     title: Self.cleanTitle(url.deletingPathExtension().lastPathComponent),
-                    fileName: dest.lastPathComponent,
+                    fileName: info.file.lastPathComponent,
                     pageCount: info.pages,
                     added: Date().timeIntervalSince1970
                 )
@@ -103,6 +119,7 @@ final class LocalLibrary {
                 saveIndex()
             case .failure(let error):
                 try? FileManager.default.removeItem(at: dest)
+                try? FileManager.default.removeItem(at: dest.deletingPathExtension().appendingPathExtension("cbz"))
                 problems.append("\(name): \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
             }
         }

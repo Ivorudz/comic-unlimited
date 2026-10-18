@@ -27,7 +27,7 @@ enum ArchiveError: LocalizedError {
         case .encrypted: return "El archivo tiene contraseña y no se puede abrir."
         case .noPages: return "No encontré páginas (imágenes) adentro del archivo."
         case .badPDF: return "No se pudo abrir el PDF."
-        case .rar: return "Este .cbr está comprimido como RAR, y la app no puede abrir RAR. Podés convertirlo a .cbz con otra app y volver a importarlo."
+        case .rar: return "Este .cbr está comprimido como RAR."
         }
     }
 }

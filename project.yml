@@ -36,4 +36,7 @@ targets:
         PRODUCT_NAME: ComicUnlimited
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # libarchive (viene en iOS) para convertir .cbr (RAR) a .cbz
+        SWIFT_OBJC_BRIDGING_HEADER: ComicUnlimited/ComicUnlimited-Bridging-Header.h
+        OTHER_LDFLAGS: "-larchive"
         ENABLE_PREVIEWS: NO
