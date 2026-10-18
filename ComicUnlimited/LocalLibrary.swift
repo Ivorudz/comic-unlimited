@@ -36,6 +36,9 @@ struct LocalComic: Codable, Identifiable, Hashable {
 
     /// Nombre que le pusiste vos (si lo cambiaste).
     var customTitle: String?
+    /// Año del paquete de donde salió (por ejemplo "Avengers Disassembled (2004).zip"),
+    /// para elegir bien la ficha cuando el archivo no dice el año.
+    var packYear: Int?
 
     /// El nombre que se muestra: el tuyo, o el de Comic Vine, o el del archivo.
     var displayTitle: String { customTitle ?? cvTitle ?? title }
@@ -132,11 +135,11 @@ final class LocalLibrary {
         importing = true
         importNotices = []
         defer { importing = false }
-        return await importBatch(urls, depth: 0)
+        return await importBatch(urls, depth: 0, packYear: nil)
     }
 
     /// `depth`: cuántos paquetes hay "por encima" (un paquete adentro de otro). Hasta 2 niveles.
-    private func importBatch(_ urls: [URL], depth: Int) async -> [String] {
+    private func importBatch(_ urls: [URL], depth: Int, packYear: Int?) async -> [String] {
         var problems: [String] = []
 
         for url in urls {
@@ -204,7 +207,8 @@ final class LocalLibrary {
                     title: Self.cleanTitle(url.deletingPathExtension().lastPathComponent),
                     fileName: info.file.lastPathComponent,
                     pageCount: info.pages,
-                    added: Date().timeIntervalSince1970
+                    added: Date().timeIntervalSince1970,
+                    packYear: packYear
                 )
                 if let cover = info.cover { try? cover.write(to: coverURL(comic)) }
                 items.insert(comic, at: 0)
@@ -224,7 +228,8 @@ final class LocalLibrary {
                 switch pack {
                 case .success(let found) where !found.files.isEmpty:
                     let before = items.count
-                    problems += await importBatch(found.files, depth: depth + 1)
+                    let year = FileNameInfo(url.deletingPathExtension().lastPathComponent).year ?? packYear
+                    problems += await importBatch(found.files, depth: depth + 1, packYear: year)
                     try? FileManager.default.removeItem(at: found.folder)
                     let added = items.count - before
                     if added > 0 { importNotices.append(added == 1 ? "Se agregó 1 cómic de \(name)."
@@ -408,7 +413,9 @@ final class LocalLibrary {
         guard let comic = item(id), !ComicVineKey.current.isEmpty, !matching.contains(id) else { return false }
         matching.insert(id)
         defer { matching.remove(id) }
-        guard let found = try? await ComicVineMatcher.find(for: FileNameInfo(comic.title)) else { return false }
+        var info = FileNameInfo(comic.title)
+        if info.year == nil { info.year = comic.packYear }
+        guard let found = try? await ComicVineMatcher.find(for: info) else { return false }
         link(id, series: found.series, issue: found.issue)
         return true
     }

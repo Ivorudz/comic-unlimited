@@ -7,9 +7,10 @@ import SwiftUI
 
 /// Lo que se puede sacar del nombre de un archivo.
 struct FileNameInfo {
-    let series: String
+    var series: String
     let number: String?
-    let year: Int?
+    /// Año del archivo; si no tiene, puede venir del nombre del paquete de donde salió.
+    var year: Int?
 
     init(_ raw: String) {
         var s = raw.replacingOccurrences(of: "_", with: " ")
@@ -56,6 +57,20 @@ struct FileNameInfo {
 enum ComicVineMatcher {
     /// Busca automáticamente la ficha del archivo. Devuelve nil si no está seguro.
     static func find(for info: FileNameInfo) async throws -> (series: CVVolumeSummary, issue: CVIssueSummary)? {
+        if let found = try await findExact(for: info) { return found }
+        // "34 Fantastic Four 519": el primer número suele ser el orden de lectura del paquete.
+        // Si no encontró nada, prueba sin ese número.
+        let words = info.series.split(separator: " ")
+        if words.count > 1, words[0].allSatisfy(\.isNumber) {
+            var shorter = info
+            shorter.series = words.dropFirst().joined(separator: " ")
+                .trimmingCharacters(in: CharacterSet(charactersIn: " -#:,."))
+            return try await findExact(for: shorter)
+        }
+        return nil
+    }
+
+    private static func findExact(for info: FileNameInfo) async throws -> (series: CVVolumeSummary, issue: CVIssueSummary)? {
         guard !info.series.isEmpty, let number = info.number else { return nil }
         let client = ComicVineKey.client
         let results = try await client.searchSeries(info.series)
@@ -79,6 +94,12 @@ enum ComicVineMatcher {
             .prefix(3)
         for (series, _) in candidates {
             if let issue = try await client.findIssue(seriesID: series.id, number: number) {
+                // Si sabemos el año, el número tiene que ser de esa época (evita unirlo a una serie
+                // vieja con el mismo nombre, por ejemplo Spectacular Spider-Man de 1976 en vez de 2003).
+                if let year = info.year, let issueYear = Int((issue.coverDate ?? "").prefix(4)),
+                   abs(issueYear - year) > 2 {
+                    continue
+                }
                 return (series, issue)
             }
         }
