@@ -29,7 +29,8 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 - `project.yml`: receta de XcodeGen. El `.xcodeproj` **no** se guarda en el repo; se genera al compilar.
 - `ComicUnlimited/`: el código de la app (iOS 17 o superior).
   - `App.swift`: arranque y las cinco pestañas.
-  - `HomeView.swift`: pestaña Inicio (catálogo).
+  - `HomeView.swift`: pestaña Inicio (Seguir leyendo y Descubrir).
+  - `Discover.swift`: fila "Recién salidos" de Inicio (cómics reales de la última semana).
   - `DetailView.swift`: ficha de un cómic.
   - `ReaderView.swift`: lector a pantalla completa.
   - `UpcomingView.swift`: pestaña Próximos (lanzamientos por semana).
