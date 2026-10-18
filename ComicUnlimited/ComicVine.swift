@@ -150,11 +150,11 @@ struct ComicVineClient {
         ])
     }
 
-    /// Números de una serie, del más nuevo al más viejo, de a 100.
-    func issues(ofSeries id: Int, offset: Int) async throws -> (items: [CVIssueSummary], total: Int) {
+    /// Números de una serie, de a 100. Del más nuevo al más viejo, o al revés con `ascending`.
+    func issues(ofSeries id: Int, offset: Int, ascending: Bool = false) async throws -> (items: [CVIssueSummary], total: Int) {
         let page: CVResponse<CVIssueSummary> = try await request("issues", [
             "filter": "volume:\(id)",
-            "sort": "cover_date:desc",
+            "sort": ascending ? "cover_date:asc" : "cover_date:desc",
             "field_list": "id,name,issue_number,cover_date,store_date,image",
             "limit": "100",
             "offset": "\(offset)",

@@ -34,7 +34,8 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ForYou.swift`: "Para vos" en Inicio; sugerencias de series reales según tus puntajes y listas.
   - `RealLibrary.swift`: tus cómics y series reales (Quiero leer / Leyendo / Leído y puntaje), guardados en el iPhone.
   - `ProfileView.swift`: pestaña Perfil; tus listas de cómics reales y números rápidos.
-  - `LibraryView.swift`: pestaña Biblioteca; importar tus cómics en archivo (.cbz, .zip o PDF).
+  - `LibraryView.swift`: pestaña Biblioteca; importar archivos y elegir cómo verlos (Todos, Series, Estado).
+  - `LibraryGroups.swift`: carpetas de la Biblioteca (serie con "Te faltan", estado), tarjeta y menú de cada cómic.
   - `LocalLibrary.swift`: guarda una copia de tus archivos, su portada, la página donde quedaste y su unión con Comic Vine.
   - `LocalReader.swift`: lector de tus archivos (páginas en segundo plano, zoom con dos dedos o doble toque).
   - `ComicVineMatch.swift`: lee el nombre del archivo (serie, número, año), busca su ficha en Comic Vine y permite elegirla a mano.
@@ -58,7 +59,9 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 
 - 0.13: manitos (👎 / 👍 / 👍👍) además de estrellas + importar archivos a la Biblioteca.
 - 0.14: leer tus archivos en el lector (zoom, guarda la página, aparecen en Seguir leyendo) + nombre y ficha desde Comic Vine.
-- 0.15: ordenar la Biblioteca (buscar, ordenar, renombrar).
+- 0.15: Biblioteca por grupos (carpetas). Botones arriba: Todos · Series · Estado. Todos con buscador y orden (Recientes · A–Z). Series: carpeta por serie, números en orden y "Te faltan" (Tenés X de Y). Estado: Sin empezar / Leyendo / Leídos. Cambiar nombre. Carpeta "Sin ficha de Comic Vine".
+- 0.16: Arcos y Editoriales. Al unir con Comic Vine se guardan editorial, arcos y fecha de publicación (los ya unidos se completan de a poco). Carpeta por arco (por fecha de publicación) con "Te faltan para completar el arco" y avance; carpeta por editorial.
+- 0.17: Colecciones propias: crear, renombrar, borrar, agregar desde el menú (un cómic puede estar en varias), ordenar arrastrando (orden de lectura) y "Crear colección con este arco" (ordenada por fecha, después se ajusta).
 - .cbr: los que por dentro son .zip se abren directo. Los que son RAR se convierten a .cbz al importarlos, con libarchive (viene dentro de iOS; Apple no la permite en el App Store, pero esta app es personal).
 - LiveContainer: el selector de archivos pide una COPIA (asCopy) porque leer el original puede fallar adentro de LiveContainer.
 

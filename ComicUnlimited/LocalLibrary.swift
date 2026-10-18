@@ -24,11 +24,56 @@ struct LocalComic: Codable, Identifiable, Hashable {
     var cvSeriesID: Int?
     var cvTitle: String?
     var cvIssueName: String?
+    var cvSeriesName: String?
+    var cvSeriesYear: String?
+    var cvIssueNumber: String?
 
-    /// El nombre que se muestra: el de Comic Vine si está unido; si no, el del archivo.
-    var displayTitle: String { cvTitle ?? title }
+    /// Nombre que le pusiste vos (si lo cambiaste).
+    var customTitle: String?
+
+    /// El nombre que se muestra: el tuyo, o el de Comic Vine, o el del archivo.
+    var displayTitle: String { customTitle ?? cvTitle ?? title }
     var isFinished: Bool { finished ?? false }
     var hasStarted: Bool { lastPage != nil }
+
+    /// Nombre de la serie (de Comic Vine).
+    var seriesName: String? {
+        cvSeriesName ?? cvTitle.map { t in t.components(separatedBy: " #").first ?? t }
+    }
+
+    /// Número dentro de la serie (de Comic Vine).
+    var issueNumber: String? {
+        cvIssueNumber ?? cvTitle.flatMap { t in t.components(separatedBy: " #").dropFirst().first }
+    }
+
+    /// Para ordenar por número: 2 antes que 10, y 0.5 entre 0 y 1.
+    var numberForSorting: Double { Double(issueNumber ?? "") ?? .greatestFiniteMagnitude }
+
+    var readState: ReadState {
+        if isFinished { return .finished }
+        return hasStarted ? .reading : .unread
+    }
+}
+
+/// En qué punto de la lectura está un cómic.
+enum ReadState: String, CaseIterable, Hashable, Identifiable {
+    case unread, reading, finished
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .unread: return "Sin empezar"
+        case .reading: return "Leyendo"
+        case .finished: return "Leídos"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .unread: return "book.closed"
+        case .reading: return "book"
+        case .finished: return "checkmark.circle"
+        }
+    }
 }
 
 @MainActor
@@ -195,6 +240,9 @@ final class LocalLibrary {
             c.cvIssueID = issue.id
             c.cvSeriesID = series.id
             c.cvTitle = CVText.issueTitle(series: series.name ?? c.title, number: issue.issueNumber)
+            c.cvSeriesName = series.name
+            c.cvSeriesYear = series.startYear
+            c.cvIssueNumber = issue.issueNumber
             let name = issue.name?.trimmingCharacters(in: .whitespaces) ?? ""
             c.cvIssueName = name.isEmpty ? nil : name
         }
@@ -206,6 +254,31 @@ final class LocalLibrary {
             c.cvSeriesID = nil
             c.cvTitle = nil
             c.cvIssueName = nil
+            c.cvSeriesName = nil
+            c.cvSeriesYear = nil
+            c.cvIssueNumber = nil
+        }
+    }
+
+    /// Cambia el nombre que se muestra. Vacío o nil vuelve al nombre original.
+    func rename(_ id: String, to newTitle: String?) {
+        let clean = newTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        update(id) { c in c.customTitle = clean.isEmpty ? nil : clean }
+    }
+
+    /// Los archivos unidos antes de la versión 0.15 no tienen guardado el año de la serie:
+    /// lo busca en Comic Vine (una consulta por serie).
+    func completeSeriesInfo() async {
+        guard !ComicVineKey.current.isEmpty else { return }
+        let missing = Set(items.filter { $0.cvSeriesID != nil && $0.cvSeriesYear == nil }.compactMap(\.cvSeriesID))
+        for seriesID in missing {
+            guard let detail = try? await ComicVineKey.client.series(id: seriesID) else { continue }
+            for comic in items where comic.cvSeriesID == seriesID {
+                update(comic.id) { c in
+                    c.cvSeriesName = detail.name ?? c.cvSeriesName
+                    c.cvSeriesYear = detail.startYear ?? ""
+                }
+            }
         }
     }
 
