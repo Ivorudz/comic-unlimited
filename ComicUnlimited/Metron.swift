@@ -112,7 +112,7 @@ struct MetronClient {
         }
     }
 
-    private func get<T: Decodable>(_ url: URL) async throws -> T {
+    func get<T: Decodable>(_ url: URL) async throws -> T {
         var request = URLRequest(url: url)
         request.timeoutInterval = 60
         let login = Data("\(user):\(password)".utf8).base64EncodedString()

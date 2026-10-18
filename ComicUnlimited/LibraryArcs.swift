@@ -16,6 +16,13 @@ struct ArcFolderView: View {
     @State private var others: [CVIssueWithSeries] = []
     @State private var loading = false
     @State private var errorText: String?
+    @State private var choosingOrder = false
+    private var orders: ReadingOrderStore { ReadingOrderStore.shared }
+
+    /// Lista de lectura elegida para este arco, si se está usando.
+    private var readingOrder: SavedReadingOrder? {
+        orders.byDate.contains(arcID) ? nil : orders.orders[arcID]
+    }
 
     /// Tus archivos de este arco, por fecha de publicación.
     private var mine: [LocalComic] {
@@ -28,12 +35,25 @@ struct ArcFolderView: View {
         case missing(CVIssueWithSeries)
         /// Número del arco que Comic Vine no pudo detallar (solo sabemos número y nombre).
         case bare(CVArcIssue)
+        /// Número de la lista de lectura que no tenés y del que no hay más datos.
+        case listed(Int, SavedReadingOrder.Item)
 
         var id: String {
             switch self {
             case .owned(let c): return "mio-\(c.id)"
             case .missing(let i): return "falta-\(i.id)"
             case .bare(let i): return "falta-\(i.id)"
+            case .listed(let index, let item): return item.cvID.map { "falta-\($0)" } ?? "lista-\(index)"
+            }
+        }
+
+        /// Código de Comic Vine del número (si se sabe).
+        var cvID: Int? {
+            switch self {
+            case .owned(let c): return c.cvIssueID
+            case .missing(let i): return i.id
+            case .bare(let i): return i.id
+            case .listed(_, let item): return item.cvID
             }
         }
 
@@ -43,8 +63,33 @@ struct ArcFolderView: View {
             case .owned(let c): return c.publicationDate ?? "9999"
             case .missing(let i): return i.coverDate ?? i.storeDate ?? "9999"
             case .bare: return "9999"
+            case .listed(_, let item): return item.coverDate ?? "9999"
             }
         }
+    }
+
+    /// En orden de lectura: primero los números de la lista (tuyos a color, los que faltan en gris);
+    /// después, los del arco que la lista no incluye.
+    private func readingSlots(_ order: SavedReadingOrder, mine: [LocalComic]) -> (inList: [Slot], extra: [Slot]) {
+        let byCV = Dictionary(library.items.compactMap { c in c.cvIssueID.map { ($0, c) } },
+                              uniquingKeysWith: { first, _ in first })
+        let detailed = Dictionary(others.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var used = Set<Int>()
+        var list: [Slot] = []
+        for (index, item) in order.items.enumerated() {
+            if let cv = item.cvID {
+                guard used.insert(cv).inserted else { continue }
+                if let comic = byCV[cv] {
+                    list.append(.owned(comic))
+                } else if showMissing {
+                    list.append(detailed[cv].map(Slot.missing) ?? .listed(index, item))
+                }
+            } else if showMissing {
+                list.append(.listed(index, item))
+            }
+        }
+        let extra = slots(mine).filter { slot in slot.cvID.map { !used.contains($0) } ?? true }
+        return (list, extra)
     }
 
     private func slots(_ mine: [LocalComic]) -> [Slot] {
@@ -67,8 +112,13 @@ struct ArcFolderView: View {
 
     var body: some View {
         let mine = self.mine
-        let total = arc?.issues?.count
-        let have = Set(mine.compactMap(\.cvIssueID)).count
+        let order = readingOrder
+        let reading = order.map { readingSlots($0, mine: mine) }
+        let listIDs = Set(order?.items.compactMap(\.cvID) ?? [])
+        let total = order == nil ? arc?.issues?.count : listIDs.count
+        let have = order == nil
+            ? Set(mine.compactMap(\.cvIssueID)).count
+            : Set(library.items.compactMap(\.cvIssueID)).intersection(listIDs).count
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 16) {
@@ -96,37 +146,26 @@ struct ArcFolderView: View {
                     .padding(.top, 10)
                 }
 
+                readingOrderControls
+
                 ComicVineSummary(deck: arc?.deck, description: arc?.description)
                     .padding(.top, 12)
 
-                SectionTitle("Números, por fecha de publicación")
+                SectionTitle(order == nil ? "Números, por fecha de publicación" : "Números, en orden de lectura")
                 if loading && arc == nil {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
                 } else if let errorText {
                     Text(errorText).font(.subheadline).foregroundStyle(Theme.ink2).padding(.bottom, 12)
                 }
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
-                          alignment: .leading, spacing: 18) {
-                    ForEach(slots(mine)) { slot in
-                        switch slot {
-                        case .owned(let comic):
-                            LocalComicTile(comic: comic)
-                        case .missing(let issue):
-                            NavigationLink(value: CVRoute.issue(id: issue.id, title: Self.title(issue))) {
-                                ArcMissingCard(title: Self.title(issue), subtitle: issue.name,
-                                               date: CVText.monthYear(issue.coverDate), cover: issue.image?.small)
-                            }
-                            .buttonStyle(.plain)
-                        case .bare(let issue):
-                            NavigationLink(value: CVRoute.issue(id: issue.id,
-                                                                title: issue.issueNumber.map { "#\($0)" } ?? "Número")) {
-                                ArcMissingCard(title: issue.issueNumber.map { "#\($0)" } ?? "Número",
-                                               subtitle: issue.name, date: nil, cover: nil)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                if let reading {
+                    grid(reading.inList)
+                    if !reading.extra.isEmpty {
+                        SectionTitle("Del arco, pero no están en esta lista")
+                        grid(reading.extra)
                     }
+                } else {
+                    grid(slots(mine))
                 }
 
                 Text(showMissing
@@ -135,6 +174,13 @@ struct ArcFolderView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.ink2)
                     .padding(.top, 12)
+
+                if let order {
+                    Text("Orden de lectura: lista \"\(order.name)\" de Metron. Datos: Metron y Comic Vine.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.top, 8)
+                }
 
                 if let link = arc?.siteDetailUrl.flatMap({ URL(string: $0) }) {
                     Link("Ver este arco en Comic Vine", destination: link)
@@ -155,6 +201,98 @@ struct ArcFolderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .task { if arc == nil { await load() } }
+        .task(id: order?.listID) { await loadListDetails() }
+        .sheet(isPresented: $choosingOrder) {
+            ReadingOrderPicker(arcID: arcID, arcName: arc?.name ?? name)
+        }
+    }
+
+    private func grid(_ slots: [Slot]) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
+                  alignment: .leading, spacing: 18) {
+            ForEach(slots) { slot in
+                switch slot {
+                case .owned(let comic):
+                    LocalComicTile(comic: comic)
+                case .missing(let issue):
+                    NavigationLink(value: CVRoute.issue(id: issue.id, title: Self.title(issue))) {
+                        ArcMissingCard(title: Self.title(issue), subtitle: issue.name,
+                                       date: CVText.monthYear(issue.coverDate), cover: issue.image?.small)
+                    }
+                    .buttonStyle(.plain)
+                case .bare(let issue):
+                    NavigationLink(value: CVRoute.issue(id: issue.id,
+                                                        title: issue.issueNumber.map { "#\($0)" } ?? "Número")) {
+                        ArcMissingCard(title: issue.issueNumber.map { "#\($0)" } ?? "Número",
+                                       subtitle: issue.name, date: nil, cover: nil)
+                    }
+                    .buttonStyle(.plain)
+                case .listed(_, let item):
+                    let title = CVText.issueTitle(series: item.series, number: item.number)
+                    if let cv = item.cvID {
+                        NavigationLink(value: CVRoute.issue(id: cv, title: title)) {
+                            ArcMissingCard(title: title, subtitle: nil,
+                                           date: CVText.monthYear(item.coverDate), cover: nil)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        ArcMissingCard(title: title, subtitle: nil,
+                                       date: CVText.monthYear(item.coverDate), cover: nil)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Botón para elegir el orden de lectura (Metron) y cambiar entre "orden de lectura" y "por fecha".
+    @ViewBuilder private var readingOrderControls: some View {
+        if let saved = orders.orders[arcID] {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Orden", selection: Binding(get: { !orders.byDate.contains(arcID) },
+                                                   set: { orders.useReadingOrder($0, arc: arcID) })) {
+                    Text("Orden de lectura").tag(true)
+                    Text("Por fecha").tag(false)
+                }
+                .pickerStyle(.segmented)
+                HStack(spacing: 6) {
+                    Text(CVText.join([saved.name, ReadingSource.name(saved.source)]))
+                        .font(.caption)
+                        .foregroundStyle(Theme.ink2)
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
+                    Button("Cambiar lista") { choosingOrder = true }
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.magenta)
+                }
+            }
+            .padding(.top, 14)
+        } else {
+            Button {
+                choosingOrder = true
+            } label: {
+                Label("Orden de lectura (buscar en Metron)", systemImage: "list.number")
+                    .font(.system(size: 15, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(12)
+                    .foregroundStyle(Theme.ink)
+                    .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 14)
+        }
+    }
+
+    /// Portadas y nombres (de Comic Vine) de los números de la lista que no tenés.
+    private func loadListDetails() async {
+        guard let order = readingOrder, !ComicVineKey.current.isEmpty else { return }
+        let owned = Set(library.items.compactMap(\.cvIssueID))
+        let known = Set(others.map(\.id))
+        let wanted = order.items.compactMap(\.cvID).filter { !owned.contains($0) && !known.contains($0) }
+        // Como mucho 300 (3 consultas), para cuidar el límite de Comic Vine.
+        var seen = Set<Int>()
+        let ids = Array(wanted.filter { seen.insert($0).inserted }.prefix(300))
+        guard !ids.isEmpty, let found = try? await ComicVineKey.client.issues(ids: ids) else { return }
+        others += found
     }
 
     private static func title(_ issue: CVIssueWithSeries) -> String {

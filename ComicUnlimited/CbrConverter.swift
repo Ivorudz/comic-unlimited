@@ -65,7 +65,10 @@ enum CbrConverter {
         case failed(String)
         var errorDescription: String? {
             switch self {
-            case .failed(let why): return "No se pudo convertir el .cbr (\(why))."
+            case .failed(let why):
+                return "Este .cbr no se pudo abrir: usa un tipo de compresión RAR que el iPhone no puede leer, o el archivo está dañado. "
+                    + "Probá conseguirlo en .cbz, o abrilo con otra app (por ejemplo Documents), comprimí la carpeta de imágenes desde Archivos "
+                    + "(mantener apretado → Comprimir) e importá ese .zip. (Detalle: \(why))"
             }
         }
     }
