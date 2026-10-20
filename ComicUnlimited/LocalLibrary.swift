@@ -39,6 +39,8 @@ struct LocalComic: Codable, Identifiable, Hashable {
     /// Año del paquete de donde salió (por ejemplo "Avengers Disassembled (2004).zip"),
     /// para elegir bien la ficha cuando el archivo no dice el año.
     var packYear: Int?
+    /// true = lo sacaste de "Seguir leyendo" (vuelve a aparecer si lo abrís de nuevo).
+    var hiddenFromContinue: Bool?
     /// Portada del número en Comic Vine (solo el link; la imagen se carga al verla).
     var cvCoverURL: String?
     /// true = revisaste (o elegiste vos) su ficha de Comic Vine. Si la eligió la app sola, queda para revisar.
@@ -298,6 +300,7 @@ final class LocalLibrary {
         var start = 0
         update(comic.id) { c in
             c.lastOpened = Date().timeIntervalSince1970
+            c.hiddenFromContinue = nil
             if c.isFinished {
                 // Si ya lo terminaste, empieza de nuevo.
                 c.finished = false
@@ -327,7 +330,13 @@ final class LocalLibrary {
 
     /// Lo que empezaste a leer, lo último primero (para "Seguir leyendo").
     var recentlyRead: [LocalComic] {
-        items.filter(\.hasStarted).sorted { ($0.lastOpened ?? 0) > ($1.lastOpened ?? 0) }
+        items.filter { $0.hasStarted && $0.hiddenFromContinue != true }
+            .sorted { ($0.lastOpened ?? 0) > ($1.lastOpened ?? 0) }
+    }
+
+    /// Lo saca de "Seguir leyendo" en Inicio (no borra el cómic ni la página donde quedaste).
+    func hideFromContinue(_ id: String) {
+        update(id) { c in c.hiddenFromContinue = true }
     }
 
     // MARK: Comic Vine

@@ -105,6 +105,25 @@ struct HomeView: View {
                                 LocalContinueCard(comic: comic)
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button { onReadLocal(comic) } label: {
+                                    Label(comic.isFinished ? "Leer de nuevo" : "Seguir leyendo", systemImage: "book")
+                                }
+                                if let issueID = comic.cvIssueID {
+                                    NavigationLink(value: CVRoute.issue(id: issueID, title: comic.displayTitle)) {
+                                        Label("Ver el cómic", systemImage: "info.circle")
+                                    }
+                                } else {
+                                    NavigationLink(value: LibraryRoute.localComic(comic.id)) {
+                                        Label("Ver el cómic", systemImage: "info.circle")
+                                    }
+                                }
+                                Button(role: .destructive) {
+                                    LocalLibrary.shared.hideFromContinue(comic.id)
+                                } label: {
+                                    Label("Quitar de Seguir leyendo", systemImage: "eye.slash")
+                                }
+                            }
                         }
                     }
                 }
