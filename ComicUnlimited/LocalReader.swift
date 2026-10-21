@@ -2,35 +2,95 @@ import SwiftUI
 import UIKit
 
 // Lector para tus cómics en archivo (.cbz, .zip o PDF).
-// Las páginas se pasan deslizando. Zoom: con dos dedos o con doble toque.
-// Tocar el borde derecho o izquierdo pasa de página; tocar el centro muestra u oculta los controles.
+// - Dirección: izquierda a derecha, derecha a izquierda (manga) o vertical continua.
+// - Ajuste de página: entera, llenar el ancho o llenar el alto.
+// - Tocar los bordes pasa de página (se puede apagar); tocar el centro muestra u oculta los controles.
+// - Abajo: miniaturas y barra para saltar de página.
+// - Pantalla siempre encendida y modo nocturno (calidez y oscuridad a gusto).
+// Todo se elige en el engranaje (⚙︎) del lector y queda guardado.
 
 /// Saca las páginas del archivo de a una, en segundo plano, y recuerda las últimas que usó.
 actor PageLoader {
     private let file: ComicFile
-    private let cache = NSCache<NSNumber, UIImage>()
+    private let cache = NSCache<NSString, UIImage>()
     let pageCount: Int
 
     init(file: ComicFile) {
         self.file = file
         pageCount = file.pageCount
-        cache.countLimit = 8
+        cache.countLimit = 40
+        cache.totalCostLimit = 160_000_000
     }
 
     func image(_ index: Int, maxWidth: CGFloat) -> UIImage? {
-        if let cached = cache.object(forKey: NSNumber(value: index)) { return cached }
+        let key = "\(index)-\(Int(maxWidth))" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
         guard let image = file.page(index, maxWidth: maxWidth) else { return nil }
-        cache.setObject(image, forKey: NSNumber(value: index))
+        let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+        cache.setObject(image, forKey: key, cost: cost)
         return image
     }
+
+    /// Miniatura chiquita para la tira de abajo.
+    func thumbnail(_ index: Int) -> UIImage? { image(index, maxWidth: 140) }
 }
+
+// MARK: - Preferencias del lector
+
+enum ReaderDirection: String, CaseIterable, Identifiable {
+    case leftToRight, rightToLeft, vertical
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .leftToRight: return "Izq → der"
+        case .rightToLeft: return "Der → izq"
+        case .vertical: return "Vertical"
+        }
+    }
+}
+
+enum ReaderFit: String, CaseIterable, Identifiable {
+    case page, width, height
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .page: return "Entera"
+        case .width: return "Al ancho"
+        case .height: return "Al alto"
+        }
+    }
+}
+
+enum ReaderSettings {
+    static let direction = "reader.direction"
+    static let fit = "reader.fit"
+    static let tapEdges = "reader.tapEdges"
+    static let thumbnails = "reader.thumbnails"
+    static let keepAwake = "reader.keepAwake"
+    static let night = "reader.night"
+    static let warmth = "reader.warmth"
+    static let dim = "reader.dim"
+}
+
+// MARK: - Lector
 
 struct LocalReaderView: View {
     @Environment(\.dismiss) private var dismiss
     let comic: LocalComic
 
+    @AppStorage(ReaderSettings.direction) private var direction: ReaderDirection = .leftToRight
+    @AppStorage(ReaderSettings.fit) private var fit: ReaderFit = .page
+    @AppStorage(ReaderSettings.tapEdges) private var tapEdges = true
+    @AppStorage(ReaderSettings.thumbnails) private var thumbnails = true
+    @AppStorage(ReaderSettings.keepAwake) private var keepAwake = true
+    @AppStorage(ReaderSettings.night) private var night = false
+    @AppStorage(ReaderSettings.warmth) private var warmth = 0.5
+    @AppStorage(ReaderSettings.dim) private var dim = 0.25
+
     @State private var page: Int
+    @State private var verticalPage: Int?
     @State private var showControls = true
+    @State private var showSettings = false
     @State private var loader: PageLoader?
     @State private var errorText: String?
 
@@ -47,18 +107,7 @@ struct LocalReaderView: View {
                 Color.black.ignoresSafeArea()
 
                 if let loader {
-                    TabView(selection: $page) {
-                        ForEach(0..<loader.pageCount, id: \.self) { index in
-                            LocalPageView(loader: loader, index: index,
-                                          maxWidth: geo.size.width * UIScreen.main.scale) { x in
-                                handleTap(at: x, width: geo.size.width)
-                            }
-                            .tag(index)
-                        }
-                        endCard.tag(loader.pageCount)
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .ignoresSafeArea()
+                    pages(loader, size: geo.size)
                 } else if let errorText {
                     VStack(spacing: 14) {
                         Text(errorText).foregroundStyle(.white).multilineTextAlignment(.center)
@@ -69,6 +118,8 @@ struct LocalReaderView: View {
                     ProgressView().tint(.white)
                 }
 
+                if night { nightFilter }
+
                 if showControls || page == pageCount {
                     controls.transition(.opacity)
                 }
@@ -76,6 +127,13 @@ struct LocalReaderView: View {
         }
         .statusBarHidden(!showControls)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showSettings) {
+            ReaderSettingsSheet()
+                .presentationDetents([.medium, .large])
+        }
+        .onAppear { UIApplication.shared.isIdleTimerDisabled = keepAwake }
+        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .onChange(of: keepAwake) { _, on in UIApplication.shared.isIdleTimerDisabled = on }
         .task {
             let url = LocalLibrary.shared.fileURL(comic)
             let result: Result<ComicFile, Error> = await Task.detached(priority: .userInitiated) {
@@ -85,6 +143,7 @@ struct LocalReaderView: View {
             case .success(let file):
                 loader = PageLoader(file: file)
                 page = min(page, max(file.pageCount - 1, 0))
+                verticalPage = page
             case .failure(let error):
                 errorText = (error as? LocalizedError)?.errorDescription ?? "No se pudo abrir el archivo."
             }
@@ -93,23 +152,83 @@ struct LocalReaderView: View {
         }
         .onChange(of: page) { _, newPage in
             guard loader != nil else { return }
+            if verticalPage != newPage { verticalPage = newPage }
             if newPage >= pageCount {
                 LocalLibrary.shared.markFinished(comic.id)
             } else {
                 LocalLibrary.shared.setPage(newPage, for: comic.id)
             }
         }
+        .onChange(of: verticalPage) { _, newValue in
+            if let newValue, newValue != page { page = newValue }
+        }
+    }
+
+    // MARK: Páginas
+
+    @ViewBuilder
+    private func pages(_ loader: PageLoader, size: CGSize) -> some View {
+        let scale = UIScreen.main.scale
+        // "Al alto" puede necesitar páginas más anchas que la pantalla (páginas dobles).
+        let decodeWidth = size.width * scale * (fit == .height ? 2 : 1)
+        if direction == .vertical {
+            ScrollView(.vertical) {
+                LazyVStack(spacing: 2) {
+                    ForEach(0..<loader.pageCount, id: \.self) { index in
+                        VerticalPageView(loader: loader, index: index, maxWidth: size.width * scale, width: size.width)
+                            .id(index)
+                    }
+                    endCard
+                        .frame(height: size.height)
+                        .id(loader.pageCount)
+                }
+                .scrollTargetLayout()
+            }
+            .scrollPosition(id: $verticalPage, anchor: .top)
+            .ignoresSafeArea()
+            .onTapGesture {
+                withAnimation(.easeOut(duration: 0.2)) { showControls.toggle() }
+            }
+        } else {
+            TabView(selection: $page) {
+                ForEach(0..<loader.pageCount, id: \.self) { index in
+                    LocalPageView(loader: loader, index: index, maxWidth: decodeWidth, fit: fit) { x in
+                        handleTap(at: x, width: size.width)
+                    }
+                    .environment(\.layoutDirection, .leftToRight)   // la página nunca se da vuelta
+                    .tag(index)
+                }
+                endCard
+                    .environment(\.layoutDirection, .leftToRight)
+                    .tag(loader.pageCount)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            // Derecha a izquierda: se pasa de página deslizando hacia la derecha (como el manga).
+            .environment(\.layoutDirection, direction == .rightToLeft ? .rightToLeft : .leftToRight)
+            .ignoresSafeArea()
+        }
     }
 
     private func handleTap(at x: CGFloat, width: CGFloat) {
         let ratio = x / max(width, 1)
-        if ratio < 0.25 {
-            withAnimation { page = max(0, page - 1) }
-        } else if ratio > 0.75 {
-            withAnimation { page = min(pageCount, page + 1) }
-        } else {
+        let leftEdge = ratio < 0.25, rightEdge = ratio > 0.75
+        guard tapEdges, leftEdge || rightEdge else {
             withAnimation(.easeOut(duration: 0.2)) { showControls.toggle() }
+            return
         }
+        // En derecha a izquierda, el borde izquierdo avanza.
+        let forward = direction == .rightToLeft ? leftEdge : rightEdge
+        withAnimation { page = forward ? min(pageCount, page + 1) : max(0, page - 1) }
+    }
+
+    /// Modo nocturno: luz más cálida y más tenue (no cambia el brillo del iPhone).
+    private var nightFilter: some View {
+        ZStack {
+            Color(red: 1, green: 0.55, blue: 0.15).opacity(warmth * 0.35).blendMode(.multiply)
+            Color.black.opacity(dim * 0.8)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 
     // MARK: Controles
@@ -128,7 +247,13 @@ struct LocalReaderView: View {
                     .font(.system(size: 15, weight: .bold))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
-                Color.clear.frame(width: 40, height: 36)
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .bold))
+                        .frame(width: 40, height: 36)
+                        .background(.white.opacity(0.16), in: Capsule())
+                }
+                .accessibilityLabel("Opciones de lectura")
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
@@ -139,23 +264,32 @@ struct LocalReaderView: View {
             Spacer()
 
             if pageCount > 1 {
-                HStack(spacing: 12) {
-                    Slider(
-                        value: Binding(
-                            get: { Double(min(page, pageCount - 1) + 1) },
-                            set: { page = Int($0.rounded()) - 1 }
-                        ),
-                        in: 1...Double(pageCount),
-                        step: 1
-                    )
-                    .tint(Color(hex: 0xFF4FA3))
-                    .accessibilityLabel("Ir a la página")
-                    Text("\(min(page, pageCount - 1) + 1) / \(pageCount)")
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.white)
-                        .frame(minWidth: 64, alignment: .trailing)
+                VStack(spacing: 10) {
+                    if thumbnails, let loader {
+                        ThumbnailStrip(loader: loader, current: min(page, pageCount - 1),
+                                       reversed: direction == .rightToLeft) { index in
+                            withAnimation { page = index }
+                        }
+                    }
+                    HStack(spacing: 12) {
+                        Slider(
+                            value: Binding(
+                                get: { Double(min(page, pageCount - 1) + 1) },
+                                set: { page = Int($0.rounded()) - 1 }
+                            ),
+                            in: 1...Double(pageCount),
+                            step: 1
+                        )
+                        .tint(Color(hex: 0xFF4FA3))
+                        .environment(\.layoutDirection, direction == .rightToLeft ? .rightToLeft : .leftToRight)
+                        .accessibilityLabel("Ir a la página")
+                        Text("\(min(page, pageCount - 1) + 1) / \(pageCount)")
+                            .font(.footnote.monospacedDigit())
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 64, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 14)
                 }
-                .padding(.horizontal, 14)
                 .padding(.top, 24)
                 .padding(.bottom, 16)
                 .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom))
@@ -200,11 +334,148 @@ struct LocalReaderView: View {
     }
 }
 
+// MARK: - Opciones (engranaje)
+
+struct ReaderSettingsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage(ReaderSettings.direction) private var direction: ReaderDirection = .leftToRight
+    @AppStorage(ReaderSettings.fit) private var fit: ReaderFit = .page
+    @AppStorage(ReaderSettings.tapEdges) private var tapEdges = true
+    @AppStorage(ReaderSettings.thumbnails) private var thumbnails = true
+    @AppStorage(ReaderSettings.keepAwake) private var keepAwake = true
+    @AppStorage(ReaderSettings.night) private var night = false
+    @AppStorage(ReaderSettings.warmth) private var warmth = 0.5
+    @AppStorage(ReaderSettings.dim) private var dim = 0.25
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Dirección", selection: $direction) {
+                        ForEach(ReaderDirection.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Dirección de lectura")
+                } footer: {
+                    Text("Der → izq es para manga. Vertical muestra las páginas una debajo de la otra.")
+                }
+
+                Section {
+                    Picker("Ajuste", selection: $fit) {
+                        ForEach(ReaderFit.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(direction == .vertical)
+                } header: {
+                    Text("Tamaño de la página")
+                } footer: {
+                    Text(direction == .vertical
+                         ? "En vertical las páginas siempre ocupan el ancho."
+                         : "\"Al alto\" sirve para páginas dobles: se recorren deslizando de costado.")
+                }
+
+                Section("Al tocar") {
+                    Toggle("Tocar los bordes pasa de página", isOn: $tapEdges)
+                    Toggle("Mostrar miniaturas abajo", isOn: $thumbnails)
+                }
+
+                Section {
+                    Toggle("Pantalla siempre encendida", isOn: $keepAwake)
+                    Toggle("Modo nocturno", isOn: $night)
+                    if night {
+                        VStack(alignment: .leading) {
+                            Text("Calidez").font(.subheadline)
+                            Slider(value: $warmth, in: 0...1)
+                        }
+                        VStack(alignment: .leading) {
+                            Text("Oscurecer").font(.subheadline)
+                            Slider(value: $dim, in: 0...0.9)
+                        }
+                    }
+                } header: {
+                    Text("Pantalla")
+                } footer: {
+                    Text("El modo nocturno pone una luz más cálida y tenue sobre las páginas, solo en el lector.")
+                }
+            }
+            .tint(Color(hex: 0xFF4FA3))
+            .navigationTitle("Opciones de lectura")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Listo") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Miniaturas
+
+private struct ThumbnailStrip: View {
+    let loader: PageLoader
+    let current: Int
+    let reversed: Bool
+    let onSelect: (Int) -> Void
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 6) {
+                    ForEach(0..<loader.pageCount, id: \.self) { index in
+                        Button { onSelect(index) } label: {
+                            ThumbnailView(loader: loader, index: index)
+                                .frame(width: 44, height: 66)
+                                .overlay(RoundedRectangle(cornerRadius: 3)
+                                    .stroke(index == current ? Color(hex: 0xFF4FA3) : .white.opacity(0.2),
+                                            lineWidth: index == current ? 2 : 1))
+                                .opacity(index == current ? 1 : 0.75)
+                        }
+                        .buttonStyle(.plain)
+                        .id(index)
+                    }
+                }
+                .padding(.horizontal, 14)
+            }
+            .frame(height: 70)
+            .environment(\.layoutDirection, reversed ? .rightToLeft : .leftToRight)
+            .onAppear { proxy.scrollTo(current, anchor: .center) }
+            .onChange(of: current) { _, value in
+                withAnimation { proxy.scrollTo(value, anchor: .center) }
+            }
+        }
+    }
+}
+
+private struct ThumbnailView: View {
+    let loader: PageLoader
+    let index: Int
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            Color.white.opacity(0.08)
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Text("\(index + 1)").font(.caption2).foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .environment(\.layoutDirection, .leftToRight)
+        .task(id: index) { image = await loader.thumbnail(index) }
+    }
+}
+
+// MARK: - Página (deslizando)
+
 /// Una página: la carga en segundo plano y deja hacer zoom.
 private struct LocalPageView: View {
     let loader: PageLoader
     let index: Int
     let maxWidth: CGFloat
+    let fit: ReaderFit
     let onTap: (CGFloat) -> Void
 
     @State private var image: UIImage?
@@ -212,13 +483,13 @@ private struct LocalPageView: View {
     var body: some View {
         ZStack {
             if let image {
-                ZoomableImage(image: image, onSingleTap: onTap)
+                ZoomableImage(image: image, fit: fit, onSingleTap: onTap)
             } else {
                 ProgressView().tint(.white)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: index) {
+        .task(id: "\(index)-\(Int(maxWidth))") {
             image = await loader.image(index, maxWidth: maxWidth)
             // Dejamos lista la siguiente página para que no haya espera al pasar.
             _ = await loader.image(index + 1, maxWidth: maxWidth)
@@ -226,13 +497,43 @@ private struct LocalPageView: View {
     }
 }
 
-/// Imagen con zoom (dos dedos o doble toque), hecha con UIKit.
+/// Página en el modo vertical continuo: ocupa todo el ancho.
+private struct VerticalPageView: View {
+    let loader: PageLoader
+    let index: Int
+    let maxWidth: CGFloat
+    let width: CGFloat
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: width)
+            } else {
+                ZStack {
+                    Color.white.opacity(0.04)
+                    ProgressView().tint(.white)
+                }
+                .frame(width: width, height: width * 1.5)
+            }
+        }
+        .task(id: index) { image = await loader.image(index, maxWidth: maxWidth) }
+    }
+}
+
+// MARK: - Zoom
+
+/// Imagen con zoom (dos dedos o doble toque), hecha con UIKit. Respeta el ajuste elegido.
 private struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
+    let fit: ReaderFit
     let onSingleTap: (CGFloat) -> Void
 
-    func makeUIView(context: Context) -> UIScrollView {
-        let scroll = UIScrollView()
+    func makeUIView(context: Context) -> PageScrollView {
+        let scroll = PageScrollView()
         scroll.minimumZoomScale = 1
         scroll.maximumZoomScale = 4
         scroll.showsHorizontalScrollIndicator = false
@@ -241,21 +542,8 @@ private struct ZoomableImage: UIViewRepresentable {
         scroll.backgroundColor = .clear
         scroll.contentInsetAdjustmentBehavior = .never
         scroll.delegate = context.coordinator
-
-        let imageView = UIImageView(image: image)
-        imageView.contentMode = .scaleAspectFit
-        imageView.isUserInteractionEnabled = true
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        scroll.addSubview(imageView)
-        NSLayoutConstraint.activate([
-            imageView.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
-            imageView.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
-            imageView.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
-            imageView.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
-        ])
-        context.coordinator.imageView = imageView
+        scroll.imageView.image = image
+        scroll.fit = fit
 
         let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTapped(_:)))
         doubleTap.numberOfTapsRequired = 2
@@ -267,11 +555,13 @@ private struct ZoomableImage: UIViewRepresentable {
         return scroll
     }
 
-    func updateUIView(_ scroll: UIScrollView, context: Context) {
+    func updateUIView(_ scroll: PageScrollView, context: Context) {
         context.coordinator.onSingleTap = onSingleTap
-        if context.coordinator.imageView?.image !== image {
-            context.coordinator.imageView?.image = image
+        if scroll.imageView.image !== image || scroll.fit != fit {
             scroll.setZoomScale(1, animated: false)
+            scroll.imageView.image = image
+            scroll.fit = fit
+            scroll.relayoutImage()
         }
     }
 
@@ -279,18 +569,19 @@ private struct ZoomableImage: UIViewRepresentable {
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
         var onSingleTap: (CGFloat) -> Void
-        weak var imageView: UIImageView?
 
         init(onSingleTap: @escaping (CGFloat) -> Void) { self.onSingleTap = onSingleTap }
 
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { (scrollView as? PageScrollView)?.imageView }
+
+        func scrollViewDidZoom(_ scrollView: UIScrollView) { (scrollView as? PageScrollView)?.centerContent() }
 
         @objc func doubleTapped(_ gesture: UITapGestureRecognizer) {
-            guard let scroll = gesture.view as? UIScrollView else { return }
+            guard let scroll = gesture.view as? PageScrollView else { return }
             if scroll.zoomScale > 1.01 {
                 scroll.setZoomScale(1, animated: true)
             } else {
-                let point = gesture.location(in: imageView)
+                let point = gesture.location(in: scroll.imageView)
                 let size = CGSize(width: scroll.bounds.width / 2.5, height: scroll.bounds.height / 2.5)
                 scroll.zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
                                        width: size.width, height: size.height), animated: true)
@@ -303,8 +594,61 @@ private struct ZoomableImage: UIViewRepresentable {
             if scroll.zoomScale > 1.01 {
                 onSingleTap(scroll.bounds.width / 2)
             } else {
-                onSingleTap(gesture.location(in: scroll).x)
+                // Posición del toque en la pantalla (no en la página, que puede ser más ancha).
+                onSingleTap(gesture.location(in: scroll).x - scroll.contentOffset.x)
             }
         }
+    }
+}
+
+/// Scroll con la imagen adentro: la acomoda según el ajuste (entera, al ancho o al alto) y la centra.
+final class PageScrollView: UIScrollView {
+    let imageView = UIImageView()
+    var fit: ReaderFit = .page
+    private var lastLayout: (CGSize, ReaderFit, ObjectIdentifier?)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        imageView.contentMode = .scaleToFill
+        imageView.isUserInteractionEnabled = true
+        addSubview(imageView)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let key = (bounds.size, fit, imageView.image.map(ObjectIdentifier.init))
+        if lastLayout == nil || lastLayout!.0 != key.0 || lastLayout!.1 != key.1 || lastLayout!.2 != key.2 {
+            relayoutImage()
+        }
+    }
+
+    /// Tamaño de la imagen con zoom 1, según el ajuste.
+    func relayoutImage() {
+        guard let image = imageView.image, bounds.width > 0, bounds.height > 0,
+              image.size.width > 0, image.size.height > 0 else { return }
+        lastLayout = (bounds.size, fit, ObjectIdentifier(image))
+        let w = bounds.width / image.size.width
+        let h = bounds.height / image.size.height
+        let scale: CGFloat
+        switch fit {
+        case .page: scale = min(w, h)
+        case .width: scale = w
+        case .height: scale = h
+        }
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        zoomScale = 1
+        imageView.frame = CGRect(origin: .zero, size: size)
+        contentSize = size
+        contentOffset = .zero
+        centerContent()
+    }
+
+    /// Si la página es más chica que la pantalla, la centra.
+    func centerContent() {
+        let x = max(0, (bounds.width - contentSize.width) / 2)
+        let y = max(0, (bounds.height - contentSize.height) / 2)
+        contentInset = UIEdgeInsets(top: y, left: x, bottom: y, right: x)
     }
 }
