@@ -67,7 +67,10 @@ struct RootView: View {
             Color.clear.fullScreenCover(item: $localSession) { session in
                 LocalReaderView(comic: session.comic, startPage: session.startPage) { next in
                     // "Siguiente número": se abre el otro, en el mismo arco o serie.
-                    let context = LocalLibrary.shared.item(session.comic.id)?.lastContext
+                    let previous = LocalLibrary.shared.item(session.comic.id)
+                    let context = previous?.lastContext
+                    // El que terminaste sale de "Seguir leyendo" (queda el que empezás ahora).
+                    if previous?.isFinished == true { LocalLibrary.shared.hideFromContinue(session.comic.id) }
                     localSession = LocalSession(comic: next, startPage: LocalLibrary.shared.open(next, context: context))
                 }
                 // Cada cómic es un lector nuevo (si no, quedaban las páginas y la posición del anterior).
