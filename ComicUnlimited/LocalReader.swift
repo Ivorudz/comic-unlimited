@@ -162,6 +162,8 @@ struct LocalReaderView: View {
     @State private var showControls = true
     @State private var showSettings = false
     @State private var showMarks = false
+    /// Lo terminaste en esta lectura (al cerrar, se marca como leído en Metron).
+    @State private var finishedHere = false
     @State private var loader: PageLoader?
     @State private var errorText: String?
 
@@ -221,6 +223,9 @@ struct LocalReaderView: View {
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
             AppOrientation.set(allowLandscape: false)
+            if finishedHere, let cv = live.cvIssueID {
+                Task { await MetronSync.markRead(cvID: cv) }
+            }
         }
         .onChange(of: keepAwake) { _, on in UIApplication.shared.isIdleTimerDisabled = on }
         .task {
@@ -241,6 +246,7 @@ struct LocalReaderView: View {
         .onChange(of: page) { _, newPage in
             guard loader != nil else { return }
             if newPage >= pageCount {
+                finishedHere = true
                 LocalLibrary.shared.markFinished(comic.id)
             } else {
                 LocalLibrary.shared.setPage(newPage, for: comic.id)
@@ -410,9 +416,18 @@ struct LocalReaderView: View {
 
             Spacer()
 
-            // Al terminar: "Siguiente número" (del arco o la serie desde donde lo abriste).
-            if page >= pageCount, let next = LocalLibrary.shared.next(after: live), onOpenNext != nil {
-                nextButton(next).padding(.horizontal, 14).padding(.bottom, 8)
+            // En vertical, el final no tiene tarjeta propia: "¿Qué te pareció?" y "Siguiente" van acá.
+            if page >= pageCount && direction == .vertical {
+                ScrollView {
+                    VStack(spacing: 10) {
+                        RateCard(comic: live)
+                        if let next = LocalLibrary.shared.next(after: live), onOpenNext != nil { nextButton(next) }
+                    }
+                    .padding(.horizontal, 14)
+                }
+                .frame(maxHeight: 360)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 8)
             }
 
             if pageCount > 1 {
@@ -470,6 +485,8 @@ struct LocalReaderView: View {
     }
 
     private var endCard: some View {
+        // Se puede deslizar hacia arriba (con "¿Qué te pareció?" no entra en pantallas chicas).
+        ScrollView {
         VStack(spacing: 12) {
             Text("Terminaste")
                 .font(.headline)
@@ -481,7 +498,8 @@ struct LocalReaderView: View {
             Text("Quedó guardado como leído.")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.7))
-                .padding(.bottom, 12)
+                .padding(.bottom, 4)
+            RateCard(comic: live)
             if let next = LocalLibrary.shared.next(after: live), onOpenNext != nil {
                 nextButton(next)
             }
@@ -505,7 +523,11 @@ struct LocalReaderView: View {
         .foregroundStyle(.white)
         .frame(maxWidth: 330)
         .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 90)
+        .padding(.bottom, 150)
+        }
+        .scrollIndicators(.hidden)
     }
 }
 

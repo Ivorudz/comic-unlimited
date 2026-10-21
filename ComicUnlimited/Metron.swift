@@ -113,8 +113,21 @@ struct MetronClient {
         }
     }
 
-    func get<T: Decodable>(_ url: URL) async throws -> T {
+    /// Manda datos a Metron (por ejemplo, "lo leí" con tus estrellas).
+    func send<T: Decodable>(_ method: String, _ url: URL, body: [String: Any]) async throws -> T {
         var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await perform(request)
+    }
+
+    func get<T: Decodable>(_ url: URL) async throws -> T {
+        try await perform(URLRequest(url: url))
+    }
+
+    private func perform<T: Decodable>(_ original: URLRequest) async throws -> T {
+        var request = original
         request.timeoutInterval = 60
         let login = Data("\(user):\(password)".utf8).base64EncodedString()
         request.setValue("Basic \(login)", forHTTPHeaderField: "Authorization")
@@ -130,7 +143,7 @@ struct MetronClient {
         let (data, response) = fetched
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         switch code {
-        case 200: break
+        case 200, 201: break
         case 401, 403: throw MetronError.badLogin
         case 429: throw MetronError.tooManyRequests
         default: throw MetronError.server("código \(code)")
@@ -191,6 +204,9 @@ struct MetronIssueDetail: Decodable {
     let image: String?
     let credits: [Credit]?
     let cvId: Int?
+    /// Promedio de la comunidad de Metron (1 a 5) y cuántos votaron.
+    let averageRating: Flexible?
+    let ratingCount: Int?
 
     /// Metron manda el precio a veces como texto ("4.99") y a veces como número.
     struct Flexible: Decodable {

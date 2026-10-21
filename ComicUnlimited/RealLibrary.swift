@@ -48,8 +48,13 @@ final class RealLibrary {
         var status: Status?
         var rating: Int?
         var updated: Double
-        /// Puntaje con manitos: -1 = 👎, 1 = 👍, 2 = 👍👍. Se usa en lugar de las estrellas.
+        /// Puntaje con manitos: -1 = 👎, 1 = 👍, 2 = 👍👍.
         var thumbs: Int? = nil
+        /// Tu comentario (y cuándo lo escribiste).
+        var review: String? = nil
+        var reviewDate: Double? = nil
+        /// En tu colección de Metron (si se mandó): para actualizar ahí las estrellas.
+        var metronCollectionID: Int? = nil
 
         var isSeries: Bool { kind == .series }
         /// Clave única: un número y una serie pueden tener el mismo id en Comic Vine.
@@ -98,10 +103,10 @@ final class RealLibrary {
 
     /// Al leer un archivo tuyo unido a Comic Vine: pasa a "Leyendo"; al terminarlo, a "Leído".
     /// Si ya estaba en "Leído", volver a abrirlo no lo cambia.
-    func updateFromReading(_ comic: LocalComic, finished: Bool) {
-        guard let issueID = comic.cvIssueID else { return }
-        let key = "issue-\(issueID)"
-        var entry = entries[key] ?? Entry(
+    /// Datos para guardar un archivo tuyo unido a Comic Vine (nil si no tiene ficha).
+    static func makeEntry(_ comic: LocalComic) -> Entry? {
+        guard let issueID = comic.cvIssueID else { return nil }
+        return Entry(
             id: issueID,
             kind: .issue,
             title: comic.cvTitle ?? comic.displayTitle,
@@ -113,6 +118,11 @@ final class RealLibrary {
             rating: nil,
             updated: Date().timeIntervalSince1970
         )
+    }
+
+    func updateFromReading(_ comic: LocalComic, finished: Bool) {
+        guard let template = Self.makeEntry(comic) else { return }
+        var entry = entries[template.key] ?? template
         if finished {
             guard entry.status != .read else { return }
             entry.status = .read
@@ -152,6 +162,32 @@ final class RealLibrary {
             if entry.status == nil { entry.status = .read }
         }
         save(entry)
+        // Si ya está en tu colección de Metron, se actualizan ahí las estrellas.
+        if let item = entry.metronCollectionID, let stars = entry.rating {
+            Task { await MetronSync.updateRating(collectionID: item, stars: stars) }
+        }
+    }
+
+    /// Guarda (o borra, si queda vacío) tu comentario.
+    func setReview(_ text: String?, for template: Entry) {
+        var entry = entries[template.key] ?? template
+        let clean = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        entry.review = clean.isEmpty ? nil : clean
+        entry.reviewDate = clean.isEmpty ? nil : Date().timeIntervalSince1970
+        if entry.review != nil && entry.status == nil { entry.status = .read }
+        save(entry)
+    }
+
+    /// Guarda en qué ítem de tu colección de Metron quedó este número.
+    func setMetronCollectionID(_ id: Int, for key: String) {
+        guard var entry = entries[key] else { return }
+        entry.metronCollectionID = id
+        save(entry)
+    }
+
+    /// Tus comentarios, el más nuevo primero.
+    var reviews: [Entry] {
+        entries.values.filter { $0.review != nil }.sorted { ($0.reviewDate ?? 0) > ($1.reviewDate ?? 0) }
     }
 
     /// Puntaje con manitos (-1, 1 o 2). Tocar la misma de nuevo lo borra. Convive con las estrellas.
@@ -174,7 +210,7 @@ final class RealLibrary {
     private func save(_ entry: Entry) {
         var entry = entry
         entry.updated = Date().timeIntervalSince1970
-        if entry.status == nil && entry.rating == nil && entry.thumbs == nil {
+        if entry.status == nil && entry.rating == nil && entry.thumbs == nil && entry.review == nil {
             entries[entry.key] = nil
         } else {
             entries[entry.key] = entry
@@ -235,13 +271,20 @@ struct RealLibraryControls: View {
     let template: RealLibrary.Entry
     private var library: RealLibrary { RealLibrary.shared }
 
+    /// false = solo estrellas y manitos (al terminar un cómic).
+    var showsStatus = true
+
     init(detail: CVIssueDetail) { template = RealLibrary.makeEntry(detail) }
-    init(template: RealLibrary.Entry) { self.template = template }
+    init(template: RealLibrary.Entry, showsStatus: Bool = true) {
+        self.template = template
+        self.showsStatus = showsStatus
+    }
     init(series: CVVolumeDetail) { template = RealLibrary.makeEntry(series) }
 
     var body: some View {
         let entry = library.entry(template.key)
         VStack(alignment: .leading, spacing: 14) {
+            if showsStatus {
             HStack(spacing: 8) {
                 ForEach(RealLibrary.Status.allCases) { status in
                     let on = entry?.status == status
@@ -260,6 +303,8 @@ struct RealLibraryControls: View {
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(on ? .isSelected : [])
                 }
+            }
+
             }
 
             VStack(alignment: .leading, spacing: 4) {

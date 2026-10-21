@@ -112,6 +112,8 @@ struct MetronIssueView: View {
 
             RealLibraryControls(template: template(d))
                 .padding(.top, 16)
+            MetronCommunityRating(cvID: nil, known: MetronSync.rating(of: d))
+            ReviewSection(template: template(d))
 
             if let desc = d.desc?.trimmingCharacters(in: .whitespacesAndNewlines), !desc.isEmpty {
                 SectionTitle("De qué se trata")

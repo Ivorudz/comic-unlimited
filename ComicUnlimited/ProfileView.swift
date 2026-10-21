@@ -7,6 +7,7 @@ struct ProfileView: View {
     @State private var selected: RealLibrary.Status = .reading
     @AppStorage(AppSettings.showMissingKey) private var showMissing = true
     @AppStorage(AppSettings.autoLinkKey) private var autoLink = true
+    @AppStorage(MetronSync.enabledKey) private var metronSync = true
     @AppStorage(TranslationSettings.enabledKey) private var translate = true
     @AppStorage(TranslationSettings.languageKey) private var language = "es"
     private var library: RealLibrary { RealLibrary.shared }
@@ -72,8 +73,31 @@ struct ProfileView: View {
                         }
                     }
 
+                    SectionTitle("Mis comentarios")
+                    let reviews = RealLibrary.shared.reviews
+                    if reviews.isEmpty {
+                        Text("Todavía no comentaste ningún cómic. Al terminar uno, aparece \"¿Qué te pareció?\".")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.ink2)
+                    }
+                    ForEach(reviews, id: \.key) { entry in
+                        EntryLink(entry: entry) { ReviewRow(entry: entry) }
+                    }
+
                     SectionTitle("Configuración")
                     VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $metronSync) {
+                            Text("Mandar a Metron lo que leo")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .tint(Theme.magenta)
+                        Text("Al terminar un cómic con ficha, se marca como leído en tu colección de Metron, con tus estrellas (necesita tu usuario de Metron).")
+                            .font(.caption)
+                            .foregroundStyle(Theme.ink2)
+
+                        Divider().padding(.vertical, 8)
+
                         Toggle(isOn: $autoLink) {
                             Text("Buscar la ficha de Comic Vine al importar")
                                 .font(.subheadline.weight(.semibold))

@@ -166,6 +166,7 @@ struct SeriesView: View {
                 if let detail {
                     header(detail)
                     RealLibraryControls(series: detail)
+                    ReviewSection(template: RealLibrary.makeEntry(detail))
                     ComicVineSummary(deck: detail.deck, description: detail.description)
                         .padding(.top, 16)
                     SectionTitle("Números")
@@ -369,6 +370,8 @@ struct IssueView: View {
         LibraryAvailability(detail: d)
 
         RealLibraryControls(detail: d)
+        MetronCommunityRating(cvID: d.id)
+        ReviewSection(template: RealLibrary.makeEntry(d))
 
         if ComicVineSummary.hasContent(deck: d.deck, description: d.description) {
             SectionTitle("De qué se trata")
