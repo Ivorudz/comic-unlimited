@@ -116,10 +116,6 @@ struct LocalReaderView: View {
     @AppStorage(ReaderSettings.doublePage) private var doublePage = true
 
     @State private var page: Int
-    @State private var verticalPage: Int?
-    /// Zoom del modo vertical (1 = el ancho de la pantalla).
-    @State private var verticalZoom: CGFloat = 1
-    @State private var verticalZoomStart: CGFloat = 1
     @State private var showControls = true
     @State private var showSettings = false
     @State private var loader: PageLoader?
@@ -180,7 +176,6 @@ struct LocalReaderView: View {
             case .success(let file):
                 loader = PageLoader(file: file)
                 page = min(page, max(file.pageCount - 1, 0))
-                verticalPage = page
             case .failure(let error):
                 errorText = (error as? LocalizedError)?.errorDescription ?? "No se pudo abrir el archivo."
             }
@@ -189,15 +184,11 @@ struct LocalReaderView: View {
         }
         .onChange(of: page) { _, newPage in
             guard loader != nil else { return }
-            if verticalPage != newPage { verticalPage = newPage }
             if newPage >= pageCount {
                 LocalLibrary.shared.markFinished(comic.id)
             } else {
                 LocalLibrary.shared.setPage(newPage, for: comic.id)
             }
-        }
-        .onChange(of: verticalPage) { _, newValue in
-            if let newValue, newValue != page { page = newValue }
         }
     }
 
@@ -209,39 +200,11 @@ struct LocalReaderView: View {
         // "Al alto" puede necesitar páginas más anchas que la pantalla (páginas dobles).
         let decodeWidth = size.width * scale * (fit == .height ? 2 : 1)
         if direction == .vertical {
-            let width = size.width * verticalZoom
-            ScrollView([.vertical, .horizontal]) {
-                LazyVStack(spacing: 2) {
-                    ForEach(0..<loader.pageCount, id: \.self) { index in
-                        // Se decodifican al doble para que el zoom no se vea borroso.
-                        VerticalPageView(loader: loader, index: index, maxWidth: size.width * scale * 2, width: width)
-                            .id(index)
-                    }
-                    endCard
-                        .frame(width: size.width, height: size.height)
-                        .id(loader.pageCount)
-                }
-                .scrollTargetLayout()
-            }
-            .scrollPosition(id: $verticalPage, anchor: .top)
-            .ignoresSafeArea()
-            // Zoom: con dos dedos, o doble toque (agranda al doble / vuelve).
-            .simultaneousGesture(
-                MagnifyGesture()
-                    .onChanged { value in
-                        verticalZoom = min(max(verticalZoomStart * value.magnification, 1), 4)
-                    }
-                    .onEnded { _ in verticalZoomStart = verticalZoom }
-            )
-            .onTapGesture(count: 2) {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    verticalZoom = verticalZoom > 1.05 ? 1 : 2
-                    verticalZoomStart = verticalZoom
-                }
-            }
-            .onTapGesture {
+            // Hecho con UIKit para que el zoom agrande donde ponés los dedos (o donde hacés doble toque).
+            VerticalReader(loader: loader, decodeWidth: size.width * scale * 1.5, page: $page) {
                 withAnimation(.easeOut(duration: 0.2)) { showControls.toggle() }
             }
+            .ignoresSafeArea()
         } else if doublePage && size.width > size.height {
             spreadPages(loader, size: size)
         } else {
@@ -636,30 +599,197 @@ private struct SpreadPageView: View {
     }
 }
 
-/// Página en el modo vertical continuo: ocupa todo el ancho.
-private struct VerticalPageView: View {
+/// Modo vertical continuo: todas las páginas una debajo de la otra, con zoom de verdad
+/// (dos dedos o doble toque, agranda donde tocás). Las páginas se cargan a medida que aparecen.
+private struct VerticalReader: UIViewRepresentable {
     let loader: PageLoader
-    let index: Int
-    let maxWidth: CGFloat
-    let width: CGFloat
-    @State private var image: UIImage?
+    let decodeWidth: CGFloat
+    @Binding var page: Int
+    let onTap: () -> Void
 
-    var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: width)
-            } else {
-                ZStack {
-                    Color.white.opacity(0.04)
-                    ProgressView().tint(.white)
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    func makeUIView(context: Context) -> VerticalScrollView {
+        let c = context.coordinator
+        let scroll = VerticalScrollView()
+        scroll.minimumZoomScale = 1
+        scroll.maximumZoomScale = 4
+        scroll.bouncesZoom = true
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.showsVerticalScrollIndicator = false
+        scroll.backgroundColor = .clear
+        scroll.contentInsetAdjustmentBehavior = .never
+        scroll.delegate = c
+        scroll.addSubview(c.container)
+        for _ in 0..<loader.pageCount {
+            let view = UIImageView()
+            view.contentMode = .scaleAspectFit
+            view.backgroundColor = UIColor(white: 1, alpha: 0.04)
+            c.container.addSubview(view)
+            c.views.append(view)
+            c.aspects.append(1.5)
+        }
+        c.footer.text = "Terminaste ✓\nQuedó guardado como leído."
+        c.footer.numberOfLines = 0
+        c.footer.textAlignment = .center
+        c.footer.textColor = UIColor(white: 1, alpha: 0.8)
+        c.footer.font = .preferredFont(forTextStyle: .headline)
+        c.container.addSubview(c.footer)
+        c.scroll = scroll
+        scroll.onLayout = { [weak c] in c?.boundsChanged() }
+
+        let doubleTap = UITapGestureRecognizer(target: c, action: #selector(Coordinator.doubleTapped(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        scroll.addGestureRecognizer(doubleTap)
+        let singleTap = UITapGestureRecognizer(target: c, action: #selector(Coordinator.singleTapped))
+        singleTap.require(toFail: doubleTap)
+        scroll.addGestureRecognizer(singleTap)
+        return scroll
+    }
+
+    func updateUIView(_ scroll: VerticalScrollView, context: Context) {
+        let c = context.coordinator
+        c.parent = self
+        // Saltar de página desde las miniaturas o la barra (no cuando el cambio vino de deslizar).
+        if c.lastSeen != page {
+            c.lastSeen = page
+            if page != c.reportedPage, c.width > 0 { c.scrollTo(page) }
+        }
+    }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        var parent: VerticalReader
+        let container = UIView()
+        let footer = UILabel()
+        var views: [UIImageView] = []
+        var aspects: [CGFloat] = []
+        weak var scroll: VerticalScrollView?
+        var width: CGFloat = 0
+        var reportedPage = -1
+        var lastSeen = -1
+        private var loading = Set<Int>()
+        private var placedFirstPage = false
+        private let gap: CGFloat = 2
+        private let footerHeight: CGFloat = 220
+
+        init(parent: VerticalReader) { self.parent = parent }
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { container }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) { visibleChanged() }
+
+        /// Cambió el tamaño de la pantalla (por ejemplo, al girar): se vuelven a acomodar las páginas.
+        func boundsChanged() {
+            guard let scroll, scroll.bounds.width > 0, abs(scroll.bounds.width - width) > 0.5 else { return }
+            let current = max(0, min(parent.page, views.count - 1))
+            width = scroll.bounds.width
+            scroll.zoomScale = 1
+            layout()
+            scrollTo(placedFirstPage ? current : parent.page)
+            placedFirstPage = true
+            visibleChanged()
+        }
+
+        /// Acomoda las páginas una debajo de la otra (tamaño sin zoom).
+        private func layout() {
+            guard let scroll else { return }
+            var y: CGFloat = 0
+            for (i, view) in views.enumerated() {
+                let h = width * aspects[i]
+                view.frame = CGRect(x: 0, y: y, width: width, height: h)
+                y += h + gap
+            }
+            footer.frame = CGRect(x: 0, y: y, width: width, height: footerHeight)
+            y += footerHeight
+            let zoom = scroll.zoomScale
+            container.bounds = CGRect(x: 0, y: 0, width: width, height: y)
+            container.center = CGPoint(x: width * zoom / 2, y: y * zoom / 2)
+            scroll.contentSize = CGSize(width: width * zoom, height: y * zoom)
+        }
+
+        func scrollTo(_ index: Int) {
+            guard let scroll, !views.isEmpty else { return }
+            let zoom = scroll.zoomScale
+            let target = index >= views.count ? footer.frame.minY : views[max(0, index)].frame.minY
+            let maxY = max(0, scroll.contentSize.height - scroll.bounds.height)
+            scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: min(target * zoom, maxY)), animated: false)
+            reportedPage = index
+            visibleChanged()
+        }
+
+        /// Carga las páginas que se ven (y las de al lado), suelta las lejanas y avisa en qué página vas.
+        private func visibleChanged() {
+            guard let scroll, width > 0, !views.isEmpty else { return }
+            let zoom = scroll.zoomScale
+            let top = scroll.contentOffset.y / zoom
+            let bottom = (scroll.contentOffset.y + scroll.bounds.height) / zoom
+            let first = views.firstIndex { $0.frame.maxY >= top } ?? views.count - 1
+            let last = views.lastIndex { $0.frame.minY <= bottom } ?? first
+            for i in max(0, first - 1)...min(views.count - 1, max(first, last) + 2) { load(i) }
+            for (i, view) in views.enumerated() where (i < first - 4 || i > last + 6) && view.image != nil {
+                view.image = nil
+            }
+            // Página actual: la que está en el medio de la pantalla (o "terminado" si se ve el final).
+            let middle = (top + bottom) / 2
+            var current = views.firstIndex { $0.frame.minY <= middle && $0.frame.maxY + gap >= middle } ?? first
+            if bottom >= footer.frame.minY + 60 { current = views.count }
+            if current != reportedPage {
+                reportedPage = current
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.parent.page != current else { return }
+                    self.parent.page = current
                 }
-                .frame(width: width, height: width * 1.5)
             }
         }
-        .task(id: index) { image = await loader.image(index, maxWidth: maxWidth) }
+
+        private func load(_ i: Int) {
+            guard views[i].image == nil, !loading.contains(i) else { return }
+            loading.insert(i)
+            let loader = parent.loader, width = parent.decodeWidth
+            Task { @MainActor [weak self] in
+                let image = await loader.image(i, maxWidth: width)
+                guard let self else { return }
+                self.loading.remove(i)
+                guard let image, image.size.width > 0 else { return }
+                self.views[i].image = image
+                let aspect = image.size.height / image.size.width
+                if abs(aspect - self.aspects[i]) > 0.01, let scroll = self.scroll {
+                    // Si la página que cambió de tamaño está arriba de lo que estás viendo, compensamos
+                    // para que la pantalla no salte.
+                    let zoom = scroll.zoomScale
+                    let above = self.views[i].frame.maxY <= scroll.contentOffset.y / zoom
+                    let delta = (aspect - self.aspects[i]) * self.width
+                    self.aspects[i] = aspect
+                    self.layout()
+                    if above {
+                        scroll.contentOffset.y += delta * zoom
+                    }
+                }
+            }
+        }
+
+        @objc func doubleTapped(_ gesture: UITapGestureRecognizer) {
+            guard let scroll else { return }
+            if scroll.zoomScale > 1.01 {
+                scroll.setZoomScale(1, animated: true)
+            } else {
+                let point = gesture.location(in: container)
+                let size = CGSize(width: scroll.bounds.width / 2.5, height: scroll.bounds.height / 2.5)
+                scroll.zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
+                                       width: size.width, height: size.height), animated: true)
+            }
+        }
+
+        @objc func singleTapped() { parent.onTap() }
+    }
+}
+
+/// Scroll que avisa cuando cambia de tamaño (al abrir o al girar el teléfono).
+final class VerticalScrollView: UIScrollView {
+    var onLayout: (() -> Void)?
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onLayout?()
     }
 }
 
