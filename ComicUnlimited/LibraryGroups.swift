@@ -21,6 +21,8 @@ enum LibraryRoute: Hashable {
     case reviewLinks
     /// Ficha de un archivo tuyo que no tiene ficha de Comic Vine.
     case localComic(String)
+    /// Ficha de un número de Metron (Próximos).
+    case metronIssue(Int)
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.
@@ -384,6 +386,10 @@ struct SeriesFolderView: View {
         }
         .background(Theme.paper)
         .navigationTitle(title)
+        // Si leés un cómic desde acá, "Siguiente número" sigue esta serie.
+        .onAppear {
+            if let seriesID { BrowsingContext.current = ReadContext(kind: .series, id: seriesID, name: title) }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .task {

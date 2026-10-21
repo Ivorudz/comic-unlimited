@@ -208,6 +208,7 @@ struct SeriesView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .onAppear { BrowsingContext.current = ReadContext(kind: .series, id: id, name: name) }
         .task { if detail == nil { await load() } }
     }
 

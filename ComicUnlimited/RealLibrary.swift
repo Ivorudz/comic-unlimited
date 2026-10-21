@@ -124,6 +124,25 @@ final class RealLibrary {
         save(entry)
     }
 
+    /// Números guardados desde una ficha de Metron (con id negativo): si Comic Vine ya los tiene,
+    /// pasan a su ficha de Comic Vine, con tu lista y tu puntaje.
+    private var movingMetron = false
+    func moveMetronEntriesToComicVine() async {
+        guard !movingMetron, let client = MetronClient.current else { return }
+        movingMetron = true
+        defer { movingMetron = false }
+        let pending = entries.values.filter { $0.id < 0 && !$0.isSeries }.prefix(10)
+        for old in pending {
+            guard let detail = try? await client.issueDetail(id: -old.id), let cv = detail.cvId else { continue }
+            var moved = old
+            moved = Entry(id: cv, kind: .issue, title: old.title, coverURL: old.coverURL, series: old.series,
+                          writers: old.writers, characters: old.characters, status: old.status,
+                          rating: old.rating, updated: old.updated, thumbs: old.thumbs)
+            entries[old.key] = nil
+            if entries[moved.key] == nil { save(moved) } else { save(entries[moved.key]!) }
+        }
+    }
+
     /// Cambia el puntaje. Tocar la misma estrella de nuevo lo borra.
     /// Puntuar un cómic lo pasa a "Leído" si no estaba en ninguna lista.
     func setRating(_ rating: Int, for template: Entry) {
@@ -217,6 +236,7 @@ struct RealLibraryControls: View {
     private var library: RealLibrary { RealLibrary.shared }
 
     init(detail: CVIssueDetail) { template = RealLibrary.makeEntry(detail) }
+    init(template: RealLibrary.Entry) { self.template = template }
     init(series: CVVolumeDetail) { template = RealLibrary.makeEntry(series) }
 
     var body: some View {

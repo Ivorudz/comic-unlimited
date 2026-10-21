@@ -11,6 +11,8 @@ struct ContainedIssue: Codable, Hashable {
     let title: String
     let coverDate: String?
     let cover: String?
+    /// Página del TPB donde empieza este número (la marcás desde el lector).
+    var startPage: Int? = nil
 }
 
 extension LocalComic {

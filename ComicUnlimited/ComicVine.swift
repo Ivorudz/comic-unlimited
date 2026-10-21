@@ -16,6 +16,8 @@ struct UpcomingIssue: Identifiable, Hashable {
     let link: URL?
     let volumeID: Int?
     var publisher: String?
+    /// Si viene de Metron: su número en Metron (para abrir la ficha).
+    var metronID: Int? = nil
 
     var title: String { number.isEmpty ? series : "\(series) #\(number)" }
 }

@@ -104,6 +104,8 @@ enum ReaderSettings {
 struct LocalReaderView: View {
     @Environment(\.dismiss) private var dismiss
     let comic: LocalComic
+    /// Abrir el siguiente número (lo maneja quien abrió el lector).
+    var onOpenNext: ((LocalComic) -> Void)? = nil
 
     @AppStorage(ReaderSettings.direction) private var direction: ReaderDirection = .leftToRight
     @AppStorage(ReaderSettings.fit) private var fit: ReaderFit = .page
@@ -118,15 +120,20 @@ struct LocalReaderView: View {
     @State private var page: Int
     @State private var showControls = true
     @State private var showSettings = false
+    @State private var showMarks = false
     @State private var loader: PageLoader?
     @State private var errorText: String?
 
-    init(comic: LocalComic, startPage: Int) {
+    init(comic: LocalComic, startPage: Int, onOpenNext: ((LocalComic) -> Void)? = nil) {
         self.comic = comic
+        self.onOpenNext = onOpenNext
         _page = State(initialValue: startPage)
     }
 
     private var pageCount: Int { loader?.pageCount ?? comic.pageCount }
+    /// El cómic con lo último guardado (marcadores, números del TPB…).
+    private var live: LocalComic { LocalLibrary.shared.item(comic.id) ?? comic }
+    private var isBookmarked: Bool { live.bookmarks?.contains(page) == true }
 
     var body: some View {
         GeometryReader { geo in
@@ -157,6 +164,14 @@ struct LocalReaderView: View {
         .sheet(isPresented: $showSettings) {
             ReaderSettingsSheet()
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showMarks) {
+            ReaderMarksSheet(comicID: comic.id, currentPage: min(page, max(pageCount - 1, 0)),
+                             loader: loader) { target in
+                showMarks = false
+                withAnimation { page = target }
+            }
+            .presentationDetents([.medium, .large])
         }
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = keepAwake
@@ -318,6 +333,25 @@ struct LocalReaderView: View {
                     .font(.system(size: 15, weight: .bold))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
+                if page < pageCount {
+                    Button {
+                        LocalLibrary.shared.toggleBookmark(page, for: comic.id)
+                    } label: {
+                        Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(isBookmarked ? Color(hex: 0xFF4FA3) : .white)
+                            .frame(width: 40, height: 36)
+                            .background(.white.opacity(0.16), in: Capsule())
+                    }
+                    .accessibilityLabel(isBookmarked ? "Quitar marcador" : "Marcar esta página")
+                }
+                Button { showMarks = true } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 16, weight: .bold))
+                        .frame(width: 40, height: 36)
+                        .background(.white.opacity(0.16), in: Capsule())
+                }
+                .accessibilityLabel(live.isCollection ? "Números y marcadores" : "Marcadores")
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16, weight: .bold))
@@ -334,11 +368,17 @@ struct LocalReaderView: View {
 
             Spacer()
 
+            // Al terminar: "Siguiente número" (del arco o la serie desde donde lo abriste).
+            if page >= pageCount, let next = LocalLibrary.shared.next(after: live), onOpenNext != nil {
+                nextButton(next).padding(.horizontal, 14).padding(.bottom, 8)
+            }
+
             if pageCount > 1 {
                 VStack(spacing: 10) {
                     if thumbnails, let loader {
                         ThumbnailStrip(loader: loader, current: min(page, pageCount - 1),
-                                       reversed: direction == .rightToLeft) { index in
+                                       reversed: direction == .rightToLeft,
+                                       bookmarks: Set(live.bookmarks ?? [])) { index in
                             withAnimation { page = index }
                         }
                     }
@@ -368,6 +408,25 @@ struct LocalReaderView: View {
         }
     }
 
+    private func nextButton(_ next: (comic: LocalComic, label: String)) -> some View {
+        Button {
+            onOpenNext?(next.comic)
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(next.label).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                    Text(next.comic.displayTitle).font(.system(size: 15, weight: .heavy)).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right.circle.fill").font(.title2)
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .background(Color(hex: 0xFF4FA3), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+
     private var endCard: some View {
         VStack(spacing: 12) {
             Text("Terminaste")
@@ -381,6 +440,9 @@ struct LocalReaderView: View {
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 12)
+            if let next = LocalLibrary.shared.next(after: live), onOpenNext != nil {
+                nextButton(next)
+            }
             Button {
                 withAnimation { page = 0 }
             } label: {
@@ -489,12 +551,99 @@ struct ReaderSettingsSheet: View {
     }
 }
 
+// MARK: - Marcadores y números del TPB
+
+/// Lista de marcadores (y, si es un TPB, sus números con la página donde empieza cada uno).
+struct ReaderMarksSheet: View {
+    let comicID: String
+    let currentPage: Int
+    let loader: PageLoader?
+    let onJump: (Int) -> Void
+    @Environment(\.dismiss) private var dismiss
+    private var library: LocalLibrary { LocalLibrary.shared }
+
+    var body: some View {
+        let comic = library.item(comicID)
+        NavigationStack {
+            List {
+                if let contents = comic?.contents, !contents.isEmpty {
+                    Section {
+                        ForEach(contents, id: \.cvID) { issue in
+                            HStack(spacing: 10) {
+                                Button {
+                                    if let start = issue.startPage { onJump(start) }
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(issue.title).font(.subheadline.weight(.bold))
+                                        Text(issue.startPage.map { "Empieza en la página \($0 + 1)" } ?? "Sin marcar")
+                                            .font(.caption)
+                                            .foregroundStyle(issue.startPage == nil ? Color.secondary : Color(hex: 0xFF4FA3))
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(issue.startPage == nil)
+                                Button(issue.startPage == currentPage ? "Marcado acá" : "Empieza acá") {
+                                    library.setStartPage(currentPage, issue: issue.cvID, in: comicID)
+                                }
+                                .font(.caption.weight(.bold))
+                                .buttonStyle(.bordered)
+                                .disabled(issue.startPage == currentPage)
+                            }
+                        }
+                    } header: {
+                        Text("Números de este TPB")
+                    } footer: {
+                        Text("Andá a la primera página de un número y tocá \"Empieza acá\". Después, tocando el número, saltás directo.")
+                    }
+                }
+
+                Section {
+                    let marks = comic?.bookmarks ?? []
+                    if marks.isEmpty {
+                        Text("Todavía no marcaste páginas. Tocá el marcador (arriba) en una página que te guste.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(marks, id: \.self) { mark in
+                        Button {
+                            onJump(mark)
+                        } label: {
+                            HStack(spacing: 12) {
+                                if let loader {
+                                    ThumbnailView(loader: loader, index: mark).frame(width: 36, height: 54)
+                                }
+                                Text("Página \(mark + 1)").font(.subheadline.weight(.semibold))
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .onDelete { offsets in
+                        for offset in offsets { library.toggleBookmark(marks[offset], for: comicID) }
+                    }
+                } header: {
+                    Text("Marcadores")
+                }
+            }
+            .navigationTitle(comic?.displayTitle ?? "Marcadores")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Listo") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Miniaturas
 
 private struct ThumbnailStrip: View {
     let loader: PageLoader
     let current: Int
     let reversed: Bool
+    var bookmarks: Set<Int> = []
     let onSelect: (Int) -> Void
 
     var body: some View {
@@ -509,6 +658,14 @@ private struct ThumbnailStrip: View {
                                     .stroke(index == current ? Color(hex: 0xFF4FA3) : .white.opacity(0.2),
                                             lineWidth: index == current ? 2 : 1))
                                 .opacity(index == current ? 1 : 0.75)
+                                .overlay(alignment: .topTrailing) {
+                                    if bookmarks.contains(index) {
+                                        Image(systemName: "bookmark.fill")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Color(hex: 0xFF4FA3))
+                                            .padding(2)
+                                    }
+                                }
                         }
                         .buttonStyle(.plain)
                         .id(index)
@@ -526,7 +683,7 @@ private struct ThumbnailStrip: View {
     }
 }
 
-private struct ThumbnailView: View {
+struct ThumbnailView: View {
     let loader: PageLoader
     let index: Int
     @State private var image: UIImage?

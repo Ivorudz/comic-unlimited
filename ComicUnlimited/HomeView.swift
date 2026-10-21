@@ -31,6 +31,7 @@ struct HomeView: View {
             }
             .navigationTitle("Inicio")
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear { BrowsingContext.current = nil }
         }
     }
 
@@ -187,6 +188,11 @@ private struct LocalContinueCard: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
+                // De qué arco o serie venías (o "Biblioteca").
+                Text(comic.lastContext?.label ?? "Biblioteca")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.magenta)
+                    .lineLimit(1)
                 Text(comic.isFinished ? "Terminado" : "Página \((comic.lastPage ?? 0) + 1) de \(comic.pageCount)")
                     .font(.footnote)
                     .foregroundStyle(Theme.ink2)

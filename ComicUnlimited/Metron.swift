@@ -107,7 +107,8 @@ struct MetronClient {
                 coverURL: issue.image.flatMap { URL(string: $0) },
                 link: nil,
                 volumeID: nil,
-                publisher: nil
+                publisher: nil,
+                metronID: issue.id
             )
         }
     }
@@ -165,4 +166,46 @@ struct MetronIssue: Decodable {
 struct MetronSeries: Decodable {
     let name: String?
     let volume: Int?
+}
+
+// MARK: - Ficha completa de un número
+
+/// Un número de Metron con todos sus datos (para la ficha de Próximos).
+struct MetronIssueDetail: Decodable {
+    struct Named: Decodable { let id: Int?; let name: String? }
+    struct Series: Decodable { let id: Int?; let name: String?; let volume: Int?; let yearBegan: Int? }
+    struct Credit: Decodable { let creator: String?; let role: [Named]? }
+
+    let id: Int
+    let publisher: Named?
+    let series: Series?
+    let number: String?
+    let title: String?
+    let name: [String]?
+    let coverDate: String?
+    let storeDate: String?
+    let price: Flexible?
+    let priceCurrency: String?
+    let page: Int?
+    let desc: String?
+    let image: String?
+    let credits: [Credit]?
+    let cvId: Int?
+
+    /// Metron manda el precio a veces como texto ("4.99") y a veces como número.
+    struct Flexible: Decodable {
+        let text: String
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let s = try? c.decode(String.self) { text = s }
+            else if let d = try? c.decode(Double.self) { text = String(format: "%.2f", d) }
+            else { text = "" }
+        }
+    }
+}
+
+extension MetronClient {
+    func issueDetail(id: Int) async throws -> MetronIssueDetail {
+        try await get(URL(string: "https://metron.cloud/api/issue/\(id)/")!)
+    }
 }

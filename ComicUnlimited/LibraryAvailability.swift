@@ -23,6 +23,7 @@ struct AppDestinations: ViewModifier {
                     FindInSourcesView(series: series, number: number)
                 case .reviewLinks: ReviewLinksView()
                 case .localComic(let id): LocalComicDetailView(comicID: id)
+                case .metronIssue(let id): MetronIssueView(metronID: id)
                 }
             }
     }
@@ -81,11 +82,14 @@ struct LibraryAvailability: View {
                 TPBContentsButton(comic: mine)
                     .padding(.top, 10)
             } else if let tpb = inTPB.first {
+                // Si marcaste en qué página del TPB empieza este número, se abre ahí.
+                let start = tpb.contents?.first { $0.cvID == detail.id }?.startPage
                 HStack(spacing: 10) {
                     Button {
+                        if let start { library.setPage(start, for: tpb.id) }
                         actions?.onRead(tpb)
                     } label: {
-                        Label("Leer el TPB", systemImage: "book.fill")
+                        Label(start == nil ? "Leer el TPB" : "Leer este número", systemImage: "book.fill")
                             .font(.system(size: 16, weight: .heavy))
                             .frame(maxWidth: .infinity)
                             .padding(13)

@@ -41,6 +41,10 @@ struct LocalComic: Codable, Identifiable, Hashable {
     var packYear: Int?
     /// Si es un TPB: los números que trae (ver TPB.swift).
     var contents: [ContainedIssue]?
+    /// Desde dónde lo abriste la última vez (un arco o una serie), para "Siguiente número".
+    var lastContext: ReadContext?
+    /// Páginas marcadas (marcadores).
+    var bookmarks: [Int]?
     /// true = lo sacaste de "Seguir leyendo" (vuelve a aparecer si lo abrís de nuevo).
     var hiddenFromContinue: Bool?
     /// Portada del número en Comic Vine (solo el link; la imagen se carga al verla).
@@ -298,7 +302,16 @@ final class LocalLibrary {
     // MARK: Lectura
 
     /// Se llama al abrir el lector. Devuelve la página donde arrancar.
-    func open(_ comic: LocalComic) -> Int {
+    /// Si lo abriste desde un arco o una serie a la que pertenece, se guarda (para "Siguiente número").
+    func open(_ comic: LocalComic, context fromPrevious: ReadContext? = nil) -> Int {
+        // El que viene de "Siguiente número" sigue en el mismo arco o serie.
+        if let context = fromPrevious ?? BrowsingContext.current, belongs(comic, to: context) {
+            update(comic.id) { c in c.lastContext = context }
+        }
+        return openPage(comic)
+    }
+
+    private func openPage(_ comic: LocalComic) -> Int {
         var start = 0
         update(comic.id) { c in
             c.lastOpened = Date().timeIntervalSince1970
@@ -334,6 +347,24 @@ final class LocalLibrary {
     var recentlyRead: [LocalComic] {
         items.filter { $0.hasStarted && $0.hiddenFromContinue != true }
             .sorted { ($0.lastOpened ?? 0) > ($1.lastOpened ?? 0) }
+    }
+
+    /// Marca o desmarca una página.
+    func toggleBookmark(_ page: Int, for id: String) {
+        update(id) { c in
+            var marks = Set(c.bookmarks ?? [])
+            if marks.contains(page) { marks.remove(page) } else { marks.insert(page) }
+            c.bookmarks = marks.isEmpty ? nil : marks.sorted()
+        }
+    }
+
+    /// Guarda en qué página del TPB empieza uno de sus números.
+    func setStartPage(_ page: Int?, issue cvID: Int, in id: String) {
+        update(id) { c in
+            guard var list = c.contents, let index = list.firstIndex(where: { $0.cvID == cvID }) else { return }
+            list[index].startPage = page
+            c.contents = list
+        }
     }
 
     /// Guarda qué números trae un TPB (vacío = ninguno).

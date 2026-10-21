@@ -569,6 +569,10 @@ private struct UpcomingRow: View {
         if isComicVine {
             NavigationLink(value: CVRoute.issue(id: issue.id, title: issue.title)) { row(showsArrow: false) }
                 .buttonStyle(.plain)
+        } else if let metronID = issue.metronID {
+            // De Metron: abre la ficha de Comic Vine si la tiene; si no, una ficha con los datos de Metron.
+            NavigationLink(value: LibraryRoute.metronIssue(metronID)) { row(showsArrow: false) }
+                .buttonStyle(.plain)
         } else {
             Button {
                 if let link = issue.link { openURL(link) }

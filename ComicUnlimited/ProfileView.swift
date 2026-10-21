@@ -56,10 +56,17 @@ struct ProfileView: View {
                             .padding(.vertical, 18)
                     } else {
                         ForEach(list, id: \.key) { entry in
-                            NavigationLink(value: entry.isSeries
-                                           ? CVRoute.series(id: entry.id, name: entry.title)
-                                           : CVRoute.issue(id: entry.id, title: entry.title)) {
-                                EntryRow(entry: entry)
+                            Group {
+                                if entry.id < 0 {
+                                    // Guardado desde una ficha de Metron (Comic Vine todavía no lo tenía).
+                                    NavigationLink(value: LibraryRoute.metronIssue(-entry.id)) { EntryRow(entry: entry) }
+                                } else {
+                                    NavigationLink(value: entry.isSeries
+                                                   ? CVRoute.series(id: entry.id, name: entry.title)
+                                                   : CVRoute.issue(id: entry.id, title: entry.title)) {
+                                        EntryRow(entry: entry)
+                                    }
+                                }
                             }
                             .buttonStyle(.plain)
                         }
@@ -132,6 +139,9 @@ struct ProfileView: View {
             .appDestinations()
             .navigationTitle("Perfil")
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear { BrowsingContext.current = nil }
+            // Los guardados desde Metron pasan a su ficha de Comic Vine cuando Comic Vine los carga.
+            .task { await RealLibrary.shared.moveMetronEntriesToComicVine() }
         }
     }
 

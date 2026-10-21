@@ -233,6 +233,8 @@ struct ArcFolderView: View {
         }
         .background(Theme.paper)
         .navigationTitle(arc?.name ?? name)
+        // Si leés un cómic desde acá, "Siguiente número" sigue este arco.
+        .onAppear { BrowsingContext.current = ReadContext(kind: .arc, id: arcID, name: arc?.name ?? name) }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .task { if arc == nil { await load() } }

@@ -76,6 +76,7 @@ struct LibraryView: View {
             .appDestinations()
             .navigationTitle("Biblioteca")
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear { BrowsingContext.current = nil }
         }
         .task { await library.completeSeriesInfo() }
         .sheet(isPresented: $showImporter) {
