@@ -108,7 +108,7 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                             .contextMenu {
                                 Button { onReadLocal(comic) } label: {
-                                    Label(comic.isFinished ? "Leer de nuevo" : "Seguir leyendo", systemImage: "book")
+                                    Label(comic.isFinished ? "Volver a leer" : "Seguir leyendo", systemImage: "book")
                                 }
                                 if let issueID = comic.cvIssueID {
                                     NavigationLink(value: CVRoute.issue(id: issueID, title: comic.displayTitle)) {

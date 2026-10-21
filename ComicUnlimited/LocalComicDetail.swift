@@ -60,7 +60,7 @@ struct LocalComicDetailView: View {
             Button {
                 actions?.onRead(comic)
             } label: {
-                Label(comic.hasStarted && !comic.isFinished ? "Seguir leyendo" : "Leer", systemImage: "book.fill")
+                Label(comic.isFinished ? "Volver a leer" : comic.hasStarted ? "Seguir leyendo" : "Leer", systemImage: "book.fill")
                     .font(.system(size: 16, weight: .heavy))
                     .frame(maxWidth: .infinity)
                     .padding(13)

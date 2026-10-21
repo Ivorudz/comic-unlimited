@@ -51,7 +51,7 @@ struct LibraryAvailability: View {
                     Button {
                         actions?.onRead(mine)
                     } label: {
-                        Label(mine.hasStarted && !mine.isFinished ? "Seguir leyendo" : "Leer", systemImage: "book.fill")
+                        Label(mine.isFinished ? "Volver a leer" : mine.hasStarted ? "Seguir leyendo" : "Leer", systemImage: "book.fill")
                             .font(.system(size: 16, weight: .heavy))
                             .frame(maxWidth: .infinity)
                             .padding(13)
