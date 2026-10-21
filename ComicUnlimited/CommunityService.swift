@@ -262,7 +262,7 @@ final class Community {
             "bio": bio.trimmingCharacters(in: .whitespacesAndNewlines),
             "avatar": String(avatar.trimmingCharacters(in: .whitespaces).prefix(2)),
             "share_lists": shareLists,
-        ], prefer: "return=minimal")
+        ] as [String: Any], prefer: "return=minimal")
         await loadMe()
         if sharingChanged { await syncAfterLogin() }
     }
