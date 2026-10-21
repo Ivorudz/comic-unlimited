@@ -26,6 +26,14 @@ struct AppDestinations: ViewModifier {
                 case .metronIssue(let id): MetronIssueView(metronID: id)
                 }
             }
+            .navigationDestination(for: CommunityRoute.self) { route in
+                switch route {
+                case .friends: FriendsView()
+                case .settings: CommunitySettingsView()
+                case .profile(let id): FriendProfileView(userID: id)
+                case .editProfile: EditProfileView()
+                }
+            }
     }
 }
 

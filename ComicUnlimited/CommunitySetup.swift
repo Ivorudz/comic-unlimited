@@ -77,5 +77,28 @@ enum CommunitySetup {
     create policy "comentarios: escribir los míos" on public.reviews for insert to authenticated with check (user_id = auth.uid());
     create policy "comentarios: cambiar los míos" on public.reviews for update to authenticated using (user_id = auth.uid());
     create policy "comentarios: borrar los míos" on public.reviews for delete to authenticated using (user_id = auth.uid());
+
+    -- 0.30: perfiles (nombre, bio, emoji, compartir listas, cuántos leíste) y listas compartidas
+    alter table public.profiles add column if not exists display_name text check (char_length(display_name) <= 40);
+    alter table public.profiles add column if not exists bio text check (char_length(bio) <= 200);
+    alter table public.profiles add column if not exists avatar text check (char_length(avatar) <= 8);
+    alter table public.profiles add column if not exists share_lists boolean not null default true;
+    alter table public.profiles add column if not exists read_count integer not null default 0;
+    alter table public.reviews add column if not exists status text check (status in ('quiero', 'leyendo', 'leido'));
+    notify pgrst, 'reload schema';
+    """
+
+    /// Actualización de la 0.30, para quien ya armó la base de datos antes (no borra nada).
+    static let updateV2 = """
+    -- Cómic Unlimited 0.30: pegar en Supabase → SQL Editor → Run (no borra nada)
+
+    -- 0.30: perfiles (nombre, bio, emoji, compartir listas, cuántos leíste) y listas compartidas
+    alter table public.profiles add column if not exists display_name text check (char_length(display_name) <= 40);
+    alter table public.profiles add column if not exists bio text check (char_length(bio) <= 200);
+    alter table public.profiles add column if not exists avatar text check (char_length(avatar) <= 8);
+    alter table public.profiles add column if not exists share_lists boolean not null default true;
+    alter table public.profiles add column if not exists read_count integer not null default 0;
+    alter table public.reviews add column if not exists status text check (status in ('quiero', 'leyendo', 'leido'));
+    notify pgrst, 'reload schema';
     """
 }

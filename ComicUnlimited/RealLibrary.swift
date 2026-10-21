@@ -99,6 +99,7 @@ final class RealLibrary {
         var entry = entries[template.key] ?? template
         entry.status = entry.status == status ? nil : status
         save(entry)
+        shareWithFriends(entry.key)
     }
 
     /// Al leer un archivo tuyo unido a Comic Vine: pasa a "Leyendo"; al terminarlo, a "Leído".
@@ -132,6 +133,7 @@ final class RealLibrary {
         }
         if entry.coverURL == nil { entry.coverURL = comic.cvCoverURL }
         save(entry)
+        shareWithFriends(entry.key)
     }
 
     /// Números guardados desde una ficha de Metron (con id negativo): si Comic Vine ya los tiene,

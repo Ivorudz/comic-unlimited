@@ -32,6 +32,9 @@ struct ProfileView: View {
                         .misprint(0.7)
                         .padding(.top, 20)
 
+                    // Tu perfil en la comunidad (si entraste).
+                    ProfileCommunityCard()
+
                     // Números rápidos.
                     HStack(spacing: 10) {
                         StatTile(value: "\(all.filter { $0.status == .read }.count)", label: "Leídos")

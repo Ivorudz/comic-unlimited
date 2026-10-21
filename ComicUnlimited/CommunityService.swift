@@ -13,11 +13,30 @@ import Observation
 struct CommunityProfile: Codable, Identifiable, Hashable {
     let id: String
     let username: String
+    /// Datos del perfil (0.30). Pueden faltar si la base de datos todavía no se actualizó.
+    var displayName: String? = nil
+    var bio: String? = nil
+    /// Un emoji como "foto" (si no hay, se usa la inicial).
+    var avatar: String? = nil
+    /// Si comparte sus listas (Quiero leer / Leyendo / Leído) con sus amigos.
+    var shareLists: Bool? = nil
+    var readCount: Int? = nil
+
+    /// Nombre para mostrar: el elegido, o el @usuario.
+    var name: String {
+        if let displayName, !displayName.trimmingCharacters(in: .whitespaces).isEmpty { return displayName }
+        return "@" + username
+    }
+
+    var initial: String {
+        if let avatar, !avatar.isEmpty { return avatar }
+        return String((displayName?.first ?? username.first ?? "?")).uppercased()
+    }
 }
 
 /// Un comentario o puntaje (tuyo o de un amigo) guardado en la base de datos.
 struct RemoteReview: Decodable, Identifiable, Hashable {
-    struct Author: Decodable, Hashable { let username: String? }
+    struct Author: Decodable, Hashable { let username: String?; let avatar: String? }
     let userId: String
     let comicKey: String
     let cvId: Int?
@@ -28,6 +47,8 @@ struct RemoteReview: Decodable, Identifiable, Hashable {
     let rating: Int?
     let thumbs: Int?
     let comment: String?
+    /// Lista ("quiero", "leyendo", "leido"), si comparte sus listas.
+    let status: String?
     let updatedAt: String?
     let profiles: Author?
 
@@ -87,6 +108,11 @@ final class Community {
     private(set) var apiKey: String = UserDefaults.standard.string(forKey: Community.anonKey) ?? ""
     private(set) var session: Session?
     private(set) var me: CommunityProfile?
+    /// La base de datos tiene los datos de perfil y listas (texto de actualización de la 0.30 pegado).
+    private(set) var hasProfileV2 = UserDefaults.standard.bool(forKey: "community.v2")
+    /// Ya probamos si la base de datos está actualizada (para mostrar el aviso solo si hace falta).
+    private(set) var checkedV2 = false
+    var needsDatabaseUpdate: Bool { isLoggedIn && me != nil && checkedV2 && !hasProfileV2 }
 
     /// Amigos (se agregaron los dos), pedidos que te llegaron y pedidos que mandaste.
     private(set) var friends: [CommunityProfile] = []
@@ -158,6 +184,7 @@ final class Community {
         store(session)
         do {
             try await createProfile(username: name)
+            await loadMe()
         } catch {
             signOut()
             throw error
@@ -203,10 +230,52 @@ final class Community {
         setMe(CommunityProfile(id: session.userID, username: name))
     }
 
+    static let profileColumnsV2 = "id,username,display_name,bio,avatar,share_lists,read_count"
+    private var profileColumns: String { hasProfileV2 ? Self.profileColumnsV2 : "id,username" }
+
     func loadMe() async {
         guard let session else { return }
-        let list: [CommunityProfile]? = try? await rest("GET", "profiles?id=eq.\(session.userID)&select=id,username")
-        if let found = list?.first { setMe(found) }
+        // Primero con los datos nuevos del perfil; si la base de datos no los tiene, sin ellos.
+        do {
+            let list: [CommunityProfile]? = try await rest("GET", "profiles?id=eq.\(session.userID)&select=\(Self.profileColumnsV2)")
+            setV2(true)
+            if let found = list?.first { setMe(found) }
+        } catch CommunityError.server {
+            setV2(false)
+            let list: [CommunityProfile]? = try? await rest("GET", "profiles?id=eq.\(session.userID)&select=id,username")
+            if let found = list?.first { setMe(found) }
+        } catch {}
+    }
+
+    private func setV2(_ value: Bool) {
+        hasProfileV2 = value
+        checkedV2 = true
+        UserDefaults.standard.set(value, forKey: "community.v2")
+    }
+
+    /// Cambiar tu nombre, bio, emoji o si compartís tus listas.
+    func updateProfile(displayName: String, bio: String, avatar: String, shareLists: Bool) async throws {
+        guard let session, hasProfileV2 else { throw CommunityError.notLoggedIn }
+        let sharingChanged = (me?.shareLists ?? true) != shareLists
+        _ = try await rest("PATCH", "profiles?id=eq.\(session.userID)", body: [
+            "display_name": displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+            "bio": bio.trimmingCharacters(in: .whitespacesAndNewlines),
+            "avatar": String(avatar.trimmingCharacters(in: .whitespaces).prefix(2)),
+            "share_lists": shareLists,
+        ], prefer: "return=minimal")
+        await loadMe()
+        if sharingChanged { await syncAfterLogin() }
+    }
+
+    /// El perfil de un amigo (con sus datos, si la base de datos está actualizada).
+    func profile(id: String) async throws -> CommunityProfile? {
+        let list: [CommunityProfile] = try await rest("GET", "profiles?id=eq.\(id)&select=\(profileColumns)") ?? []
+        return list.first
+    }
+
+    /// Todo lo de un amigo: comentarios, puntajes y (si las comparte) sus listas.
+    func activity(of userID: String) async throws -> [RemoteReview] {
+        try await rest("GET", "reviews?select=\(reviewColumns)&user_id=eq.\(userID)&order=updated_at.desc&limit=300") ?? []
     }
 
     private func setMe(_ profile: CommunityProfile) {
@@ -256,7 +325,7 @@ final class Community {
             friends = []; requests = []; pending = []
             return
         }
-        let list: [CommunityProfile] = (try? await rest("GET", "profiles?select=id,username&id=in.(\(ids.joined(separator: ",")))")) ?? []
+        let list: [CommunityProfile] = (try? await rest("GET", "profiles?select=\(profileColumns)&id=in.(\(ids.joined(separator: ",")))")) ?? []
         let sorted = list.sorted { $0.username < $1.username }
         friends = sorted.filter { iFollow.contains($0.id) && followMe.contains($0.id) }
         requests = sorted.filter { followMe.contains($0.id) && !iFollow.contains($0.id) }
@@ -290,25 +359,31 @@ final class Community {
 
     // MARK: Comentarios y puntajes
 
-    private static let reviewColumns = "user_id,comic_key,cv_id,metron_id,kind,title,cover_url,rating,thumbs,comment,updated_at,profiles(username)"
+    private var reviewColumns: String {
+        hasProfileV2
+            ? "user_id,comic_key,cv_id,metron_id,kind,title,cover_url,rating,thumbs,comment,status,updated_at,profiles(username,avatar)"
+            : "user_id,comic_key,cv_id,metron_id,kind,title,cover_url,rating,thumbs,comment,updated_at,profiles(username)"
+    }
+    /// Solo filas con comentario o puntaje (no las que son solo "está en su lista").
+    private static let onlyOpinions = "or=(comment.not.is.null,rating.not.is.null,thumbs.not.is.null)"
 
     /// Lo último de tus amigos (la base de datos solo devuelve lo de tus amigos y lo tuyo).
     func feed() async throws -> [RemoteReview] {
         guard let session else { throw CommunityError.notLoggedIn }
-        return try await rest("GET", "reviews?select=\(Self.reviewColumns)&user_id=neq.\(session.userID)&order=updated_at.desc&limit=60") ?? []
+        return try await rest("GET", "reviews?select=\(reviewColumns)&user_id=neq.\(session.userID)&\(Self.onlyOpinions)&order=updated_at.desc&limit=60") ?? []
     }
 
     /// Lo que dijeron tus amigos de un cómic o serie (por ejemplo "issue-123").
     func reviews(for comicKey: String) async throws -> [RemoteReview] {
         guard let session else { throw CommunityError.notLoggedIn }
         let key = comicKey.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_"))) ?? comicKey
-        return try await rest("GET", "reviews?select=\(Self.reviewColumns)&comic_key=eq.\(key)&user_id=neq.\(session.userID)&order=updated_at.desc") ?? []
+        return try await rest("GET", "reviews?select=\(reviewColumns)&comic_key=eq.\(key)&user_id=neq.\(session.userID)&\(Self.onlyOpinions)&order=updated_at.desc") ?? []
     }
 
     /// Sube (o borra) tu comentario y puntaje de un cómic.
     func push(_ entry: RealLibrary.Entry?, key: String) async {
         guard let session, me != nil else { return }
-        if let entry, entry.review != nil || entry.rating != nil || entry.thumbs != nil {
+        if let entry, shouldShare(entry) {
             _ = try? await rest("POST", "reviews?on_conflict=user_id,comic_key", body: [row(entry, user: session.userID)],
                                 prefer: "resolution=merge-duplicates,return=minimal")
         } else {
@@ -320,14 +395,30 @@ final class Community {
     /// Al entrar: sube todos tus comentarios y puntajes, y carga tus amigos.
     func syncAfterLogin() async {
         guard let session, me != nil else { return }
-        let rows = RealLibrary.shared.entries.values
-            .filter { $0.review != nil || $0.rating != nil || $0.thumbs != nil }
-            .map { row($0, user: session.userID) }
+        let entries = Array(RealLibrary.shared.entries.values)
+        let rows = entries.filter(shouldShare).map { row($0, user: session.userID) }
         if !rows.isEmpty {
             _ = try? await rest("POST", "reviews?on_conflict=user_id,comic_key", body: rows,
                                 prefer: "resolution=merge-duplicates,return=minimal")
         }
+        if hasProfileV2 {
+            // Si dejaste de compartir tus listas, se borran las filas que eran solo "está en mi lista".
+            if !sharesLists {
+                _ = try? await rest("DELETE", "reviews?user_id=eq.\(session.userID)&comment=is.null&rating=is.null&thumbs=is.null",
+                                    prefer: "return=minimal")
+            }
+            // Cuántos leíste (para tu perfil).
+            let read = entries.filter { $0.status == .read && !$0.isSeries }.count
+            _ = try? await rest("PATCH", "profiles?id=eq.\(session.userID)", body: ["read_count": read], prefer: "return=minimal")
+        }
         await loadFriends()
+    }
+
+    private var sharesLists: Bool { hasProfileV2 && (me?.shareLists ?? true) }
+
+    /// Qué se sube: lo que tiene comentario o puntaje y, si compartís tus listas, también lo que está en una lista.
+    private func shouldShare(_ e: RealLibrary.Entry) -> Bool {
+        e.review != nil || e.rating != nil || e.thumbs != nil || (sharesLists && e.status != nil)
     }
 
     private func row(_ e: RealLibrary.Entry, user: String) -> [String: Any] {
@@ -344,6 +435,9 @@ final class Community {
         row["rating"] = e.rating.map { $0 as Any } ?? NSNull()
         row["thumbs"] = e.thumbs.map { $0 as Any } ?? NSNull()
         row["comment"] = e.review.map { $0 as Any } ?? NSNull()
+        if hasProfileV2 {
+            row["status"] = sharesLists ? (e.status.map { $0.rawValue as Any } ?? NSNull()) : NSNull()
+        }
         return row
     }
 

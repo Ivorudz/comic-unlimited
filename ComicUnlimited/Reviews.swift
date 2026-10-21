@@ -232,6 +232,7 @@ struct CommunityView: View {
                         UsernameCard()
                     } else {
                         accountHeader
+                        if community.needsDatabaseUpdate { DatabaseUpdateBanner() }
                         SectionTitle("Tus amigos comentaron")
                         if loadingFeed && feed.isEmpty {
                             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -245,7 +246,7 @@ struct CommunityView: View {
                                 .foregroundStyle(Theme.ink2)
                         }
                         ForEach(feed) { review in
-                            RemoteReviewLink(review: review) { RemoteReviewRow(review: review, showsUser: true) }
+                            FeedItem(review: review)
                         }
                     }
 
@@ -266,15 +267,10 @@ struct CommunityView: View {
             .background(Theme.paper)
             .refreshable { await loadFeed() }
             .appDestinations()
-            .navigationDestination(for: CommunityRoute.self) { route in
-                switch route {
-                case .friends: FriendsView()
-                case .settings: CommunitySettingsView()
-                }
-            }
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { BrowsingContext.current = nil }
             .task(id: community.me?.id) {
+                await community.loadMe()
                 await library.fillMissingCovers()
                 await loadFeed()
             }
@@ -283,9 +279,15 @@ struct CommunityView: View {
 
     private var accountHeader: some View {
         HStack(spacing: 10) {
-            Text("@\(community.me?.username ?? "")")
-                .font(.headline)
-                .foregroundStyle(Theme.magenta)
+            NavigationLink(value: CommunityRoute.editProfile) {
+                HStack(spacing: 8) {
+                    AvatarView(profile: community.me, size: 34)
+                    Text("@\(community.me?.username ?? "")")
+                        .font(.headline)
+                        .foregroundStyle(Theme.magenta)
+                }
+            }
+            .buttonStyle(.plain)
             Spacer()
             NavigationLink(value: CommunityRoute.friends) {
                 Label("Amigos\(community.requests.isEmpty ? "" : " (\(community.requests.count))")", systemImage: "person.2.fill")
@@ -321,7 +323,11 @@ struct CommunityView: View {
     }
 }
 
-enum CommunityRoute: Hashable { case friends, settings }
+enum CommunityRoute: Hashable {
+    case friends, settings, editProfile
+    /// Perfil de un amigo (por su id en la comunidad).
+    case profile(String)
+}
 
 // MARK: - Configurar (primera vez)
 
@@ -534,7 +540,17 @@ struct FriendsView: View {
                     Text("Todavía no tenés amigos en la comunidad.").foregroundStyle(Theme.ink2)
                 }
                 ForEach(community.friends) { person in
-                    Text("@\(person.username)")
+                    NavigationLink(value: CommunityRoute.profile(person.id)) {
+                        HStack(spacing: 10) {
+                            AvatarView(profile: person, size: 32)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(person.name).font(.subheadline.weight(.semibold))
+                                if person.displayName?.isEmpty == false {
+                                    Text("@\(person.username)").font(.caption).foregroundStyle(Theme.ink2)
+                                }
+                            }
+                        }
+                    }
                         .swipeActions {
                             Button("Sacar", role: .destructive) { Task { try? await community.remove(person) } }
                         }
