@@ -33,6 +33,32 @@ actor PageLoader {
 
     /// Miniatura chiquita para la tira de abajo.
     func thumbnail(_ index: Int) -> UIImage? { image(index, maxWidth: 140) }
+
+    /// Dos páginas juntas en una sola imagen (para el teléfono de costado).
+    /// `pages` va en el orden en que se ven, de izquierda a derecha.
+    func spread(_ pages: [Int], maxWidth: CGFloat) -> UIImage? {
+        let key = "spread-\(pages.map(String.init).joined(separator: "-"))-\(Int(maxWidth))" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        let images = pages.compactMap { image($0, maxWidth: maxWidth / CGFloat(max(pages.count, 1))) }
+        guard !images.isEmpty else { return nil }
+        if images.count == 1 { return images[0] }
+        let height = images.map(\.size.height).max() ?? 1
+        // Las dos a la misma altura.
+        let widths = images.map { $0.size.width * height / max($0.size.height, 1) }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let result = UIGraphicsImageRenderer(size: CGSize(width: widths.reduce(0, +), height: height), format: format)
+            .image { _ in
+                var x: CGFloat = 0
+                for (img, w) in zip(images, widths) {
+                    img.draw(in: CGRect(x: x, y: 0, width: w, height: height))
+                    x += w
+                }
+            }
+        let cost = Int(result.size.width * result.size.height * 4)
+        cache.setObject(result, forKey: key, cost: cost)
+        return result
+    }
 }
 
 // MARK: - Preferencias del lector
@@ -70,6 +96,7 @@ enum ReaderSettings {
     static let night = "reader.night"
     static let warmth = "reader.warmth"
     static let dim = "reader.dim"
+    static let doublePage = "reader.doublePage"
 }
 
 // MARK: - Lector
@@ -86,9 +113,13 @@ struct LocalReaderView: View {
     @AppStorage(ReaderSettings.night) private var night = false
     @AppStorage(ReaderSettings.warmth) private var warmth = 0.5
     @AppStorage(ReaderSettings.dim) private var dim = 0.25
+    @AppStorage(ReaderSettings.doublePage) private var doublePage = true
 
     @State private var page: Int
     @State private var verticalPage: Int?
+    /// Zoom del modo vertical (1 = el ancho de la pantalla).
+    @State private var verticalZoom: CGFloat = 1
+    @State private var verticalZoomStart: CGFloat = 1
     @State private var showControls = true
     @State private var showSettings = false
     @State private var loader: PageLoader?
@@ -131,8 +162,14 @@ struct LocalReaderView: View {
             ReaderSettingsSheet()
                 .presentationDetents([.medium, .large])
         }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = keepAwake }
-        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = keepAwake
+            AppOrientation.set(allowLandscape: true)
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
+            AppOrientation.set(allowLandscape: false)
+        }
         .onChange(of: keepAwake) { _, on in UIApplication.shared.isIdleTimerDisabled = on }
         .task {
             let url = LocalLibrary.shared.fileURL(comic)
@@ -172,23 +209,41 @@ struct LocalReaderView: View {
         // "Al alto" puede necesitar páginas más anchas que la pantalla (páginas dobles).
         let decodeWidth = size.width * scale * (fit == .height ? 2 : 1)
         if direction == .vertical {
-            ScrollView(.vertical) {
+            let width = size.width * verticalZoom
+            ScrollView([.vertical, .horizontal]) {
                 LazyVStack(spacing: 2) {
                     ForEach(0..<loader.pageCount, id: \.self) { index in
-                        VerticalPageView(loader: loader, index: index, maxWidth: size.width * scale, width: size.width)
+                        // Se decodifican al doble para que el zoom no se vea borroso.
+                        VerticalPageView(loader: loader, index: index, maxWidth: size.width * scale * 2, width: width)
                             .id(index)
                     }
                     endCard
-                        .frame(height: size.height)
+                        .frame(width: size.width, height: size.height)
                         .id(loader.pageCount)
                 }
                 .scrollTargetLayout()
             }
             .scrollPosition(id: $verticalPage, anchor: .top)
             .ignoresSafeArea()
+            // Zoom: con dos dedos, o doble toque (agranda al doble / vuelve).
+            .simultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        verticalZoom = min(max(verticalZoomStart * value.magnification, 1), 4)
+                    }
+                    .onEnded { _ in verticalZoomStart = verticalZoom }
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    verticalZoom = verticalZoom > 1.05 ? 1 : 2
+                    verticalZoomStart = verticalZoom
+                }
+            }
             .onTapGesture {
                 withAnimation(.easeOut(duration: 0.2)) { showControls.toggle() }
             }
+        } else if doublePage && size.width > size.height {
+            spreadPages(loader, size: size)
         } else {
             TabView(selection: $page) {
                 ForEach(0..<loader.pageCount, id: \.self) { index in
@@ -209,7 +264,52 @@ struct LocalReaderView: View {
         }
     }
 
-    private func handleTap(at x: CGFloat, width: CGFloat) {
+    // MARK: Doble página (teléfono de costado)
+
+    /// Grupos de páginas: la tapa sola y después de a dos (1-2, 3-4…).
+    private func spreads(_ count: Int) -> [[Int]] {
+        guard count > 0 else { return [] }
+        var list: [[Int]] = [[0]]
+        var i = 1
+        while i < count {
+            list.append(i + 1 < count ? [i, i + 1] : [i])
+            i += 2
+        }
+        return list
+    }
+
+    private func spreadIndex(for page: Int, in spreads: [[Int]]) -> Int {
+        if page >= pageCount { return spreads.count }   // "Terminaste"
+        return spreads.firstIndex { $0.contains(page) } ?? 0
+    }
+
+    @ViewBuilder
+    private func spreadPages(_ loader: PageLoader, size: CGSize) -> some View {
+        let groups = spreads(loader.pageCount)
+        let selection = Binding<Int>(
+            get: { spreadIndex(for: page, in: groups) },
+            set: { index in page = index < groups.count ? groups[index][0] : loader.pageCount }
+        )
+        TabView(selection: selection) {
+            ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
+                // En manga, la primera página del par va a la derecha.
+                SpreadPageView(loader: loader, pages: direction == .rightToLeft ? Array(group.reversed()) : group,
+                               maxWidth: size.width * UIScreen.main.scale, fit: fit) { x in
+                    handleTap(at: x, width: size.width, inSpreads: true)
+                }
+                .environment(\.layoutDirection, .leftToRight)
+                .tag(index)
+            }
+            endCard
+                .environment(\.layoutDirection, .leftToRight)
+                .tag(groups.count)
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .environment(\.layoutDirection, direction == .rightToLeft ? .rightToLeft : .leftToRight)
+        .ignoresSafeArea()
+    }
+
+    private func handleTap(at x: CGFloat, width: CGFloat, inSpreads: Bool = false) {
         let ratio = x / max(width, 1)
         let leftEdge = ratio < 0.25, rightEdge = ratio > 0.75
         guard tapEdges, leftEdge || rightEdge else {
@@ -218,6 +318,14 @@ struct LocalReaderView: View {
         }
         // En derecha a izquierda, el borde izquierdo avanza.
         let forward = direction == .rightToLeft ? leftEdge : rightEdge
+        // Con el teléfono de costado se avanza de a dos páginas.
+        let groups = spreads(pageCount)
+        if inSpreads, !groups.isEmpty {
+            let current = spreadIndex(for: page, in: groups)
+            let next = forward ? min(groups.count, current + 1) : max(0, current - 1)
+            withAnimation { page = next < groups.count ? groups[next][0] : pageCount }
+            return
+        }
         withAnimation { page = forward ? min(pageCount, page + 1) : max(0, page - 1) }
     }
 
@@ -346,6 +454,7 @@ struct ReaderSettingsSheet: View {
     @AppStorage(ReaderSettings.night) private var night = false
     @AppStorage(ReaderSettings.warmth) private var warmth = 0.5
     @AppStorage(ReaderSettings.dim) private var dim = 0.25
+    @AppStorage(ReaderSettings.doublePage) private var doublePage = true
 
     var body: some View {
         NavigationStack {
@@ -373,6 +482,12 @@ struct ReaderSettingsSheet: View {
                     Text(direction == .vertical
                          ? "En vertical las páginas siempre ocupan el ancho."
                          : "\"Al alto\" sirve para páginas dobles: se recorren deslizando de costado.")
+                }
+
+                Section {
+                    Toggle("Dos páginas con el teléfono de costado", isOn: $doublePage)
+                } footer: {
+                    Text("Girá el teléfono dentro del lector: se ven dos páginas juntas (la tapa va sola).")
                 }
 
                 Section("Al tocar") {
@@ -493,6 +608,30 @@ private struct LocalPageView: View {
             image = await loader.image(index, maxWidth: maxWidth)
             // Dejamos lista la siguiente página para que no haya espera al pasar.
             _ = await loader.image(index + 1, maxWidth: maxWidth)
+        }
+    }
+}
+
+/// Dos páginas juntas (teléfono de costado), con zoom.
+private struct SpreadPageView: View {
+    let loader: PageLoader
+    let pages: [Int]
+    let maxWidth: CGFloat
+    let fit: ReaderFit
+    let onTap: (CGFloat) -> Void
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            if let image {
+                ZoomableImage(image: image, fit: fit == .height ? .height : .page, onSingleTap: onTap)
+            } else {
+                ProgressView().tint(.white)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: pages.map(String.init).joined(separator: "-")) {
+            image = await loader.spread(pages, maxWidth: maxWidth)
         }
     }
 }

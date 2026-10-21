@@ -9,7 +9,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.26"
+    MARKETING_VERSION: "0.26.1"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   ComicUnlimited:
@@ -28,8 +28,11 @@ targets:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # La app va derecha; solo el lector de tus archivos deja girar el teléfono (ver Orientation.swift).
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ivorudz.comicunlimited

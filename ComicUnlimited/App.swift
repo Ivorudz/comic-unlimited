@@ -3,6 +3,7 @@ import SwiftUI
 // Punto de partida de la app.
 @main
 struct ComicUnlimitedApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store = ReadingStore()
 
     var body: some Scene {
