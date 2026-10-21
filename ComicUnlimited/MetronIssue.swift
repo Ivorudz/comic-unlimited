@@ -115,7 +115,7 @@ struct MetronIssueView: View {
 
             if let desc = d.desc?.trimmingCharacters(in: .whitespacesAndNewlines), !desc.isEmpty {
                 SectionTitle("De qué se trata")
-                ComicVineText(text: desc, isLead: false, showsFooter: false)
+                ComicVineSummary(deck: desc, description: nil)
             }
 
             let credits = Self.groupedCredits(d.credits ?? [])
