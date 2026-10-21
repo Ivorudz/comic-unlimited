@@ -70,6 +70,9 @@ struct LocalComicDetailView: View {
             .buttonStyle(.plain)
             .padding(.top, 18)
 
+            TPBContentsButton(comic: comic)
+                .padding(.top, 14)
+
             VStack(spacing: 0) {
                 actionRow("Buscar su ficha en Comic Vine", icon: "sparkle.magnifyingglass") {
                     Task {

@@ -557,15 +557,27 @@ private struct DayHeader: View {
     }
 }
 
-/// Un cómic de la lista. Al tocarlo se abre su ficha en Comic Vine.
+/// Un cómic de la lista. Al tocarlo se abre su ficha dentro de la app (si viene de Comic Vine).
 private struct UpcomingRow: View {
     @Environment(\.openURL) private var openURL
     let issue: UpcomingIssue
 
+    /// Los de Comic Vine traen su link de Comic Vine; con eso sabemos que `id` es el número en Comic Vine.
+    private var isComicVine: Bool { issue.link?.host?.contains("comicvine") == true }
+
     var body: some View {
-        Button {
-            if let link = issue.link { openURL(link) }
-        } label: {
+        if isComicVine {
+            NavigationLink(value: CVRoute.issue(id: issue.id, title: issue.title)) { row(showsArrow: false) }
+                .buttonStyle(.plain)
+        } else {
+            Button {
+                if let link = issue.link { openURL(link) }
+            } label: { row(showsArrow: issue.link != nil) }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func row(showsArrow: Bool) -> some View {
             HStack(alignment: .top, spacing: 12) {
                 RemoteCover(url: issue.coverURL)
                     .frame(width: 56)
@@ -585,19 +597,15 @@ private struct UpcomingRow: View {
                     }
                 }
                 Spacer(minLength: 0)
-                if issue.link != nil {
-                    Image(systemName: "arrow.up.right")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(Theme.ink2)
-                }
+                Image(systemName: showsArrow ? "arrow.up.right" : "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Theme.ink2)
             }
             .padding(.vertical, 10)
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Theme.line).frame(height: 1)
             }
             .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 

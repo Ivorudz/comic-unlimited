@@ -39,6 +39,8 @@ struct LocalComic: Codable, Identifiable, Hashable {
     /// Año del paquete de donde salió (por ejemplo "Avengers Disassembled (2004).zip"),
     /// para elegir bien la ficha cuando el archivo no dice el año.
     var packYear: Int?
+    /// Si es un TPB: los números que trae (ver TPB.swift).
+    var contents: [ContainedIssue]?
     /// true = lo sacaste de "Seguir leyendo" (vuelve a aparecer si lo abrís de nuevo).
     var hiddenFromContinue: Bool?
     /// Portada del número en Comic Vine (solo el link; la imagen se carga al verla).
@@ -332,6 +334,11 @@ final class LocalLibrary {
     var recentlyRead: [LocalComic] {
         items.filter { $0.hasStarted && $0.hiddenFromContinue != true }
             .sorted { ($0.lastOpened ?? 0) > ($1.lastOpened ?? 0) }
+    }
+
+    /// Guarda qué números trae un TPB (vacío = ninguno).
+    func setContents(_ id: String, _ list: [ContainedIssue]) {
+        update(id) { c in c.contents = list.isEmpty ? nil : list }
     }
 
     /// Lo saca de "Seguir leyendo" en Inicio (no borra el cómic ni la página donde quedaste).

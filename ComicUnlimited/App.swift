@@ -42,8 +42,12 @@ struct RootView: View {
                 .tabItem { Label("Inicio", systemImage: "house") }
             LibraryView()
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
-            UpcomingView()
-                .tabItem { Label("Próximos", systemImage: "calendar") }
+            NavigationStack {
+                UpcomingView()
+                    .appDestinations()
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+            .tabItem { Label("Próximos", systemImage: "calendar") }
             ComingSoonView(title: "Comunidad", icon: "bubble.left",
                            message: "Acá vas a poder charlar sobre cómics y leer reseñas.")
                 .tabItem { Label("Comunidad", systemImage: "bubble.left") }

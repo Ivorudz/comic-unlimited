@@ -15,6 +15,9 @@ struct LibraryActionsHost: ViewModifier {
         .sheet(item: $actions.linking) { comic in
             LinkPickerView(comic: comic)
         }
+        .sheet(item: $actions.editingContents) { comic in
+            TPBContentsEditor(comicID: comic.id)
+        }
         .alert("Cambiar nombre",
                isPresented: Binding(get: { actions.renaming != nil }, set: { if !$0 { actions.renaming = nil } })) {
             TextField("Nombre", text: $renameText)

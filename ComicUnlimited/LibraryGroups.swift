@@ -31,6 +31,8 @@ final class LibraryActions {
     var linking: LocalComic?
     var toDelete: LocalComic?
     var renaming: LocalComic?
+    /// TPB al que le estás eligiendo qué números trae.
+    var editingContents: LocalComic?
 
     init(onRead: @escaping (LocalComic) -> Void) { self.onRead = onRead }
 }
@@ -177,6 +179,9 @@ struct LocalComicTile: View {
             }
             Button { actions.linking = comic } label: {
                 Label("Elegir ficha de Comic Vine", systemImage: "list.bullet.rectangle")
+            }
+            Button { actions.editingContents = comic } label: {
+                Label(comic.isCollection ? "Números del TPB" : "¿Es un TPB? Qué números trae", systemImage: "books.vertical")
             }
             Button { actions.renaming = comic } label: {
                 Label("Cambiar nombre", systemImage: "pencil")
@@ -417,25 +422,31 @@ private struct SeriesIssuesGrid: View {
     private enum Slot: Identifiable {
         case owned(LocalComic)
         case missing(CVIssueSummary)
+        /// No lo tenés suelto, pero sí dentro de un TPB.
+        case collected(CVIssueSummary, LocalComic)
 
         var id: String {
             switch self {
             case .owned(let c): return "mio-\(c.id)"
             case .missing(let i): return "falta-\(i.id)"
+            case .collected(let i, _): return "tpb-\(i.id)"
             }
         }
 
         var sortKey: Double {
             switch self {
             case .owned(let c): return c.numberForSorting
-            case .missing(let i): return Double(i.issueNumber ?? "") ?? .greatestFiniteMagnitude
+            case .missing(let i), .collected(let i, _): return Double(i.issueNumber ?? "") ?? .greatestFiniteMagnitude
             }
         }
     }
 
     private var slots: [Slot] {
         let owned = Set(mine.compactMap(\.cvIssueID))
-        let missing = loaded.filter { !owned.contains($0.id) }.map(Slot.missing)
+        let collected = LocalLibrary.shared.collectedIssues
+        let missing = loaded.filter { !owned.contains($0.id) }.map { issue in
+            collected[issue.id].map { Slot.collected(issue, $0) } ?? Slot.missing(issue)
+        }
         return (mine.map(Slot.owned) + missing).sorted { $0.sortKey < $1.sortKey }
     }
 
@@ -461,6 +472,9 @@ private struct SeriesIssuesGrid: View {
                             MissingIssueCard(issue: issue)
                         }
                         .buttonStyle(.plain)
+                    case .collected(let issue, let tpb):
+                        CollectedIssueCard(title: issue.issueNumber.map { "#\($0)" } ?? "Número",
+                                           subtitle: issue.name, cover: issue.image?.small, tpb: tpb)
                     }
                 }
             }

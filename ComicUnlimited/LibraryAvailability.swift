@@ -42,6 +42,8 @@ struct LibraryAvailability: View {
 
     var body: some View {
         let mine = library.items.first { $0.cvIssueID == detail.id }
+        // TPB tuyos que traen este número.
+        let inTPB = library.collections(containing: detail.id)
         Group {
             if let mine {
                 HStack(spacing: 10) {
@@ -67,6 +69,40 @@ struct LibraryAvailability: View {
                     .buttonStyle(.plain)
                 }
                 Label("En biblioteca", systemImage: "checkmark.seal.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.magenta)
+                    .padding(.top, 6)
+                if !inTPB.isEmpty {
+                    Text("También lo tenés en: \(inTPB.map(\.displayTitle).joined(separator: ", "))")
+                        .font(.caption)
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.top, 2)
+                }
+                TPBContentsButton(comic: mine)
+                    .padding(.top, 10)
+            } else if let tpb = inTPB.first {
+                HStack(spacing: 10) {
+                    Button {
+                        actions?.onRead(tpb)
+                    } label: {
+                        Label("Leer el TPB", systemImage: "book.fill")
+                            .font(.system(size: 16, weight: .heavy))
+                            .frame(maxWidth: .infinity)
+                            .padding(13)
+                            .foregroundStyle(Theme.paper)
+                            .background(Theme.ink, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    TPBLink(tpb: tpb) {
+                        Label("Ver el TPB", systemImage: "books.vertical")
+                            .font(.system(size: 15, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                            .padding(13)
+                            .foregroundStyle(Theme.ink)
+                            .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                Label("En biblioteca, dentro de: \(tpb.displayTitle)", systemImage: "checkmark.seal.fill")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.magenta)
                     .padding(.top, 6)

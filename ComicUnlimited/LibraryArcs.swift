@@ -37,6 +37,8 @@ struct ArcFolderView: View {
         case bare(CVArcIssue)
         /// Número de la lista de lectura que no tenés y del que no hay más datos.
         case listed(Int, SavedReadingOrder.Item)
+        /// Número que no tenés suelto pero sí dentro de un TPB tuyo.
+        case collected(cvID: Int, title: String, subtitle: String?, cover: URL?, date: String?, tpb: LocalComic)
 
         var id: String {
             switch self {
@@ -44,6 +46,7 @@ struct ArcFolderView: View {
             case .missing(let i): return "falta-\(i.id)"
             case .bare(let i): return "falta-\(i.id)"
             case .listed(let index, let item): return item.cvID.map { "falta-\($0)" } ?? "lista-\(index)"
+            case .collected(let cvID, _, _, _, _, _): return "tpb-\(cvID)"
             }
         }
 
@@ -54,6 +57,7 @@ struct ArcFolderView: View {
             case .missing(let i): return i.id
             case .bare(let i): return i.id
             case .listed(_, let item): return item.cvID
+            case .collected(let cvID, _, _, _, _, _): return cvID
             }
         }
 
@@ -64,6 +68,7 @@ struct ArcFolderView: View {
             case .missing(let i): return i.coverDate ?? i.storeDate ?? "9999"
             case .bare: return "9999"
             case .listed(_, let item): return item.coverDate ?? "9999"
+            case .collected(_, _, _, _, let date, _): return date ?? "9999"
             }
         }
     }
@@ -73,6 +78,7 @@ struct ArcFolderView: View {
     private func readingSlots(_ order: SavedReadingOrder, mine: [LocalComic]) -> (inList: [Slot], extra: [Slot]) {
         let byCV = Dictionary(library.items.compactMap { c in c.cvIssueID.map { ($0, c) } },
                               uniquingKeysWith: { first, _ in first })
+        let collected = library.collectedIssues
         let detailed = Dictionary(others.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var used = Set<Int>()
         var list: [Slot] = []
@@ -81,6 +87,10 @@ struct ArcFolderView: View {
                 guard used.insert(cv).inserted else { continue }
                 if let comic = byCV[cv] {
                     list.append(.owned(comic))
+                } else if let tpb = collected[cv] {
+                    list.append(collectedSlot(cv, tpb: tpb,
+                                              fallbackTitle: CVText.issueTitle(series: item.series, number: item.number),
+                                              fallbackDate: item.coverDate))
                 } else if showMissing {
                     list.append(detailed[cv].map(Slot.missing) ?? .listed(index, item))
                 }
@@ -92,13 +102,34 @@ struct ArcFolderView: View {
         return (list, extra)
     }
 
+    /// Un número que está dentro de un TPB tuyo, con los datos que haya (de Comic Vine o del TPB).
+    private func collectedSlot(_ cvID: Int, tpb: LocalComic, fallbackTitle: String?, fallbackDate: String?) -> Slot {
+        let full = others.first { $0.id == cvID }
+        let saved = tpb.contents?.first { $0.cvID == cvID }
+        return .collected(cvID: cvID,
+                          title: full.map(Self.title) ?? saved?.title ?? fallbackTitle ?? "Número",
+                          subtitle: full?.name,
+                          cover: full?.image?.small ?? saved?.cover.flatMap { URL(string: $0) },
+                          date: full?.coverDate ?? saved?.coverDate ?? fallbackDate,
+                          tpb: tpb)
+    }
+
     private func slots(_ mine: [LocalComic]) -> [Slot] {
         let owned = Set(mine.compactMap(\.cvIssueID))
-        var list = mine.map(Slot.owned)
-        if showMissing, let arcIssues = arc?.issues {
+        let collected = library.collectedIssues
+        let arcIDs = Set(arc?.issues?.map(\.id) ?? [])
+        // Un TPB que trae números de este arco se ve por esos números, no como tapa aparte.
+        let shown = mine.filter { c in !(c.isCollection && (c.contents ?? []).contains { arcIDs.contains($0.cvID) }) }
+        var list = shown.map(Slot.owned)
+        if let arcIssues = arc?.issues {
             let detailed = Dictionary(others.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             for issue in arcIssues where !owned.contains(issue.id) {
-                if let full = detailed[issue.id] {
+                if let tpb = collected[issue.id] {
+                    list.append(collectedSlot(issue.id, tpb: tpb,
+                                              fallbackTitle: issue.issueNumber.map { "#\($0)" }, fallbackDate: nil))
+                } else if !showMissing {
+                    continue
+                } else if let full = detailed[issue.id] {
                     list.append(.missing(full))
                 } else {
                     list.append(.bare(issue))
@@ -116,9 +147,11 @@ struct ArcFolderView: View {
         let reading = order.map { readingSlots($0, mine: mine) }
         let listIDs = Set(order?.items.compactMap(\.cvID) ?? [])
         let total = order == nil ? arc?.issues?.count : listIDs.count
+        // Los tuyos: sueltos o dentro de un TPB.
+        let yours = Set(library.items.compactMap(\.cvIssueID)).union(library.collectedIssues.keys)
         let have = order == nil
-            ? Set(mine.compactMap(\.cvIssueID)).count
-            : Set(library.items.compactMap(\.cvIssueID)).intersection(listIDs).count
+            ? (arc?.issues.map { Set($0.map(\.id)).intersection(yours).count } ?? Set(mine.compactMap(\.cvIssueID)).count)
+            : yours.intersection(listIDs).count
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 16) {
@@ -229,6 +262,8 @@ struct ArcFolderView: View {
                                        subtitle: issue.name, date: nil, cover: nil)
                     }
                     .buttonStyle(.plain)
+                case .collected(_, let title, let subtitle, let cover, _, let tpb):
+                    CollectedIssueCard(title: title, subtitle: subtitle, cover: cover, tpb: tpb)
                 case .listed(_, let item):
                     let title = CVText.issueTitle(series: item.series, number: item.number)
                     if let cv = item.cvID {
