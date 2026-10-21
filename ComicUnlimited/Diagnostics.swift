@@ -70,15 +70,16 @@ struct DiagnosticsView: View {
         // Metron
         lines.append("")
         lines.append("=== METRON ===")
+        // Primero, ¿se llega a metron.cloud? (sin cuenta, pedidos livianos)
+        lines.append(await plain("A) Página de Metron (sin cuenta)", "https://metron.cloud/"))
+        lines.append(await plain("B) API de Metron (sin cuenta)", "https://metron.cloud/api/"))
         if MetronAccount.isSet {
-            lines.append(await metron("1) Esta semana", [
+            lines.append(await metron("C) Con tu cuenta, consulta liviana", path: "publisher/", ["name": "marvel"]))
+            lines.append(await metron("D) Un solo día (\(day(wednesday)))", ["store_date": day(wednesday)]))
+            lines.append(await metron("E) Esta semana", [
                 "store_date_range_after": day(today),
                 "store_date_range_before": day(weekEnd),
             ]))
-            lines.append(await metron("2) Desde hoy en adelante", [
-                "store_date_range_after": day(today),
-            ]))
-            lines.append(await metron("3) Sin filtros", [:]))
         } else {
             lines.append("No hay cuenta de Metron cargada.")
         }
@@ -102,6 +103,15 @@ struct DiagnosticsView: View {
                 "field_list": "name,issue_number,store_date,volume",
                 "limit": "5",
             ]))
+            // Anunciados: los que tienen fecha de tapa en los próximos meses (aunque no tengan fecha de venta).
+            let in1 = calendar.date(byAdding: .month, value: 1, to: today) ?? today
+            let in3 = calendar.date(byAdding: .month, value: 3, to: today) ?? today
+            lines.append(await comicVine("4) Anunciados (fecha de tapa \(day(in1)) a \(day(in3)))", [
+                "filter": "cover_date:\(day(in1))|\(day(in3))",
+                "sort": "cover_date:asc",
+                "field_list": "name,issue_number,store_date,cover_date,volume",
+                "limit": "8",
+            ]))
         } else {
             lines.append("No hay clave de Comic Vine cargada.")
         }
@@ -110,8 +120,15 @@ struct DiagnosticsView: View {
         running = false
     }
 
-    private func metron(_ title: String, _ params: [String: String]) async -> String {
-        var components = URLComponents(string: "https://metron.cloud/api/issue/")!
+    /// Pedido simple, sin cuenta: solo para saber si se llega al sitio.
+    private func plain(_ title: String, _ link: String) async -> String {
+        await probe(title, URLRequest(url: URL(string: link)!), shownURL: link) { json in
+            json["detail"].map { ["Mensaje: \($0)"] } ?? []
+        }
+    }
+
+    private func metron(_ title: String, path: String = "issue/", _ params: [String: String]) async -> String {
+        var components = URLComponents(string: "https://metron.cloud/api/\(path)")!
         if !params.isEmpty {
             components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         }
@@ -124,7 +141,8 @@ struct DiagnosticsView: View {
             if let count = json["count"] { out.append("Total: \(count)") }
             if let results = json["results"] as? [[String: Any]] {
                 for item in results.prefix(3) {
-                    out.append("- \(item["issue"] ?? "?") | salida: \(item["store_date"] ?? "sin fecha")")
+                    let name = item["issue"] ?? item["name"] ?? "?"
+                    out.append("- \(name) | salida: \(item["store_date"] ?? "-")")
                 }
             }
             if let detail = json["detail"] { out.append("Mensaje: \(detail)") }
@@ -146,7 +164,7 @@ struct DiagnosticsView: View {
             if let results = json["results"] as? [[String: Any]] {
                 for item in results.prefix(5) {
                     let series = (item["volume"] as? [String: Any])?["name"] ?? "?"
-                    out.append("- \(series) #\(item["issue_number"] ?? "?") | salida: \(item["store_date"] ?? "sin fecha")")
+                    out.append("- \(series) #\(item["issue_number"] ?? "?") | salida: \(item["store_date"] ?? "sin fecha") | tapa: \(item["cover_date"] ?? "-")")
                 }
             }
             return out
@@ -160,18 +178,22 @@ struct DiagnosticsView: View {
         request.timeoutInterval = 30
         request.setValue("ComicUnlimited/0.4 (app personal, uso no comercial)", forHTTPHeaderField: "User-Agent")
         var out = ["", title, "Pedido: \(shownURL)"]
+        let start = Date()
+        func elapsed() -> String { String(format: "%.1f s", Date().timeIntervalSince(start)) }
         do {
             let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            out.append("Código HTTP: \(code)")
+            out.append("Código HTTP: \(code) (tardó \(elapsed()))")
             if let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
                 out += summarize(json)
             } else {
-                let text = String(decoding: data.prefix(300), as: UTF8.self)
+                let text = String(decoding: data.prefix(160), as: UTF8.self)
+                    .replacingOccurrences(of: "\n", with: " ")
                 out.append("Respuesta (no es JSON): \(text)")
             }
         } catch {
-            out.append("Error de conexión: \(error.localizedDescription)")
+            let ns = error as NSError
+            out.append("Error de conexión: \(error.localizedDescription) [código \(ns.code), tardó \(elapsed())]")
         }
         return out.joined(separator: "\n")
     }
