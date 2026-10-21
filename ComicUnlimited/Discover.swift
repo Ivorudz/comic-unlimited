@@ -19,13 +19,7 @@ final class DiscoverModel {
     /// Cuántos cómics mostrar en la fila.
     private static let limit = 20
 
-    /// Editoriales de cómics (no manga ni ediciones de otros países): solo se muestran estas.
-    private static let known = ["marvel", "dc comics", "image", "dark horse", "idw", "boom",
-                                "dynamite", "oni", "titan", "valiant", "mad cave", "ahoy", "vault", "archie",
-                                "aftershock", "awa", "artists writers", "skybound", "top cow", "zenescope",
-                                "black mask", "scout", "abstract studio", "humanoids", "fantagraphics",
-                                "drawn & quarterly", "dstlry", "tko", "massive", "rebellion", "2000 ad",
-                                "behemoth", "heavy metal", "source point", "bad idea", "magnetic", "first second"]
+
 
     func load() async {
         switch state {
@@ -62,12 +56,7 @@ final class DiscoverModel {
 
     /// Elige qué mostrar: solo editoriales de cómics, primero los que tienen portada y los más nuevos.
     private static func pick(_ issues: [UpcomingIssue]) -> [UpcomingIssue] {
-        func isComics(_ issue: UpcomingIssue) -> Bool {
-            guard let p = issue.publisher?.lowercased() else { return false }
-            return known.contains { p.hasPrefix($0) }
-        }
-        // Si Comic Vine no dijo ninguna editorial (falló esa consulta), mostramos todo.
-        let candidates = issues.contains { $0.publisher != nil } ? issues.filter(isComics) : issues
+        let candidates = ComicPublishers.onlyComics(issues)
         func rank(_ issue: UpcomingIssue) -> Int { issue.coverURL != nil ? 2 : 0 }
         let sorted = candidates.sorted {
             let a = rank($0), b = rank($1)
@@ -161,5 +150,26 @@ private struct ReleaseCard: View {
                 .lineLimit(1)
         }
         .frame(width: 110)
+    }
+}
+
+/// Editoriales de cómics (no manga ni ediciones de otros países). Se usa en Inicio y en Próximos.
+enum ComicPublishers {
+    static let known = ["marvel", "dc comics", "image", "dark horse", "idw", "boom",
+                                "dynamite", "oni", "titan", "valiant", "mad cave", "ahoy", "vault", "archie",
+                                "aftershock", "awa", "artists writers", "skybound", "top cow", "zenescope",
+                                "black mask", "scout", "abstract studio", "humanoids", "fantagraphics",
+                                "drawn & quarterly", "dstlry", "tko", "massive", "rebellion", "2000 ad",
+                                "behemoth", "heavy metal", "source point", "bad idea", "magnetic", "first second"]
+
+    static func isComics(_ publisher: String?) -> Bool {
+        guard let p = publisher?.lowercased() else { return false }
+        return known.contains { p.hasPrefix($0) }
+    }
+
+    /// Deja solo los de editoriales de cómics. Si Comic Vine no dijo ninguna editorial
+    /// (falló esa consulta), no filtra, para no dejar la lista vacía.
+    static func onlyComics(_ issues: [UpcomingIssue]) -> [UpcomingIssue] {
+        issues.contains { $0.publisher != nil } ? issues.filter { isComics($0.publisher) } : issues
     }
 }

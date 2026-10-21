@@ -174,12 +174,14 @@ final class UpcomingModel {
             return issues
         case .comicVine:
             let client = ComicVineKey.client
-            var issues = try await client.issues(from: range.start, to: range.end, onProgress: show)
+            // Con Comic Vine no mostramos nada hasta saber la editorial de cada uno: así no se cuelan mangas
+            // ni ediciones de otros países.
+            var issues = try await client.issues(from: range.start, to: range.end)
             let publishers = await client.publishers(volumeIDs: issues.compactMap(\.volumeID))
             for i in issues.indices {
                 if let volume = issues[i].volumeID { issues[i].publisher = publishers[volume] }
             }
-            return issues
+            return ComicPublishers.onlyComics(issues)
         }
     }
 
