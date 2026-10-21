@@ -23,12 +23,50 @@ actor PageLoader {
     }
 
     func image(_ index: Int, maxWidth: CGFloat) -> UIImage? {
-        let key = "\(index)-\(Int(maxWidth))" as NSString
+        let crop = UserDefaults.standard.bool(forKey: ReaderSettings.cropMargins)
+        let key = "\(index)-\(Int(maxWidth))-\(crop)" as NSString
         if let cached = cache.object(forKey: key) { return cached }
-        guard let image = file.page(index, maxWidth: maxWidth) else { return nil }
+        guard var image = file.page(index, maxWidth: maxWidth) else { return nil }
+        if crop { image = Self.trimmingWhiteMargins(image) }
         let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
         cache.setObject(image, forKey: key, cost: cost)
         return image
+    }
+
+    /// Recorta los bordes blancos de una página escaneada (como mucho un 12 % de cada lado,
+    /// para no cortar dibujo). Si no hay bordes, la deja igual.
+    static func trimmingWhiteMargins(_ image: UIImage) -> UIImage {
+        guard let cg = image.cgImage, cg.width > 20, cg.height > 20 else { return image }
+        // Se analiza una copia chiquita, que es rápido.
+        let w = 160, h = max(20, Int(CGFloat(cg.height) * 160 / CGFloat(cg.width)))
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { raw in
+            guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                                      bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        guard drawn else { return image }
+        func isWhite(_ x: Int, _ y: Int) -> Bool {
+            let i = (y * w + x) * 4
+            return pixels[i] > 232 && pixels[i + 1] > 232 && pixels[i + 2] > 232
+        }
+        // Una fila o columna es "borde" si casi todos sus puntos son blancos.
+        func rowBlank(_ y: Int) -> Bool { (0..<w).filter { !isWhite($0, y) }.count <= w / 100 + 1 }
+        func colBlank(_ x: Int) -> Bool { (0..<h).filter { !isWhite(x, $0) }.count <= h / 100 + 1 }
+        let maxY = h * 12 / 100, maxX = w * 12 / 100
+        var top = 0; while top < maxY && rowBlank(top) { top += 1 }
+        var bottom = 0; while bottom < maxY && rowBlank(h - 1 - bottom) { bottom += 1 }
+        var left = 0; while left < maxX && colBlank(left) { left += 1 }
+        var right = 0; while right < maxX && colBlank(w - 1 - right) { right += 1 }
+        guard top + bottom + left + right > 2 else { return image }
+        // La fila 0 de la copia chiquita es la de arriba de la página (igual que al recortar).
+        let sx = CGFloat(cg.width) / CGFloat(w), sy = CGFloat(cg.height) / CGFloat(h)
+        let rect = CGRect(x: CGFloat(left) * sx, y: CGFloat(top) * sy,
+                          width: CGFloat(w - left - right) * sx, height: CGFloat(h - top - bottom) * sy)
+        guard let cropped = cg.cropping(to: rect.integral) else { return image }
+        return UIImage(cgImage: cropped, scale: image.scale, orientation: image.imageOrientation)
     }
 
     /// Miniatura chiquita para la tira de abajo.
@@ -37,7 +75,8 @@ actor PageLoader {
     /// Dos páginas juntas en una sola imagen (para el teléfono de costado).
     /// `pages` va en el orden en que se ven, de izquierda a derecha.
     func spread(_ pages: [Int], maxWidth: CGFloat) -> UIImage? {
-        let key = "spread-\(pages.map(String.init).joined(separator: "-"))-\(Int(maxWidth))" as NSString
+        let crop = UserDefaults.standard.bool(forKey: ReaderSettings.cropMargins)
+        let key = "spread-\(pages.map(String.init).joined(separator: "-"))-\(Int(maxWidth))-\(crop)" as NSString
         if let cached = cache.object(forKey: key) { return cached }
         let images = pages.compactMap { image($0, maxWidth: maxWidth / CGFloat(max(pages.count, 1))) }
         guard !images.isEmpty else { return nil }
@@ -97,6 +136,7 @@ enum ReaderSettings {
     static let warmth = "reader.warmth"
     static let dim = "reader.dim"
     static let doublePage = "reader.doublePage"
+    static let cropMargins = "reader.cropMargins"
 }
 
 // MARK: - Lector
@@ -116,6 +156,7 @@ struct LocalReaderView: View {
     @AppStorage(ReaderSettings.warmth) private var warmth = 0.5
     @AppStorage(ReaderSettings.dim) private var dim = 0.25
     @AppStorage(ReaderSettings.doublePage) private var doublePage = true
+    @AppStorage(ReaderSettings.cropMargins) private var cropMargins = false
 
     @State private var page: Int
     @State private var showControls = true
@@ -219,13 +260,14 @@ struct LocalReaderView: View {
             VerticalReader(loader: loader, decodeWidth: size.width * scale * 1.5, page: $page) {
                 withAnimation(.easeOut(duration: 0.2)) { showControls.toggle() }
             }
+            .id(cropMargins)   // al cambiar "Recortar bordes", se vuelven a cargar las páginas
             .ignoresSafeArea()
         } else if doublePage && size.width > size.height {
             spreadPages(loader, size: size)
         } else {
             TabView(selection: $page) {
                 ForEach(0..<loader.pageCount, id: \.self) { index in
-                    LocalPageView(loader: loader, index: index, maxWidth: decodeWidth, fit: fit) { x in
+                    LocalPageView(loader: loader, index: index, maxWidth: decodeWidth, fit: fit, crop: cropMargins) { x in
                         handleTap(at: x, width: size.width)
                     }
                     .environment(\.layoutDirection, .leftToRight)   // la página nunca se da vuelta
@@ -272,7 +314,7 @@ struct LocalReaderView: View {
             ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
                 // En manga, la primera página del par va a la derecha.
                 SpreadPageView(loader: loader, pages: direction == .rightToLeft ? Array(group.reversed()) : group,
-                               maxWidth: size.width * UIScreen.main.scale, fit: fit) { x in
+                               maxWidth: size.width * UIScreen.main.scale, fit: fit, crop: cropMargins) { x in
                     handleTap(at: x, width: size.width, inSpreads: true)
                 }
                 .environment(\.layoutDirection, .leftToRight)
@@ -480,6 +522,7 @@ struct ReaderSettingsSheet: View {
     @AppStorage(ReaderSettings.warmth) private var warmth = 0.5
     @AppStorage(ReaderSettings.dim) private var dim = 0.25
     @AppStorage(ReaderSettings.doublePage) private var doublePage = true
+    @AppStorage(ReaderSettings.cropMargins) private var cropMargins = false
 
     var body: some View {
         NavigationStack {
@@ -501,12 +544,14 @@ struct ReaderSettingsSheet: View {
                     }
                     .pickerStyle(.segmented)
                     .disabled(direction == .vertical)
+                    Toggle("Recortar bordes blancos", isOn: $cropMargins)
                 } header: {
                     Text("Tamaño de la página")
                 } footer: {
                     Text(direction == .vertical
                          ? "En vertical las páginas siempre ocupan el ancho."
                          : "\"Al alto\" sirve para páginas dobles: se recorren deslizando de costado.")
+                    + Text(" \"Recortar bordes blancos\" saca los márgenes blancos de las páginas escaneadas (como mucho un poco de cada lado).")
                 }
 
                 Section {
@@ -711,6 +756,7 @@ private struct LocalPageView: View {
     let index: Int
     let maxWidth: CGFloat
     let fit: ReaderFit
+    var crop = false
     let onTap: (CGFloat) -> Void
 
     @State private var image: UIImage?
@@ -724,7 +770,7 @@ private struct LocalPageView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: "\(index)-\(Int(maxWidth))") {
+        .task(id: "\(index)-\(Int(maxWidth))-\(crop)") {
             image = await loader.image(index, maxWidth: maxWidth)
             // Dejamos lista la siguiente página para que no haya espera al pasar.
             _ = await loader.image(index + 1, maxWidth: maxWidth)
@@ -738,6 +784,7 @@ private struct SpreadPageView: View {
     let pages: [Int]
     let maxWidth: CGFloat
     let fit: ReaderFit
+    var crop = false
     let onTap: (CGFloat) -> Void
     @State private var image: UIImage?
 
@@ -750,7 +797,7 @@ private struct SpreadPageView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: pages.map(String.init).joined(separator: "-")) {
+        .task(id: pages.map(String.init).joined(separator: "-") + "-\(crop)") {
             image = await loader.spread(pages, maxWidth: maxWidth)
         }
     }
