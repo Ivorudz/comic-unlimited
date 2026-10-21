@@ -66,13 +66,12 @@ struct RootView: View {
             // Un segundo lector, para tus archivos. Va en otra vista para no chocar con el primero.
             Color.clear.fullScreenCover(item: $localSession) { session in
                 LocalReaderView(comic: session.comic, startPage: session.startPage) { next in
-                    // "Siguiente número": se cierra este y se abre el otro, en el mismo arco o serie.
+                    // "Siguiente número": se abre el otro, en el mismo arco o serie.
                     let context = LocalLibrary.shared.item(session.comic.id)?.lastContext
-                    localSession = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        localSession = LocalSession(comic: next, startPage: LocalLibrary.shared.open(next, context: context))
-                    }
+                    localSession = LocalSession(comic: next, startPage: LocalLibrary.shared.open(next, context: context))
                 }
+                // Cada cómic es un lector nuevo (si no, quedaban las páginas y la posición del anterior).
+                .id(session.id)
             }
         }
     }

@@ -216,13 +216,9 @@ struct LocalReaderView: View {
             }
             .presentationDetents([.medium, .large])
         }
-        .onAppear {
-            UIApplication.shared.isIdleTimerDisabled = keepAwake
-            AppOrientation.set(allowLandscape: true)
-        }
+        .onAppear { AppOrientation.readerOpened(keepAwake: keepAwake) }
         .onDisappear {
-            UIApplication.shared.isIdleTimerDisabled = false
-            AppOrientation.set(allowLandscape: false)
+            AppOrientation.readerClosed()
             if finishedHere, let cv = live.cvIssueID {
                 Task { await MetronSync.markRead(cvID: cv) }
             }
