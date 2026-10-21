@@ -165,7 +165,10 @@ struct ProfileView: View {
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { BrowsingContext.current = nil }
             // Los guardados desde Metron pasan a su ficha de Comic Vine cuando Comic Vine los carga.
-            .task { await RealLibrary.shared.moveMetronEntriesToComicVine() }
+            .task {
+                await RealLibrary.shared.moveMetronEntriesToComicVine()
+                await RealLibrary.shared.fillMissingCovers()   // portadas que faltaban en tus listas
+            }
         }
     }
 

@@ -1,11 +1,12 @@
 import SwiftUI
+import UIKit
 
 // Comentarios y puntaje.
 // - Al terminar un cómic: "¿Qué te pareció?" (estrellas, manitos y comentario).
 // - En cada ficha: "Tu comentario". En Perfil y en Comunidad: "Mis comentarios".
 // - Metron: al terminar un cómic se marca como leído en tu colección de Metron (con tus estrellas)
 //   y en cada ficha se ve el promedio de la comunidad de Metron.
-// Por ahora todo queda en este iPhone; los amigos llegan con la base de datos (0.29).
+// Con la comunidad (CommunityService.swift), tus comentarios y puntajes los ven tus amigos.
 
 // MARK: - Tu comentario (en la ficha)
 
@@ -51,6 +52,7 @@ struct ReviewSection: View {
         .sheet(isPresented: $editing) {
             ReviewEditor(template: template)
         }
+        FriendReviewsSection(comicKey: template.key)
     }
 }
 
@@ -71,7 +73,9 @@ struct ReviewEditor: View {
                     .scrollContentBackground(.hidden)
                     .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
                     .frame(minHeight: 180)
-                Text("Tu opinión sobre este cómic. Por ahora queda guardada en tu iPhone (más adelante la vas a poder compartir con tus amigos).")
+                Text(Community.shared.isLoggedIn
+                     ? "Tu opinión sobre este cómic. La ven tus amigos de la comunidad."
+                     : "Tu opinión sobre este cómic. Queda guardada en tu iPhone (si entrás a la Comunidad, también la ven tus amigos).")
                     .font(.caption)
                     .foregroundStyle(Theme.ink2)
                 if library.entry(template.key)?.review != nil {
@@ -202,10 +206,14 @@ struct EntryLink<Label: View>: View {
     }
 }
 
-// MARK: - Comunidad
+// MARK: - Comunidad (pestaña)
 
 struct CommunityView: View {
     private var library: RealLibrary { RealLibrary.shared }
+    private var community: Community { Community.shared }
+    @State private var feed: [RemoteReview] = []
+    @State private var feedError: String?
+    @State private var loadingFeed = false
 
     var body: some View {
         NavigationStack {
@@ -215,10 +223,31 @@ struct CommunityView: View {
                         .font(.system(size: 32, weight: .black).width(.expanded))
                         .foregroundStyle(Theme.ink)
                         .padding(.top, 8)
-                    Text("Muy pronto: los comentarios y puntajes de tus amigos. Por ahora, acá están los tuyos.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.ink2)
-                        .padding(.top, 4)
+
+                    if !community.isConfigured {
+                        CommunitySetupCard()
+                    } else if !community.isLoggedIn {
+                        CommunityLoginCard()
+                    } else if community.needsUsername {
+                        UsernameCard()
+                    } else {
+                        accountHeader
+                        SectionTitle("Tus amigos comentaron")
+                        if loadingFeed && feed.isEmpty {
+                            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
+                        } else if let feedError {
+                            Text(feedError).font(.subheadline).foregroundStyle(Theme.ink2)
+                        } else if feed.isEmpty {
+                            Text(community.friends.isEmpty
+                                 ? "Todavía no tenés amigos en la comunidad. Tocá \"Amigos\" para agregar a alguien por su nombre de usuario (y que esa persona te agregue a vos)."
+                                 : "Tus amigos todavía no comentaron nada.")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.ink2)
+                        }
+                        ForEach(feed) { review in
+                            RemoteReviewLink(review: review) { RemoteReviewRow(review: review, showsUser: true) }
+                        }
+                    }
 
                     SectionTitle("Mis comentarios")
                     let reviews = library.reviews
@@ -235,9 +264,461 @@ struct CommunityView: View {
                 .padding(.bottom, 30)
             }
             .background(Theme.paper)
+            .refreshable { await loadFeed() }
             .appDestinations()
+            .navigationDestination(for: CommunityRoute.self) { route in
+                switch route {
+                case .friends: FriendsView()
+                case .settings: CommunitySettingsView()
+                }
+            }
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { BrowsingContext.current = nil }
+            .task(id: community.me?.id) {
+                await library.fillMissingCovers()
+                await loadFeed()
+            }
+        }
+    }
+
+    private var accountHeader: some View {
+        HStack(spacing: 10) {
+            Text("@\(community.me?.username ?? "")")
+                .font(.headline)
+                .foregroundStyle(Theme.magenta)
+            Spacer()
+            NavigationLink(value: CommunityRoute.friends) {
+                Label("Amigos\(community.requests.isEmpty ? "" : " (\(community.requests.count))")", systemImage: "person.2.fill")
+                    .font(.subheadline.weight(.bold))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .foregroundStyle(Theme.ink)
+                    .background(Theme.chip, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            NavigationLink(value: CommunityRoute.settings) {
+                Image(systemName: "gearshape")
+                    .font(.subheadline.weight(.bold))
+                    .padding(9)
+                    .foregroundStyle(Theme.ink)
+                    .background(Theme.chip, in: Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 10)
+    }
+
+    private func loadFeed() async {
+        guard community.isLoggedIn, !community.needsUsername else { return }
+        loadingFeed = true
+        feedError = nil
+        await community.loadFriends()
+        do {
+            feed = try await community.feed()
+        } catch {
+            feedError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        loadingFeed = false
+    }
+}
+
+enum CommunityRoute: Hashable { case friends, settings }
+
+// MARK: - Configurar (primera vez)
+
+private struct CommunitySetupCard: View {
+    @State private var url = ""
+    @State private var key = ""
+    @State private var code = ""
+    @State private var errorText: String?
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Para ver lo que comentan tus amigos, la comunidad usa una base de datos gratuita (Supabase) que crea una sola persona. Los demás se suman con un código de invitación.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.ink2)
+
+            GroupBox("¿Te invitaron? Pegá el código") {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("CU1-…", text: $code, axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.footnote.monospaced())
+                    Button("Unirme") {
+                        errorText = Community.shared.join(code: code) ? nil : "Ese código no es válido. Copialo entero (empieza con CU1-)."
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.magenta)
+                    .disabled(code.isEmpty)
+                }
+            }
+
+            GroupBox("¿La creás vos? (una sola vez)") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("1. En Safari, entrá a supabase.com, creá una cuenta gratis y un proyecto nuevo (región: South America).")
+                    Text("2. En el proyecto: SQL Editor → New query → pegá el texto de abajo → Run.")
+                    Button(copied ? "¡Copiado!" : "Copiar el texto para pegar") {
+                        UIPasteboard.general.string = CommunitySetup.sql
+                        copied = true
+                    }
+                    .buttonStyle(.bordered)
+                    Text("3. Authentication → Sign In / Providers → Email: apagá \"Confirm email\" y guardá.")
+                    Text("4. Project Settings → Data API (o API Keys): copiá la dirección (Project URL) y la clave pública (\"anon\" o \"publishable\"). Pegalas acá:")
+                    TextField("https://xxxx.supabase.co", text: $url)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                    TextField("Clave pública", text: $key)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Button("Guardar") {
+                        Community.shared.configure(url: url, key: key)
+                        errorText = Community.shared.isConfigured ? nil : "La dirección tiene que empezar con https://"
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.magenta)
+                    .disabled(url.isEmpty || key.isEmpty)
+                    Text("Nunca pegues acá la clave \"service_role\" ni la \"secret\": esas no se comparten.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.magenta)
+                }
+                .font(.footnote)
+            }
+
+            if let errorText {
+                Text(errorText).font(.subheadline).foregroundStyle(Theme.magenta)
+            }
+        }
+        .padding(.top, 10)
+    }
+}
+
+// MARK: - Entrar / crear cuenta
+
+private struct CommunityLoginCard: View {
+    @State private var creating = true
+    @State private var email = ""
+    @State private var password = ""
+    @State private var username = ""
+    @State private var working = false
+    @State private var errorText: String?
+
+    private var validUsername: Bool { username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("", selection: $creating) {
+                Text("Crear cuenta").tag(true)
+                Text("Ya tengo cuenta").tag(false)
+            }
+            .pickerStyle(.segmented)
+            TextField("Mail", text: $email)
+                .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.emailAddress)
+                .padding(10).background(Theme.chip, in: RoundedRectangle(cornerRadius: 10))
+            SecureField("Contraseña (6 o más letras y números)", text: $password)
+                .padding(10).background(Theme.chip, in: RoundedRectangle(cornerRadius: 10))
+            if creating {
+                TextField("Nombre de usuario (minúsculas, números o _)", text: $username)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .onChange(of: username) { _, value in username = value.lowercased() }
+                    .padding(10).background(Theme.chip, in: RoundedRectangle(cornerRadius: 10))
+                Text("Tus amigos te encuentran por este nombre. De 3 a 24: letras minúsculas, números o _.")
+                    .font(.caption).foregroundStyle(Theme.ink2)
+            }
+            Button {
+                Task { await go() }
+            } label: {
+                Group {
+                    if working { ProgressView() } else { Text(creating ? "Crear cuenta" : "Entrar") }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.magenta)
+            .disabled(working || email.isEmpty || password.count < 6 || (creating && !validUsername))
+            if let errorText {
+                Text(errorText).font(.subheadline).foregroundStyle(Theme.magenta)
+            }
+            Text("Tu contraseña es solo para la comunidad (no es la de Metron ni la de Comic Vine).")
+                .font(.caption).foregroundStyle(Theme.ink2)
+        }
+        .padding(.top, 12)
+    }
+
+    private func go() async {
+        working = true
+        errorText = nil
+        do {
+            if creating {
+                try await Community.shared.signUp(email: email, password: password, username: username)
+            } else {
+                try await Community.shared.signIn(email: email, password: password)
+            }
+        } catch {
+            errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        working = false
+    }
+}
+
+/// Entraste pero falta elegir el nombre de usuario.
+private struct UsernameCard: View {
+    @State private var username = ""
+    @State private var errorText: String?
+    @State private var working = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Elegí tu nombre de usuario").font(.headline).foregroundStyle(Theme.ink)
+            TextField("nombre_de_usuario", text: $username)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                .onChange(of: username) { _, value in username = value.lowercased() }
+                .padding(10).background(Theme.chip, in: RoundedRectangle(cornerRadius: 10))
+            Button("Guardar") {
+                Task {
+                    working = true
+                    do {
+                        try await Community.shared.createProfile(username: username)
+                        await Community.shared.syncAfterLogin()
+                    } catch {
+                        errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    }
+                    working = false
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.magenta)
+            .disabled(working || username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) == nil)
+            if let errorText { Text(errorText).font(.subheadline).foregroundStyle(Theme.magenta) }
+        }
+        .padding(.top, 12)
+    }
+}
+
+// MARK: - Amigos
+
+struct FriendsView: View {
+    private var community: Community { Community.shared }
+    @State private var username = ""
+    @State private var message: String?
+    @State private var working = false
+
+    var body: some View {
+        List {
+            Section {
+                HStack {
+                    TextField("Nombre de usuario de tu amigo", text: $username)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Button("Agregar") { Task { await add() } }
+                        .disabled(working || username.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                if let message { Text(message).font(.footnote).foregroundStyle(Theme.ink2) }
+            } header: {
+                Text("Agregar")
+            } footer: {
+                Text("Son amigos cuando los dos se agregan. Ahí ven sus comentarios y puntajes.")
+            }
+
+            if !community.requests.isEmpty {
+                Section("Te quieren agregar") {
+                    ForEach(community.requests) { person in
+                        HStack {
+                            Text("@\(person.username)")
+                            Spacer()
+                            Button("Aceptar") { Task { try? await community.follow(person) } }
+                                .buttonStyle(.borderedProminent).tint(Theme.magenta)
+                        }
+                    }
+                }
+            }
+
+            Section("Amigos") {
+                if community.friends.isEmpty {
+                    Text("Todavía no tenés amigos en la comunidad.").foregroundStyle(Theme.ink2)
+                }
+                ForEach(community.friends) { person in
+                    Text("@\(person.username)")
+                        .swipeActions {
+                            Button("Sacar", role: .destructive) { Task { try? await community.remove(person) } }
+                        }
+                }
+            }
+
+            if !community.pending.isEmpty {
+                Section {
+                    ForEach(community.pending) { person in
+                        Text("@\(person.username)")
+                            .foregroundStyle(Theme.ink2)
+                            .swipeActions {
+                                Button("Cancelar", role: .destructive) { Task { try? await community.remove(person) } }
+                            }
+                    }
+                } header: {
+                    Text("Esperando que te agreguen")
+                }
+            }
+
+            Section {
+                ShareLink(item: inviteText) {
+                    Label("Invitar a un amigo", systemImage: "square.and.arrow.up")
+                }
+            } footer: {
+                Text("Le manda el código para unirse a tu comunidad y cómo instalar la app. El código no incluye ninguna contraseña.")
+            }
+        }
+        .navigationTitle("Amigos")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .refreshable { await community.loadFriends() }
+        .task { await community.loadFriends() }
+    }
+
+    private var inviteText: String {
+        """
+        ¡Sumate a mi comunidad de Cómic Unlimited! Mi usuario es @\(community.me?.username ?? "").
+        1) Instalá la app: https://github.com/ivorudz/comic-unlimited/releases/latest (se abre con LiveContainer).
+        2) En la pestaña Comunidad, pegá este código y tocá "Unirme":
+        \(community.inviteCode)
+        3) Creá tu cuenta y agregame.
+        """
+    }
+
+    private func add() async {
+        working = true
+        message = nil
+        do {
+            if let found = try await community.add(username: username) {
+                message = community.friends.contains(found)
+                    ? "¡Listo! @\(found.username) ya es tu amigo."
+                    : "Le mandaste el pedido a @\(found.username). Cuando te agregue, van a ser amigos."
+                username = ""
+            } else {
+                message = "No encontré a nadie con ese nombre."
+            }
+        } catch {
+            message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        working = false
+    }
+}
+
+struct CommunitySettingsView: View {
+    private var community: Community { Community.shared }
+    @State private var copied = false
+    @State private var confirmingReset = false
+
+    var body: some View {
+        List {
+            Section("Tu cuenta") {
+                Text("@\(community.me?.username ?? "")")
+                Text(community.session?.email ?? "").foregroundStyle(Theme.ink2)
+                Button("Salir de la comunidad", role: .destructive) { community.signOut() }
+            }
+            Section {
+                Button(copied ? "¡Copiado!" : "Copiar código de invitación") {
+                    UIPasteboard.general.string = community.inviteCode
+                    copied = true
+                }
+            } footer: {
+                Text("Con este código, tus amigos se suman a esta misma comunidad.")
+            }
+            Section {
+                Button("Usar otra comunidad", role: .destructive) { confirmingReset = true }
+            } footer: {
+                Text("Borra de este iPhone la dirección y la clave de la comunidad (no borra nada de la base de datos).")
+            }
+        }
+        .navigationTitle("Comunidad")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .confirmationDialog("¿Usar otra comunidad?", isPresented: $confirmingReset, titleVisibility: .visible) {
+            Button("Sí, cambiar", role: .destructive) { community.configure(url: "", key: "") }
+        }
+    }
+}
+
+// MARK: - Comentarios de amigos
+
+struct RemoteReviewRow: View {
+    let review: RemoteReview
+    var showsUser = true
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            if showsUser {
+                RemoteCover(url: review.coverUrl.flatMap { URL(string: $0) }).frame(width: 48)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                if showsUser {
+                    Text(review.title)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                }
+                HStack(spacing: 6) {
+                    Text("@\(review.username)").foregroundStyle(Theme.magenta).fontWeight(.semibold)
+                    if let rating = review.rating {
+                        (Text(String(repeating: "★", count: rating)).foregroundStyle(Theme.star)
+                            + Text(String(repeating: "★", count: max(0, 5 - rating))).foregroundStyle(Theme.line))
+                    }
+                    if let thumbs = review.thumbs {
+                        Text(thumbs < 0 ? "👎" : thumbs == 1 ? "👍" : "👍👍")
+                    }
+                    if let date = review.date {
+                        Text(date.formatted(date: .abbreviated, time: .omitted)).foregroundStyle(Theme.ink2)
+                    }
+                }
+                .font(.caption)
+                if let comment = review.comment, !comment.isEmpty {
+                    Text(comment)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.ink)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
+        .contentShape(Rectangle())
+    }
+}
+
+/// Lleva a la ficha del cómic que comentó un amigo.
+struct RemoteReviewLink<Label: View>: View {
+    let review: RemoteReview
+    @ViewBuilder let label: () -> Label
+
+    var body: some View {
+        Group {
+            if let cv = review.cvId, review.kind == "series" {
+                NavigationLink(value: CVRoute.series(id: cv, name: review.title)) { label() }
+            } else if let cv = review.cvId {
+                NavigationLink(value: CVRoute.issue(id: cv, title: review.title)) { label() }
+            } else if let metron = review.metronId {
+                NavigationLink(value: LibraryRoute.metronIssue(metron)) { label() }
+            } else {
+                label()
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// "Lo que dicen tus amigos" en la ficha de un cómic o serie.
+struct FriendReviewsSection: View {
+    let comicKey: String
+    @State private var reviews: [RemoteReview] = []
+    private var community: Community { Community.shared }
+
+    var body: some View {
+        Group {
+            if !reviews.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionTitle("Lo que dicen tus amigos")
+                    ForEach(reviews) { RemoteReviewRow(review: $0, showsUser: false) }
+                }
+            }
+        }
+        .task(id: comicKey) {
+            guard community.isLoggedIn, !community.needsUsername else { return }
+            reviews = (try? await community.reviews(for: comicKey)) ?? []
         }
     }
 }

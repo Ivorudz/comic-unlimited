@@ -162,6 +162,7 @@ final class RealLibrary {
             if entry.status == nil { entry.status = .read }
         }
         save(entry)
+        shareWithFriends(entry.key)
         // Si ya está en tu colección de Metron, se actualizan ahí las estrellas.
         if let item = entry.metronCollectionID, let stars = entry.rating {
             Task { await MetronSync.updateRating(collectionID: item, stars: stars) }
@@ -176,6 +177,34 @@ final class RealLibrary {
         entry.reviewDate = clean.isEmpty ? nil : Date().timeIntervalSince1970
         if entry.review != nil && entry.status == nil { entry.status = .read }
         save(entry)
+        shareWithFriends(entry.key)
+    }
+
+    /// Si entraste a la comunidad, tu comentario y puntaje se suben (o se borran) allá.
+    private func shareWithFriends(_ key: String) {
+        let current = entries[key]
+        Task { await Community.shared.push(current, key: key) }
+    }
+
+    /// Portadas que faltan (por ejemplo, de comentarios guardados antes de que la app guardara la portada):
+    /// se piden a Comic Vine de una sola vez.
+    private var fillingCovers = false
+    func fillMissingCovers() async {
+        guard !fillingCovers, !ComicVineKey.current.isEmpty else { return }
+        let ids = entries.values.filter { $0.coverURL == nil && $0.id > 0 && !$0.isSeries }.map(\.id)
+        guard !ids.isEmpty else { return }
+        fillingCovers = true
+        defer { fillingCovers = false }
+        guard let found = try? await ComicVineKey.client.issues(ids: Array(ids.prefix(100))) else { return }
+        for issue in found {
+            guard var entry = entries["issue-\(issue.id)"],
+                  let url = issue.image?.smallUrl ?? issue.image?.thumbUrl else { continue }
+            entry.coverURL = url
+            entries[entry.key] = entry
+        }
+        if let data = try? JSONEncoder().encode(Array(entries.values)) {
+            UserDefaults.standard.set(data, forKey: Self.storageKey)
+        }
     }
 
     /// Guarda en qué ítem de tu colección de Metron quedó este número.
@@ -198,6 +227,7 @@ final class RealLibrary {
             if entry.status == nil { entry.status = .read }
         }
         save(entry)
+        shareWithFriends(entry.key)
     }
 
     /// Algo cambió en las listas o los puntajes (sirve para saber cuándo recalcular "Para vos").
