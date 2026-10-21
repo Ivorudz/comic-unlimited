@@ -190,13 +190,18 @@ private struct EntryRow: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Theme.ink)
                     .multilineTextAlignment(.leading)
-                if let thumbs = entry.thumbs {
-                    Text(thumbs < 0 ? "👎" : thumbs == 1 ? "👍" : "👍👍")
-                        .font(.footnote)
-                } else if let rating = entry.rating {
-                    (Text(String(repeating: "★", count: rating)).foregroundStyle(Theme.star)
-                        + Text(String(repeating: "★", count: 5 - rating)).foregroundStyle(Theme.line))
-                        .font(.footnote)
+                if entry.rating != nil || entry.thumbs != nil {
+                    // Estrellas y manitos juntos, si pusiste los dos.
+                    HStack(spacing: 6) {
+                        if let rating = entry.rating {
+                            (Text(String(repeating: "★", count: rating)).foregroundStyle(Theme.star)
+                                + Text(String(repeating: "★", count: 5 - rating)).foregroundStyle(Theme.line))
+                        }
+                        if let thumbs = entry.thumbs {
+                            Text(thumbs < 0 ? "👎" : thumbs == 1 ? "👍" : "👍👍")
+                        }
+                    }
+                    .font(.footnote)
                 } else if let writer = entry.writers.first {
                     Text(entry.isSeries ? "De \(writer.name)" : "Guion: \(writer.name)")
                         .font(.footnote)

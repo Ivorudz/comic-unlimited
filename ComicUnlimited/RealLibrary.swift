@@ -57,13 +57,15 @@ final class RealLibrary {
 
         /// Cuánto pesa este cómic en las sugerencias. Negativo = no te gustó.
         var weight: Double {
-            if let rating { return Double(rating) - 2.5 }   // 5★ = 2.5 … 1★ = -1.5
-            if let thumbs {                                   // 👎 = 1★, 👍 = 4★, 👍👍 = 5★
-                switch thumbs {
-                case ..<0: return -1.5
-                case 1: return 1.5
-                default: return 2.5
-                }
+            // Estrellas: 5★ = 2.5 … 1★ = -1.5. Manitos: 👎 = -1.5, 👍 = 1.5, 👍👍 = 2.5.
+            // Si pusiste las dos, cuenta el promedio.
+            let stars = rating.map { Double($0) - 2.5 }
+            let hands: Double? = thumbs.map { $0 < 0 ? -1.5 : ($0 == 1 ? 1.5 : 2.5) }
+            switch (stars, hands) {
+            case let (s?, h?): return (s + h) / 2
+            case let (s?, nil): return s
+            case let (nil, h?): return h
+            default: break
             }
             switch status {
             case .reading: return 1.5
@@ -128,18 +130,16 @@ final class RealLibrary {
         var entry = entries[template.key] ?? template
         entry.rating = entry.rating == rating ? nil : rating
         if entry.rating != nil {
-            entry.thumbs = nil   // un solo puntaje por cómic
             if entry.status == nil { entry.status = .read }
         }
         save(entry)
     }
 
-    /// Puntaje con manitos (-1, 1 o 2). Tocar la misma de nuevo lo borra; borra las estrellas.
+    /// Puntaje con manitos (-1, 1 o 2). Tocar la misma de nuevo lo borra. Convive con las estrellas.
     func setThumbs(_ value: Int, for template: Entry) {
         var entry = entries[template.key] ?? template
         entry.thumbs = entry.thumbs == value ? nil : value
         if entry.thumbs != nil {
-            entry.rating = nil
             if entry.status == nil { entry.status = .read }
         }
         save(entry)
@@ -256,7 +256,7 @@ struct RealLibraryControls: View {
                         thumbs
                     }
                 }
-                Text("Usá estrellas o manitos: si elegís uno, el otro se borra. Tu puntaje y tus listas se usan para \"Para vos\" en Inicio.")
+                Text("Podés usar estrellas y manitos a la vez. Tu puntaje y tus listas se usan para \"Para vos\" en Inicio.")
                     .font(.caption)
                     .foregroundStyle(Theme.ink2)
             }
