@@ -8,15 +8,19 @@ import Observation
 final class ReadingStore {
     private static let pagesKey = "reading.pages"
     private static let finishedKey = "reading.finished"
+    private static let openedKey = "reading.lastOpened"
 
     /// Página guardada de cada cómic (la primera página es la 0).
     private(set) var pages: [String: Int]
     /// Cómics que leíste hasta el final.
     private(set) var finished: Set<String>
+    /// Cuándo abriste cada cómic por última vez (en segundos), para ordenar "Seguir leyendo".
+    private(set) var lastOpened: [String: Double]
 
     init() {
         pages = (UserDefaults.standard.dictionary(forKey: Self.pagesKey) as? [String: Int]) ?? [:]
         finished = Set(UserDefaults.standard.stringArray(forKey: Self.finishedKey) ?? [])
+        lastOpened = (UserDefaults.standard.dictionary(forKey: Self.openedKey) as? [String: Double]) ?? [:]
     }
 
     func savedPage(for comic: Comic) -> Int {
@@ -36,8 +40,28 @@ final class ReadingStore {
         comics.filter { hasStarted($0) && !isFinished($0) }
     }
 
+    /// Todo lo que empezaste (terminado o no), lo último que abriste primero.
+    func recentlyRead(from comics: [Comic]) -> [Comic] {
+        comics.filter(hasStarted).sorted { (lastOpened[$0.id] ?? 0) > (lastOpened[$1.id] ?? 0) }
+    }
+
+    /// Sugerencias: primero los que no empezaste, de los géneros que más leés y con mejor puntaje.
+    /// Si todavía no leíste nada, ordena por puntaje.
+    func recommended(from comics: [Comic]) -> [Comic] {
+        var genres: [String: Int] = [:]
+        for comic in comics where hasStarted(comic) { genres[comic.genre, default: 0] += 1 }
+        func score(_ c: Comic) -> Double {
+            Double(genres[c.genre] ?? 0) * 10 + c.rating - (hasStarted(c) ? 100 : 0)
+        }
+        return comics.sorted { score($0) > score($1) }
+    }
+
+    /// true si ya hay algo leído para basar las sugerencias.
+    var hasHistory: Bool { !pages.isEmpty }
+
     /// Se llama al abrir el lector. Devuelve la página donde hay que arrancar.
     func open(_ comic: Comic) -> Int {
+        lastOpened[comic.id] = Date().timeIntervalSince1970
         if isFinished(comic) {
             // Si ya lo terminaste, empieza de nuevo desde la primera página.
             finished.remove(comic.id)
@@ -64,5 +88,6 @@ final class ReadingStore {
     private func persist() {
         UserDefaults.standard.set(pages, forKey: Self.pagesKey)
         UserDefaults.standard.set(Array(finished).sorted(), forKey: Self.finishedKey)
+        UserDefaults.standard.set(lastOpened, forKey: Self.openedKey)
     }
 }

@@ -9,7 +9,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1"
+    MARKETING_VERSION: "0.30"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   ComicUnlimited:
@@ -28,12 +28,18 @@ targets:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # La app va derecha; solo el lector de tus archivos deja girar el teléfono (ver Orientation.swift).
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ivorudz.comicunlimited
         PRODUCT_NAME: ComicUnlimited
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # libarchive (viene en iOS) para convertir .cbr (RAR) a .cbz
+        SWIFT_OBJC_BRIDGING_HEADER: ComicUnlimited/ComicUnlimited-Bridging-Header.h
+        OTHER_LDFLAGS: "-larchive"
         ENABLE_PREVIEWS: NO

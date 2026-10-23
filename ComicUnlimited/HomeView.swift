@@ -1,54 +1,37 @@
 import SwiftUI
+import UIKit
 
-// Pestaña Inicio: buscador, "Seguir leyendo", cómic destacado y catálogo.
+// Pestaña Inicio: acceso al buscador de cómics reales, "Seguir leyendo" y "Descubrir".
 struct HomeView: View {
     @Environment(ReadingStore.self) private var store
     /// Se usa para abrir el lector desde cualquier pantalla.
     let onRead: (Comic) -> Void
+    /// Abre un cómic de tu Biblioteca (archivo).
+    let onReadLocal: (LocalComic) -> Void
 
-    @State private var query = ""
-    @State private var filter: Filter = .all
-
-    enum Filter: String, CaseIterable, Identifiable {
-        case all = "Todos"
-        case editorial = "Editoriales"
-        case indie = "Independientes"
-        var id: String { rawValue }
-    }
-
-    private var catalog: [Comic] {
-        let q = normalize(query)
-        return Catalog.comics
-            .filter { comic in
-                switch filter {
-                case .all: return true
-                case .editorial: return comic.source == .editorial
-                case .indie: return comic.source == .indie
-                }
-            }
-            .filter { q.isEmpty || normalize("\($0.title) \($0.author) \($0.genre)").contains(q) }
-            .sorted { $0.rating > $1.rating }
-    }
+    @State private var discover = DiscoverModel()
+    @State private var forYou = ForYouModel()
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                    searchField
+                    realComicsLink
                     continueReading
-                    featured
-                    catalogSection
+                    discoverSection
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 24)
             }
             .background(Theme.paper)
+            .appDestinations()
             .navigationDestination(for: Comic.self) { comic in
                 DetailView(comic: comic, onRead: onRead)
             }
             .navigationTitle("Inicio")
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear { BrowsingContext.current = nil }
         }
     }
 
@@ -63,31 +46,86 @@ struct HomeView: View {
             .padding(.top, 10)
     }
 
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
-            TextField("Buscar por título, autor o género", text: $query)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+    /// Entrada al buscador de cómics reales (Comic Vine).
+    private var realComicsLink: some View {
+        NavigationLink(value: CVRoute.search) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkle.magnifyingglass")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Theme.magenta)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Buscar cómics reales")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Series, números, autores y personajes, desde Comic Vine")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.ink2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Theme.ink2)
+            }
+            .padding(14)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(.plain)
         .padding(.top, 18)
     }
 
+    /// Una sola fila con lo último que leíste (cómics de la app y tus archivos), lo más reciente primero.
     @ViewBuilder
     private var continueReading: some View {
-        let reading = store.inProgress(from: Catalog.comics)
-        if !reading.isEmpty {
-            SectionTitle("Seguir leyendo")
+        // Solo tus archivos de la Biblioteca (los cómics de prueba ya no se muestran en Inicio).
+        let recent = LocalLibrary.shared.recentlyRead.map { RecentItem.local($0) }
+        SectionTitle("Seguir leyendo")
+        if recent.isEmpty {
+            Text("Todavía no empezaste ningún cómic. Importá uno en la Biblioteca y abrilo: va a aparecer acá.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.ink2)
+        } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(reading) { comic in
-                        Button { onRead(comic) } label: {
-                            ContinueCard(comic: comic, page: store.savedPage(for: comic))
+                    ForEach(recent) { item in
+                        switch item {
+                        case .sample(let comic, _):
+                            if store.isFinished(comic) {
+                                NavigationLink(value: comic) {
+                                    ContinueCard(comic: comic, page: store.savedPage(for: comic), finished: true)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Button { onRead(comic) } label: {
+                                    ContinueCard(comic: comic, page: store.savedPage(for: comic), finished: false)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        case .local(let comic):
+                            Button { onReadLocal(comic) } label: {
+                                LocalContinueCard(comic: comic)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button { onReadLocal(comic) } label: {
+                                    Label(comic.isFinished ? "Volver a leer" : "Seguir leyendo", systemImage: "book")
+                                }
+                                if let issueID = comic.cvIssueID {
+                                    NavigationLink(value: CVRoute.issue(id: issueID, title: comic.displayTitle)) {
+                                        Label("Ver el cómic", systemImage: "info.circle")
+                                    }
+                                } else {
+                                    NavigationLink(value: LibraryRoute.localComic(comic.id)) {
+                                        Label("Ver el cómic", systemImage: "info.circle")
+                                    }
+                                }
+                                Button(role: .destructive) {
+                                    LocalLibrary.shared.hideFromContinue(comic.id)
+                                } label: {
+                                    Label("Quitar de Seguir leyendo", systemImage: "eye.slash")
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -96,88 +134,93 @@ struct HomeView: View {
         }
     }
 
-    private var featured: some View {
-        let comic = Catalog.comics[0]
-        return NavigationLink(value: comic) {
-            HStack(alignment: .center, spacing: 16) {
-                CoverArt(comic: comic)
-                    .frame(width: 110)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Nuevo número")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(Theme.magenta)
-                    Text(comic.fullTitle)
-                        .font(.system(size: 24, weight: .black).width(.expanded))
-                        .foregroundStyle(Theme.ink)
-                    Text(comic.synopsis)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.ink2)
-                        .multilineTextAlignment(.leading)
-                    Text("Ver cómic")
-                        .font(.subheadline.weight(.heavy))
-                        .foregroundStyle(Theme.ink)
-                        .padding(.bottom, 2)
-                        .overlay(alignment: .bottom) {
-                            Rectangle().fill(Theme.magenta).frame(height: 2)
-                        }
-                        .padding(.top, 6)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.line))
+    /// "Descubrir": cómics reales recién salidos y sugerencias de la app.
+    @ViewBuilder
+    private var discoverSection: some View {
+        SectionTitle("Descubrir")
+
+        RowTitle(title: "Recién salidos", subtitle: "Cómics reales de la última semana, desde Comic Vine")
+        RecentReleasesRow(model: discover)
+
+        RowTitle(title: "Para vos", subtitle: "Series reales según tus puntajes y tus listas")
+            .padding(.top, 22)
+        ForYouRow(model: forYou)
+    }
+}
+
+/// Algo que empezaste a leer: un cómic de la app o un archivo tuyo.
+private enum RecentItem: Identifiable {
+    case sample(Comic, Double)
+    case local(LocalComic)
+
+    var id: String {
+        switch self {
+        case .sample(let c, _): return "app-\(c.id)"
+        case .local(let c): return "file-\(c.id)"
         }
-        .buttonStyle(.plain)
-        .padding(.top, 24)
     }
 
-    private var catalogSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionTitle("Catálogo")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Filter.allCases) { option in
-                        Button { filter = option } label: {
-                            Text(option.rawValue)
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .foregroundStyle(filter == option ? Theme.paper : Theme.ink)
-                                .background(filter == option ? Theme.ink : Theme.chip, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 18)
-            }
-            .padding(.horizontal, -18)
-            .padding(.bottom, 14)
+    var time: Double {
+        switch self {
+        case .sample(_, let t): return t
+        case .local(let c): return c.lastOpened ?? 0
+        }
+    }
+}
 
-            let list = catalog
-            if list.isEmpty {
-                Text("No hay cómics que coincidan con la búsqueda.")
-                    .font(.subheadline)
+/// Tarjeta de "Seguir leyendo" para un archivo de tu Biblioteca.
+private struct LocalContinueCard: View {
+    let comic: LocalComic
+    @State private var cover: UIImage?
+
+    var body: some View {
+        let progress = comic.isFinished ? 1 : Double((comic.lastPage ?? 0) + 1) / Double(max(comic.pageCount, 1))
+        HStack(spacing: 12) {
+            ZStack {
+                Theme.chip
+                if let cover { Image(uiImage: cover).resizable().scaledToFill() }
+            }
+            .frame(width: 62, height: 93)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(comic.displayTitle)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(2)
+                // De qué arco o serie venías (o "Biblioteca").
+                Text(comic.lastContext?.label ?? "Biblioteca")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.magenta)
+                    .lineLimit(1)
+                Text(comic.isFinished ? "Terminado" : "Página \((comic.lastPage ?? 0) + 1) de \(comic.pageCount)")
+                    .font(.footnote)
                     .foregroundStyle(Theme.ink2)
-                    .padding(.vertical, 10)
-            } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
-                          alignment: .leading, spacing: 18) {
-                    ForEach(list) { comic in
-                        NavigationLink(value: comic) {
-                            CatalogCard(comic: comic)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                ProgressBar(value: progress).padding(.top, 5)
             }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(width: 290)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+        .task(id: comic.id) {
+            cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)
         }
     }
+}
 
-    /// Pasa a minúsculas y saca los acentos, para que "comic" encuentre "cómic".
-    private func normalize(_ s: String) -> String {
-        s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-            .trimmingCharacters(in: .whitespaces)
+/// Título chico de cada fila de "Descubrir".
+private struct RowTitle: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
+            Text(subtitle).font(.caption).foregroundStyle(Theme.ink2)
+        }
+        .padding(.bottom, 10)
     }
 }
 
@@ -239,9 +282,10 @@ struct CatalogCard: View {
 struct ContinueCard: View {
     let comic: Comic
     let page: Int
+    var finished = false
 
     var body: some View {
-        let progress = Double(page + 1) / Double(comic.pageCount)
+        let progress = finished ? 1 : Double(page + 1) / Double(comic.pageCount)
         HStack(spacing: 12) {
             CoverArt(comic: comic).frame(width: 62)
             VStack(alignment: .leading, spacing: 3) {
@@ -249,7 +293,7 @@ struct ContinueCard: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
-                Text("Página \(page + 1) de \(comic.pageCount)")
+                Text(finished ? "Terminado" : "Página \(page + 1) de \(comic.pageCount)")
                     .font(.footnote)
                     .foregroundStyle(Theme.ink2)
                 ProgressBar(value: progress).padding(.top, 5)

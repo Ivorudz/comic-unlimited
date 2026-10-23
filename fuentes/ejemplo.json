@@ -1,0 +1,22 @@
+{
+  "name": "mi-catalogo",
+  "version": "1.0.0",
+  "description": "Ejemplo de fuente: cómics de dominio público de los años 40",
+  "license": "Public Domain",
+  "author": "Nombre <email@ejemplo.com>",
+  "repository": { "type": "git", "url": "https://github.com/usuario/mi-catalogo" },
+  "homepage": "https://ejemplo.com",
+  "comics": [
+    {
+      "title": "Captain Ejemplo #1",
+      "series": "Captain Ejemplo",
+      "number": "1",
+      "year": 1944,
+      "publisher": "Editorial Ejemplo",
+      "cover": "https://ejemplo.com/portadas/captain-ejemplo-1.jpg",
+      "download": "https://ejemplo.com/archivos/captain-ejemplo-1.cbz",
+      "format": "cbz",
+      "size": 25000000
+    }
+  ]
+}

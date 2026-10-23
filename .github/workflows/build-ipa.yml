@@ -66,10 +66,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v0.1.${{ github.run_number }}"
+          VERSION=$(sed -n 's/.*MARKETING_VERSION: "\(.*\)".*/\1/p' project.yml | head -1)
+          TAG="v${VERSION}.${{ github.run_number }}"
           gh release create "$TAG" ComicUnlimited.ipa \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "Cómic Unlimited 0.1 (compilación ${{ github.run_number }})" \
+            --title "Cómic Unlimited ${VERSION} (compilación ${{ github.run_number }})" \
             --notes "Archivo para instalar con LiveContainer. Rama: ${{ github.ref_name }}. Descargá ComicUnlimited.ipa desde Safari y abrilo con LiveContainer." \
             --latest
