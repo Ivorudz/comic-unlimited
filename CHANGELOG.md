@@ -1,0 +1,78 @@
+# Historial de versiones
+
+Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
+
+## 0.30 · Perfiles
+- Tu perfil en la comunidad: emoji o inicial, nombre, bio y "Compartir mis listas con mis amigos".
+- Perfil de cada amigo: leídos, comentarios, puntajes y sus listas.
+- Aviso para actualizar la base de datos sin borrar nada.
+
+## 0.29 · Comunidad con amigos
+- Base de datos propia y gratuita (Supabase), creada desde Safari con un texto que trae la app.
+- Cuenta con mail y @usuario, amigos que se agregan los dos y código de invitación.
+- "Tus amigos comentaron" y "Lo que dicen tus amigos" en cada ficha.
+- Portadas que faltaban en comentarios y listas.
+
+## 0.28 · Comentarios
+- Al terminar un cómic: "¿Qué te pareció?" con estrellas, manitos y comentario.
+- "Tu comentario" en cada ficha y "Mis comentarios" en Perfil y Comunidad.
+- Metron: marcar como leído con tus estrellas y ver el promedio de su comunidad.
+- **0.28.1:** "Siguiente número" abre bien el próximo cómic, el terminado sale de "Seguir leyendo" y "Volver a leer" en los terminados.
+
+## 0.27 · Lector, parte 2
+- "Siguiente número" al terminar, según el arco o la serie desde donde lo abriste.
+- Marcadores, saltar a cada número dentro de un TPB y recortar bordes blancos (opcional).
+- Próximos: ficha con datos de Metron cuando Comic Vine todavía no tiene el número.
+
+## 0.26 · Lector, parte 1
+- Dirección (izquierda a derecha, manga o vertical), tamaño de página, miniaturas, tocar bordes, pantalla encendida y modo nocturno.
+- **0.26.1:** girar el teléfono para ver dos páginas juntas.
+- **0.26.2:** zoom en vertical donde ponés los dedos, estrellas y manitos a la vez, y "Revisar conexión" más completa.
+
+## 0.25 · TPB y Próximos
+- TPB: qué números trae cada tomo; esos números se ven "En TPB" en arcos, series y órdenes de lectura.
+- Próximos abre la ficha dentro de la app y no muestra manga.
+- Menú en "Seguir leyendo": ver el cómic o quitarlo de la fila.
+
+## 0.24 · Fichas al tocar
+- Tocar un cómic abre su ficha; ficha simple para los que no tienen ficha de Comic Vine.
+- Leer un cómic lo pasa solo a "Leyendo" y terminarlo, a "Leído".
+- "Recién salidos" sin manga ni ediciones de otros países.
+
+## 0.23 · Órdenes de lectura
+- Orden de lectura de cada arco desde Metron y, en la **0.23.1**, búsqueda automática en la colección de listas .cbl.
+- Mensaje claro cuando un .cbr no se puede abrir.
+
+## 0.22 · Paquetes y fichas sin errores
+- Paquetes .zip y .rar con muchos cómics adentro.
+- **0.22.3:** mejor unión con Comic Vine, sin repetidos, "Revisar fichas" y "¿Ya lo tenés? Elegí el archivo".
+
+## 0.21 · Descargar desde la ficha
+- Botón "En biblioteca" / "Descargar" en cada cómic real; los números en gris dicen "Descargar".
+
+## 0.20 · Tu página de WordPress
+- Ver tus publicaciones y bajar sus archivos. Manitos al costado de las estrellas.
+
+## 0.19 · Fuentes
+- Catálogos que se agregan con un link JSON, con descarga a la Biblioteca.
+
+## 0.18 · Inicio
+- Inicio sin cómics de prueba; "De qué se trata" con el resumen y solo la historia.
+
+## 0.17 · Personajes y traducción
+- Personajes y arcos con imagen en la ficha; traducción automática de los textos.
+
+## 0.16 · Arcos y editoriales
+- Carpeta por arco, con los números que faltan en gris, y carpeta por editorial.
+
+## 0.15 · Biblioteca en carpetas
+- Todos, Series y Estado, con buscador y orden; "Tenés X de Y".
+
+## 0.14 · Leer tus archivos
+- Lector con zoom que guarda la página; nombre y ficha desde Comic Vine; .cbr en RAR.
+
+## 0.13 · Importar
+- Importar archivos a la Biblioteca y puntaje con manitos además de estrellas.
+
+## 0.1 a 0.12 · La base
+- Cinco pestañas, lector, Próximos con Comic Vine y Metron, buscador de cómics reales, listas y "Para vos".
