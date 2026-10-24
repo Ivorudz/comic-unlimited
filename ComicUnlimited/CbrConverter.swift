@@ -1,7 +1,7 @@
 import Foundation
 
-// Convierte un .cbr (comprimido como RAR) a .cbz, para que la app lo pueda leer.
-// Lee el RAR con libarchive (viene dentro de iOS) y escribe un .zip sin comprimir:
+// Convierte un .cbr (comprimido como RAR), un .cb7 (7-Zip) o un .cbt (TAR) a .cbz, para que la app lo pueda leer.
+// Lee el archivo con libarchive (viene dentro de iOS) y escribe un .zip sin comprimir:
 // las páginas ya son JPG o PNG, comprimirlas otra vez casi no ahorra lugar.
 
 enum CbrConverter {
@@ -66,7 +66,7 @@ enum CbrConverter {
         var errorDescription: String? {
             switch self {
             case .failed(let why):
-                return "Este .cbr no se pudo abrir: usa un tipo de compresión RAR que el iPhone no puede leer, o el archivo está dañado. "
+                return "Este archivo no se pudo abrir: usa un tipo de compresión que el iPhone no puede leer, o está dañado. "
                     + "Probá conseguirlo en .cbz, o abrilo con otra app (por ejemplo Documents), comprimí la carpeta de imágenes desde Archivos "
                     + "(mantener apretado → Comprimir) e importá ese .zip. (Detalle: \(why))"
             }

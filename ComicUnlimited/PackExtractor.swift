@@ -1,12 +1,12 @@
 import Foundation
 
-// Paquetes: un .zip o .rar que adentro no tiene páginas sino cómics enteros (.cbz, .cbr, .zip, .rar o PDF).
+// Paquetes: un .zip, .rar, .7z o .tar que adentro no tiene páginas sino cómics enteros (.cbz, .cbr, .zip, .rar o PDF).
 // Los saca de a uno a una carpeta temporal, para importarlos como cómics separados.
 // Usa libarchive (viene dentro de iOS), que lee tanto .zip como RAR, y copia cada archivo
 // por partes, sin cargarlo entero en memoria.
 
 enum PackExtractor {
-    static let comicExtensions: Set<String> = ["cbz", "cbr", "zip", "rar", "pdf"]
+    static let comicExtensions: Set<String> = ["cbz", "cbr", "cb7", "cbt", "zip", "rar", "7z", "tar", "pdf"]
 
     /// Saca los cómics que hay adentro de `pack`. Devuelve la carpeta temporal y los archivos sacados
     /// (vacío si no había ningún cómic adentro).

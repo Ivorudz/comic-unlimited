@@ -87,8 +87,48 @@ struct ProfileView: View {
                         EntryLink(entry: entry) { ReviewRow(entry: entry) }
                     }
 
+                    SectionTitle("Historial de lectura")
+                    NavigationLink(value: LibraryRoute.history) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Últimos 7 días")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(Theme.ink2)
+                                Text(ReadingHistory.summary(ReadingHistory.shared.since(ReadingHistory.weekStart)))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(Theme.ink2)
+                        }
+                        .padding(14)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+
                     SectionTitle("Configuración")
                     VStack(alignment: .leading, spacing: 6) {
+                        NavigationLink(value: LibraryRoute.readingProfiles) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Ajustes del lector por serie")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(Theme.ink)
+                                    Text("Series que recuerdan su dirección y tamaño de página, y manga de derecha a izquierda.")
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.ink2)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundStyle(Theme.ink2)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().padding(.vertical, 8)
+
                         Toggle(isOn: $metronSync) {
                             Text("Mandar a Metron lo que leo")
                                 .font(.subheadline.weight(.semibold))

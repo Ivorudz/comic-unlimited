@@ -24,6 +24,8 @@ struct AppDestinations: ViewModifier {
                 case .reviewLinks: ReviewLinksView()
                 case .localComic(let id): LocalComicDetailView(comicID: id)
                 case .metronIssue(let id): MetronIssueView(metronID: id)
+                case .history: ReadingHistoryView()
+                case .readingProfiles: ReadingProfilesView()
                 }
             }
             .navigationDestination(for: CommunityRoute.self) { route in

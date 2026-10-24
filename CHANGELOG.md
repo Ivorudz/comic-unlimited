@@ -2,6 +2,12 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.31 · Más formatos, ajustes por serie e historial
+- Importa también **.cb7 (7-Zip) y .cbt (TAR)**, y paquetes .7z o .tar con cómics adentro. Se convierten a .cbz solos.
+- **Ajustes por serie:** en el lector (⚙︎), "Recordar para esta serie" guarda la dirección y el tamaño de página de esa serie.
+- **Manga de derecha a izquierda automático** cuando la editorial es de manga (se puede apagar).
+- **Historial de lectura** en Perfil: cuándo leíste cada cómic, qué páginas y cuánto tiempo, con el resumen de los últimos 7 días.
+
 ## 0.30 · Perfiles
 - Tu perfil en la comunidad: emoji o inicial, nombre, bio y "Compartir mis listas con mis amigos".
 - Perfil de cada amigo: leídos, comentarios, puntajes y sus listas.

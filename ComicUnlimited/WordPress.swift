@@ -129,7 +129,7 @@ enum WordPressClient {
     private static func classify(_ raw: String, url: URL, host: String) -> WPLink {
         let ext = url.pathExtension.lowercased()
         let file = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
-        if ["cbz", "cbr", "zip", "pdf"].contains(ext) {
+        if ComicFile.fileExtensions.contains(ext) || ["rar", "7z", "tar"].contains(ext) {
             return WPLink(original: raw, download: raw, label: file)
         }
         let parts = url.pathComponents

@@ -20,7 +20,7 @@ enum ArchiveError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notSupported: return "Ese tipo de archivo no se puede abrir. Usá .cbz, .zip o PDF."
+        case .notSupported: return "Ese tipo de archivo no se puede abrir. Usá .cbz, .zip, .cbr, .cb7, .cbt o PDF."
         case .notZip: return "No parece un .cbz o .zip válido."
         case .tooBig: return "El archivo es demasiado grande para abrirlo (más de 4 GB)."
         case .damaged: return "El archivo parece dañado."
@@ -149,6 +149,8 @@ final class ComicFile {
     let pageCount: Int
 
     static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "gif", "heic", "bmp"]
+    /// Tipos de archivo que se pueden importar (.rar, .7z y .tar se tratan como .cbr, .cb7 y .cbt).
+    static let fileExtensions: Set<String> = ["cbz", "zip", "cbr", "cb7", "cbt", "pdf"]
 
     init(url: URL) throws {
         switch url.pathExtension.lowercased() {
@@ -156,6 +158,9 @@ final class ComicFile {
             guard let doc = PDFDocument(url: url), doc.pageCount > 0 else { throw ArchiveError.badPDF }
             source = .pdf(doc)
             pageCount = doc.pageCount
+        case "cb7", "cbt":
+            // 7-Zip y TAR: se convierten a .cbz al importarlos (como los .cbr de tipo RAR).
+            throw ArchiveError.rar
         case "cbz", "zip", "cbr":
             // Muchos .cbr en realidad son .zip con otro nombre: los intentamos abrir igual.
             let zip: ZipArchive

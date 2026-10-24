@@ -7,7 +7,7 @@
 
 **Una app de iPhone para leer tus cómics, ordenarlos como en una comiquería, saber qué sale cada semana y comentarlos con tus amigos.**
 
-Cómic Unlimited lee tus archivos (.cbz, .cbr, .zip y PDF), los une solos a su ficha de [Comic Vine](https://comicvine.gamespot.com), los acomoda por serie, arco y editorial, te muestra los números que te faltan y te dice en qué orden leerlos. Además trae los lanzamientos de la semana desde [Metron](https://metron.cloud) y una comunidad privada para compartir puntajes y comentarios.
+Cómic Unlimited lee tus archivos (.cbz, .cbr, .cb7, .cbt, .zip y PDF), los une solos a su ficha de [Comic Vine](https://comicvine.gamespot.com), los acomoda por serie, arco y editorial, te muestra los números que te faltan y te dice en qué orden leerlos. Además trae los lanzamientos de la semana desde [Metron](https://metron.cloud) y una comunidad privada para compartir puntajes y comentarios.
 
 Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin programas de terceros adentro**. Se hizo y se prueba entero desde un iPhone: GitHub la compila sola y se instala con LiveContainer.
 
@@ -16,8 +16,8 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 ## Qué hace
 
 ### 📚 Tu biblioteca
-- Importa **.cbz, .zip, .cbr y PDF** desde la app Archivos. Los .cbr en formato RAR se convierten solos.
-- **Paquetes:** un .zip o .rar con muchos cómics adentro se separa en cómics individuales.
+- Importa **.cbz, .zip, .cbr, .cb7, .cbt y PDF** desde la app Archivos. Los RAR, 7-Zip y TAR se convierten solos.
+- **Paquetes:** un .zip, .rar, .7z o .tar con muchos cómics adentro se separa en cómics individuales.
 - Carpetas por **serie, arco, editorial y estado** (sin empezar, leyendo, leídos), con buscador y orden por fecha de publicación.
 - Los **números que te faltan aparecen en gris**, con "Tenés X de Y" y un botón para buscarlos en tus fuentes.
 - **TPB (tomos recopilatorios):** cada tomo sabe qué números trae, y esos números cuentan como tuyos en arcos, series y órdenes de lectura.
@@ -32,6 +32,7 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 - Dirección **izquierda a derecha, derecha a izquierda (manga) o vertical continua**.
 - Página entera, al ancho o al alto; **dos páginas juntas** con el teléfono de costado.
 - Zoom con dos dedos o doble toque, miniaturas para saltar, tocar los bordes para pasar.
+- **Ajustes por serie** (dirección y tamaño) y **manga de derecha a izquierda automático**.
 - **Modo nocturno** (calidez y oscuridad a gusto), pantalla siempre encendida y recortar bordes blancos (opcional).
 - **Marcadores**, saltar a cada número dentro de un TPB y **"Siguiente número"** según el arco o la serie desde donde lo abriste.
 - Al terminar: **"¿Qué te pareció?"**, con estrellas, manitos y comentario.
@@ -48,6 +49,7 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 ### 💬 Perfil y comunidad
 - Listas **Quiero leer / Leyendo / Leído**, que se actualizan solas mientras leés, y puntaje con **estrellas y manitos**.
 - "Para vos": sugerencias según tus puntajes y tus listas.
+- **Historial de lectura:** cuándo leíste cada cómic, qué páginas y cuánto tiempo.
 - **Metron:** opción para marcar como leído en tu colección, con tus estrellas, y ver el promedio de su comunidad.
 - **Comunidad privada con amigos** en una base de datos propia y gratuita ([Supabase](https://supabase.com)): perfiles, amigos que se agregan los dos, y comentarios y puntajes en cada ficha.
 

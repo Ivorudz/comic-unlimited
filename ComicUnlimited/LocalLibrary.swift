@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import UIKit
 
-// Tus cómics en archivo (.cbz, .zip o PDF). Al importarlos, la app guarda una copia
+// Tus cómics en archivo (.cbz, .zip, .cbr, .cb7, .cbt o PDF). Al importarlos, la app guarda una copia
 // en su carpeta privada del iPhone, junto con una portada chiquita (la primera página).
 // Son archivos tuyos: no se suben a ningún lado.
 
@@ -173,7 +173,10 @@ final class LocalLibrary {
             var ext = url.pathExtension.lowercased()
             // Un .rar se trata igual que un .cbr (puede ser un cómic o un paquete de cómics).
             if ext == "rar" { ext = "cbr" }
-            guard ["cbz", "zip", "cbr", "pdf"].contains(ext) else {
+            // Lo mismo con .7z (= .cb7) y .tar (= .cbt).
+            if ext == "7z" { ext = "cb7" }
+            if ext == "tar" { ext = "cbt" }
+            guard ComicFile.fileExtensions.contains(ext) else {
                 problems.append("\(name): \(ArchiveError.notSupported.errorDescription ?? "")")
                 continue
             }
@@ -200,7 +203,7 @@ final class LocalLibrary {
             if access { url.stopAccessingSecurityScopedResource() }
 
             // Abrimos la copia (fuera de la pantalla, para que no se trabe) y sacamos la portada.
-            // Si es un .cbr de tipo RAR, lo convertimos a .cbz (con libarchive, que viene en iOS).
+            // Si es un .cbr de tipo RAR, un .cb7 o un .cbt, lo convertimos a .cbz (con libarchive, que viene en iOS).
             let result: Result<(pages: Int, cover: Data?, file: URL), Error> = await Task.detached(priority: .userInitiated) {
                 do {
                     var fileURL = dest

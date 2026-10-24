@@ -23,6 +23,9 @@ enum LibraryRoute: Hashable {
     case localComic(String)
     /// Ficha de un número de Metron (Próximos).
     case metronIssue(Int)
+    /// Perfil → Historial de lectura y Ajustes por serie.
+    case history
+    case readingProfiles
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.

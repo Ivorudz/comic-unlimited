@@ -147,8 +147,10 @@ struct LocalReaderView: View {
     /// Abrir el siguiente número (lo maneja quien abrió el lector).
     var onOpenNext: ((LocalComic) -> Void)? = nil
 
-    @AppStorage(ReaderSettings.direction) private var direction: ReaderDirection = .leftToRight
-    @AppStorage(ReaderSettings.fit) private var fit: ReaderFit = .page
+    /// Opciones de siempre; cada serie puede tener las suyas (ReadingProfiles.swift).
+    @AppStorage(ReaderSettings.direction) private var globalDirection: ReaderDirection = .leftToRight
+    @AppStorage(ReaderSettings.fit) private var globalFit: ReaderFit = .page
+    @AppStorage(ReadingProfiles.autoMangaKey) private var autoManga = true
     @AppStorage(ReaderSettings.tapEdges) private var tapEdges = true
     @AppStorage(ReaderSettings.thumbnails) private var thumbnails = true
     @AppStorage(ReaderSettings.keepAwake) private var keepAwake = true
@@ -166,6 +168,9 @@ struct LocalReaderView: View {
     @State private var finishedHere = false
     @State private var loader: PageLoader?
     @State private var errorText: String?
+    /// Para el historial: cuándo abriste el cómic y qué páginas viste.
+    @State private var openedAt = Date()
+    @State private var seenPages: Set<Int> = []
 
     init(comic: LocalComic, startPage: Int, onOpenNext: ((LocalComic) -> Void)? = nil) {
         self.comic = comic
@@ -177,6 +182,11 @@ struct LocalReaderView: View {
     /// El cómic con lo último guardado (marcadores, números del TPB…).
     private var live: LocalComic { LocalLibrary.shared.item(comic.id) ?? comic }
     private var isBookmarked: Bool { live.bookmarks?.contains(page) == true }
+    /// Dirección y tamaño que valen para este cómic (los de su serie, manga o los de siempre).
+    private var direction: ReaderDirection {
+        ReadingProfiles.shared.direction(for: live, global: globalDirection, autoManga: autoManga)
+    }
+    private var fit: ReaderFit { ReadingProfiles.shared.fit(for: live, global: globalFit) }
 
     var body: some View {
         GeometryReader { geo in
@@ -205,7 +215,7 @@ struct LocalReaderView: View {
         .statusBarHidden(!showControls)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
-            ReaderSettingsSheet()
+            ReaderSettingsSheet(comic: live)
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showMarks) {
@@ -216,9 +226,14 @@ struct LocalReaderView: View {
             }
             .presentationDetents([.medium, .large])
         }
-        .onAppear { AppOrientation.readerOpened(keepAwake: keepAwake) }
+        .onAppear {
+            AppOrientation.readerOpened(keepAwake: keepAwake)
+            openedAt = Date()
+            seenPages = [page]
+        }
         .onDisappear {
             AppOrientation.readerClosed()
+            recordHistory()
             if finishedHere, let cv = live.cvIssueID {
                 Task { await MetronSync.markRead(cvID: cv) }
             }
@@ -241,6 +256,7 @@ struct LocalReaderView: View {
         }
         .onChange(of: page) { _, newPage in
             guard loader != nil else { return }
+            if newPage < pageCount { seenPages.insert(newPage) }
             if newPage >= pageCount {
                 finishedHere = true
                 LocalLibrary.shared.markFinished(comic.id)
@@ -248,6 +264,18 @@ struct LocalReaderView: View {
                 LocalLibrary.shared.setPage(newPage, for: comic.id)
             }
         }
+    }
+
+    /// Anota esta lectura en el historial (si pasaste alguna página o estuviste al menos 30 segundos).
+    private func recordHistory() {
+        let now = Date()
+        let seen = seenPages.filter { $0 < pageCount }
+        guard let first = seen.min(), let last = seen.max(),
+              seen.count > 1 || finishedHere || now.timeIntervalSince(openedAt) >= 30 else { return }
+        ReadingHistory.shared.record(ReadingSession(
+            comicID: comic.id, title: live.displayTitle,
+            start: openedAt.timeIntervalSince1970, end: now.timeIntervalSince1970,
+            fromPage: first, toPage: last, pages: seen.count, finished: finishedHere))
     }
 
     // MARK: Páginas
@@ -530,9 +558,12 @@ struct LocalReaderView: View {
 // MARK: - Opciones (engranaje)
 
 struct ReaderSettingsSheet: View {
+    /// El cómic que estás leyendo (para "Recordar para esta serie").
+    var comic: LocalComic? = nil
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(ReaderSettings.direction) private var direction: ReaderDirection = .leftToRight
-    @AppStorage(ReaderSettings.fit) private var fit: ReaderFit = .page
+    @AppStorage(ReaderSettings.direction) private var globalDirection: ReaderDirection = .leftToRight
+    @AppStorage(ReaderSettings.fit) private var globalFit: ReaderFit = .page
+    @AppStorage(ReadingProfiles.autoMangaKey) private var autoManga = true
     @AppStorage(ReaderSettings.tapEdges) private var tapEdges = true
     @AppStorage(ReaderSettings.thumbnails) private var thumbnails = true
     @AppStorage(ReaderSettings.keepAwake) private var keepAwake = true
@@ -542,22 +573,85 @@ struct ReaderSettingsSheet: View {
     @AppStorage(ReaderSettings.doublePage) private var doublePage = true
     @AppStorage(ReaderSettings.cropMargins) private var cropMargins = false
 
+    private var profiles: ReadingProfiles { ReadingProfiles.shared }
+    private var profile: ReadingProfiles.Profile? { comic.flatMap { profiles.profile(for: $0) } }
+    private var hasSeries: Bool { comic.flatMap { ReadingProfiles.key(for: $0) } != nil }
+    /// Es manga y se abre de derecha a izquierda solo (sin ajustes propios de la serie).
+    private var autoMangaActive: Bool {
+        guard let comic, profile == nil else { return false }
+        return autoManga && globalDirection == .leftToRight && ReadingProfiles.isManga(comic)
+    }
+
+    private var direction: ReaderDirection {
+        guard let comic else { return globalDirection }
+        return profiles.direction(for: comic, global: globalDirection, autoManga: autoManga)
+    }
+    private var fit: ReaderFit { comic.map { profiles.fit(for: $0, global: globalFit) } ?? globalFit }
+
+    /// Si la serie tiene ajustes propios (o es manga automático), el cambio queda para la serie;
+    /// si no, cambia las opciones de siempre.
+    private var directionBinding: Binding<ReaderDirection> {
+        Binding(get: { direction }, set: { value in
+            if let comic, profile != nil || autoMangaActive {
+                saveProfile(comic, direction: value, fit: fit)
+            } else {
+                globalDirection = value
+            }
+        })
+    }
+    private var fitBinding: Binding<ReaderFit> {
+        Binding(get: { fit }, set: { value in
+            if let comic, profile != nil {
+                saveProfile(comic, direction: direction, fit: value)
+            } else {
+                globalFit = value
+            }
+        })
+    }
+    private var rememberBinding: Binding<Bool> {
+        Binding(get: { profile != nil }, set: { on in
+            guard let comic else { return }
+            if on { saveProfile(comic, direction: direction, fit: fit) } else { profiles.remove(for: comic) }
+        })
+    }
+
+    private func saveProfile(_ comic: LocalComic, direction: ReaderDirection, fit: ReaderFit) {
+        profiles.save(.init(name: ReadingProfiles.seriesName(for: comic), direction: direction, fit: fit), for: comic)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("Dirección", selection: $direction) {
-                        ForEach(ReaderDirection.allCases) { Text($0.label).tag($0) }
+                if let comic, hasSeries {
+                    Section {
+                        Toggle(isOn: rememberBinding) {
+                            Text("Recordar para «\(ReadingProfiles.seriesName(for: comic))»")
+                        }
+                    } header: {
+                        Text("Esta serie")
+                    } footer: {
+                        Text(profile != nil
+                             ? "La dirección y el tamaño de abajo quedan solo para esta serie. Apagalo para volver a las opciones de siempre."
+                             : autoMangaActive
+                                ? "Es manga: se abre de derecha a izquierda solo. Si cambiás la dirección, queda guardada para esta serie."
+                                : "Prendelo para que esta serie recuerde su dirección y tamaño (por ejemplo, manga de derecha a izquierda).")
                     }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Dirección de lectura")
-                } footer: {
-                    Text("Der → izq es para manga. Vertical muestra las páginas una debajo de la otra.")
                 }
 
                 Section {
-                    Picker("Ajuste", selection: $fit) {
+                    Picker("Dirección", selection: directionBinding) {
+                        ForEach(ReaderDirection.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    Toggle("Manga de derecha a izquierda", isOn: $autoManga)
+                } header: {
+                    Text("Dirección de lectura")
+                } footer: {
+                    Text("Der → izq es para manga. Vertical muestra las páginas una debajo de la otra. Con \"Manga de derecha a izquierda\", los cómics de editoriales de manga (Viz, Kodansha…) se abren así solos.")
+                }
+
+                Section {
+                    Picker("Ajuste", selection: fitBinding) {
                         ForEach(ReaderFit.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)

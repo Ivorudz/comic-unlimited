@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-// Pestaña Biblioteca: los cómics que tenés en archivos (.cbz, .zip, .cbr o PDF).
+// Pestaña Biblioteca: los cómics que tenés en archivos (.cbz, .zip, .cbr, .cb7, .cbt o PDF).
 // Arriba se elige cómo verlos: Todos, por Series o por Estado de lectura (carpetas).
 // Tocar un cómic lo abre en el lector. Mantenerlo apretado muestra más opciones.
 
@@ -112,7 +112,7 @@ struct LibraryView: View {
             Button {
                 showImporter = true
             } label: {
-                Label("Importar cómic (.cbz, .zip, .cbr o PDF)", systemImage: "square.and.arrow.down")
+                Label("Importar cómic (.cbz, .cbr, .cb7, .cbt, .zip o PDF)", systemImage: "square.and.arrow.down")
                     .font(.system(size: 16, weight: .bold))
                     .frame(maxWidth: .infinity)
                     .padding(14)
@@ -148,7 +148,7 @@ struct LibraryView: View {
             if library.importing {
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text("Importando y buscando su ficha en Comic Vine… los archivos grandes (y los .cbr, que se convierten a .cbz) pueden tardar un poco.")
+                    Text("Importando y buscando su ficha en Comic Vine… los archivos grandes (y los .cbr, .cb7 y .cbt, que se convierten a .cbz) pueden tardar un poco.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -362,7 +362,7 @@ private struct DocumentPicker: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         var types: [UTType] = [.pdf, .zip, .data]
-        for ext in ["cbz", "cbr"] {
+        for ext in ["cbz", "cbr", "cb7", "cbt", "rar", "7z", "tar"] {
             if let type = UTType(filenameExtension: ext) { types.append(type) }
         }
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)

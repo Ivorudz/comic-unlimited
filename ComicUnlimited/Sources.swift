@@ -103,9 +103,9 @@ struct SourceComic: Decodable, Identifiable, Hashable {
     /// Extensión del archivo: la de "format" o la del link.
     var fileExtension: String {
         let fromFormat = (format ?? "").lowercased()
-        if ["cbz", "zip", "cbr", "pdf"].contains(fromFormat) { return fromFormat }
+        if ComicFile.fileExtensions.contains(fromFormat) { return fromFormat }
         let fromLink = (URL(string: download)?.pathExtension ?? "").lowercased()
-        return ["cbz", "zip", "cbr", "pdf"].contains(fromLink) ? fromLink : "cbz"
+        return ComicFile.fileExtensions.contains(fromLink) ? fromLink : "cbz"
     }
 
     /// Nombre para el archivo descargado, pensado para que se una solo con Comic Vine:
@@ -365,15 +365,18 @@ final class FileDownloader: NSObject, URLSessionDownloadDelegate {
         continuation = nil
     }
 
-    /// "PK" = zip/cbz, "Rar!" = rar/cbr, "%PDF" = pdf. nil si no se reconoce.
+    /// "PK" = zip/cbz, "Rar!" = rar/cbr, "7z¼¯" = 7-Zip/cb7, "%PDF" = pdf, "ustar" (en el byte 257) = tar/cbt.
+    /// nil si no se reconoce.
     static func detectExtension(_ url: URL) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
-        guard let head = try? handle.read(upToCount: 4), head.count >= 4 else { return nil }
+        guard let head = try? handle.read(upToCount: 262), head.count >= 4 else { return nil }
         let bytes = [UInt8](head)
         if bytes[0] == 0x50 && bytes[1] == 0x4B { return "cbz" }
-        if bytes == [0x52, 0x61, 0x72, 0x21] { return "cbr" }
-        if bytes == [0x25, 0x50, 0x44, 0x46] { return "pdf" }
+        if Array(bytes[0..<4]) == [0x52, 0x61, 0x72, 0x21] { return "cbr" }
+        if Array(bytes[0..<4]) == [0x37, 0x7A, 0xBC, 0xAF] { return "cb7" }
+        if Array(bytes[0..<4]) == [0x25, 0x50, 0x44, 0x46] { return "pdf" }
+        if bytes.count >= 262, Array(bytes[257..<262]) == Array("ustar".utf8) { return "cbt" }
         return nil
     }
 

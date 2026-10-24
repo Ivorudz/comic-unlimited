@@ -16,6 +16,19 @@ Lo que falta confirmar y las ideas para las próximas versiones. Lo que ya está
 | Estadísticas | Cómics y páginas por mes, editoriales y autores más leídos, resumen del año | Chico |
 | Spoilers | Comentarios tapados hasta tocarlos | Chico |
 
+## Ideas sacadas de otros lectores (Andrea Reader)
+| Idea | Qué es | Esfuerzo |
+|---|---|---|
+| Traducir la página | Tocar un globo de texto y verlo traducido (Texto en vivo de Apple) | Medio |
+| Servidores OPDS | Leer desde Komga, Kavita o Calibre con el estándar OPDS | Medio |
+| Quedarse con la mejor copia | Entre repetidos, conservar el de mejor calidad (más páginas o más resolución) | Chico |
+| Sincronizar por dónde vas | Guardar el avance en la base de la comunidad para seguir en otro iPhone o un iPad | Medio |
+| Versión para iPad | Pantalla más grande, dos columnas en la Biblioteca | Medio |
+| Notas y viñetas guardadas | Anotar una página o guardar un recorte de una viñeta | Medio |
+| Zoom por viñeta | Doble toque que agranda justo la viñeta tocada | Grande |
+| Nubes | Importar desde Google Drive, Dropbox u OneDrive con tu cuenta | Grande |
+| EPUB | Leer libros e historietas en EPUB | Medio |
+
 ## Más adelante
 | Idea | Qué es | Esfuerzo |
 |---|---|---|

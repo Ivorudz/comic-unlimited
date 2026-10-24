@@ -47,8 +47,8 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `MetronIssue.swift`: ficha de un número de Metron (Próximos) cuando Comic Vine no lo tiene.
   - `Orientation.swift`: la app va derecha; solo el lector deja girar el teléfono.
   - `ComicVineMatch.swift`: lee el nombre del archivo (serie, número, año), busca su ficha en Comic Vine y permite elegirla a mano.
-  - `PackExtractor.swift`: saca los cómics de adentro de un paquete .zip o .rar (con libarchive), para importarlos por separado.
-  - `CbrConverter.swift`: convierte .cbr (RAR) a .cbz con libarchive; escribe .zip sin comprimir.
+  - `PackExtractor.swift`: saca los cómics de adentro de un paquete .zip, .rar, .7z o .tar (con libarchive), para importarlos por separado.
+  - `CbrConverter.swift`: convierte .cbr (RAR), .cb7 y .cbt a .cbz con libarchive; escribe .zip sin comprimir.
   - `ComicUnlimited-Bridging-Header.h`: declara las funciones de libarchive que usa Swift.
   - `ComicArchive.swift`: abre .cbz/.zip/.cbr-que-es-zip (lector de zip hecho a mano con Compression de Apple) y PDF (PDFKit).
   - `DetailView.swift`: ficha de un cómic.
@@ -72,6 +72,8 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `Reviews.swift`: comentarios ("¿Qué te pareció?", Tu comentario, Mis comentarios), pestaña Comunidad y sincronización con Metron (leído, estrellas, promedio de la comunidad).
   - `ReadingOrders.swift`: órdenes de lectura: buscar en la colección de listas .cbl y en Metron, leer .cbl, elegir y guardar el orden de un arco.
   - `Diagnostics.swift`: "Revisar conexión" en Próximos; prueba Metron y Comic Vine y arma un texto para copiar.
+  - `ReadingProfiles.swift`: ajustes del lector por serie (dirección y tamaño) y manga de derecha a izquierda automático.
+  - `ReadingHistory.swift`: historial de lectura (cuándo, qué páginas y cuánto tiempo) y su pantalla en Perfil.
   - `ReadingStore.swift`: guarda en el celular la página donde quedaste.
   - `Comic.swift`: los 6 cómics de ejemplo.
   - `Drawing.swift`: dibuja portadas y páginas.
@@ -103,6 +105,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 - 0.28.1: arreglo de "Siguiente número": ahora abre el siguiente cómic desde su página (antes quedaban las páginas y la posición del anterior). Al pasar al siguiente, el que terminaste sale de "Seguir leyendo". Un cómic terminado dice "Volver a leer" (en vez de "Leer" o "Seguir leyendo").
 - 0.29: Comunidad con amigos (Supabase, base de datos gratuita que crea el dueño desde Safari; la app trae el texto SQL para pegar con las tablas y reglas de privacidad, `CommunitySetup.swift`). La dirección y la clave pública del proyecto se guardan solo en el iPhone; los amigos se suman con un código de invitación (CU1-…). Cuenta con mail y contraseña y nombre de usuario; amigos = se agregaron los dos (pedidos para aceptar). Tus comentarios y puntajes se suben solos; Comunidad muestra lo de tus amigos y cada ficha "Lo que dicen tus amigos". Se completan las portadas que faltaban en comentarios y listas. `CommunityService.swift`.
 - 0.30: perfiles de la comunidad: tu perfil (emoji o inicial, nombre, bio, "Compartir mis listas con mis amigos") arriba en Perfil y en Comunidad ("Editar perfil"); perfil de cada amigo (tocando su @usuario en Comunidad o en Amigos) con leídos, comentarios, puntuados y sus listas Leyendo / Quiere leer / Leídos. Si la base de datos es de antes, la app muestra "Falta actualizar la base de datos" con el texto corto para pegar (`CommunitySetup.updateV2`, no borra nada). `CommunityProfiles.swift`.
+- 0.31: importar .cb7 (7-Zip) y .cbt (TAR), también .7z y .tar (se convierten a .cbz con libarchive, como los .cbr). Ajustes por serie en el lector (⚙︎ → "Recordar para esta serie": dirección y tamaño; lista en Perfil → Configuración → Ajustes del lector por serie). Manga de derecha a izquierda automático según la editorial (se apaga en ⚙︎ o en esa lista). Historial de lectura en Perfil (cuándo, páginas y tiempo; resumen de 7 días; borrar uno o todo). `ReadingProfiles.swift`, `ReadingHistory.swift`.
 - Más adelante: Colecciones propias: crear, renombrar, borrar, agregar desde el menú (un cómic puede estar en varias), ordenar arrastrando (orden de lectura) y "Crear colección con este arco" (ordenada por fecha, después se ajusta).
 - .cbr: los que por dentro son .zip se abren directo. Los que son RAR se convierten a .cbz al importarlos, con libarchive (viene dentro de iOS; Apple no la permite en el App Store, pero esta app es personal).
 - LiveContainer: el selector de archivos pide una COPIA (asCopy) porque leer el original puede fallar adentro de LiveContainer.
