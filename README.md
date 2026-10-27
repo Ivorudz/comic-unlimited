@@ -49,6 +49,7 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 ### 💬 Perfil y comunidad
 - Listas **Quiero leer / Leyendo / Leído**, que se actualizan solas mientras leés, y puntaje con **estrellas y manitos**.
 - "Para vos": sugerencias según tus puntajes y tus listas.
+- **Descubrir por género** (superhéroes, terror, ciencia ficción…) y por editorial, con lo que salió en la semana.
 - **Historial de lectura:** cuándo leíste cada cómic, qué páginas y cuánto tiempo.
 - **Metron:** opción para marcar como leído en tu colección, con tus estrellas, y ver el promedio de su comunidad.
 - **Comunidad privada con amigos** en una base de datos propia y gratuita ([Supabase](https://supabase.com)): perfiles, amigos que se agregan los dos, y comentarios y puntajes en cada ficha.

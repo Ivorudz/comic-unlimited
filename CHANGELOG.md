@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.33 · Descubrir por género
+- Filas por **género** en Descubrir (Superhéroes, Terror, Ciencia ficción, Fantasía, Policiales…), con los géneros de Metron.
+- Las categorías ahora son parte de Descubrir (sin otro título) y las editoriales dicen su nombre completo ("Image Comics").
+
 ## 0.32 · Inicio más rápido
 - Inicio guarda lo último que cargó (solo datos y links, no las portadas): al abrir la app se ve enseguida y después se actualiza.
 - **Categorías** abajo de "Para vos": de tus series, series nuevas (#1) y por editorial.

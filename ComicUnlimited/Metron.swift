@@ -177,6 +177,7 @@ struct MetronIssue: Decodable {
 }
 
 struct MetronSeries: Decodable {
+    let id: Int?
     let name: String?
     let volume: Int?
 }

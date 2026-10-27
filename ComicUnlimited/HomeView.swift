@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// Pestaña Inicio: barra para buscar cómics, "Seguir leyendo" y "Descubrir" (Recién salidos, Para vos y categorías).
+// Pestaña Inicio: barra para buscar cómics, "Seguir leyendo" y "Descubrir" (Recién salidos, Para vos, géneros y editoriales).
 struct HomeView: View {
     @Environment(ReadingStore.self) private var store
     /// Se usa para abrir el lector desde cualquier pantalla.
@@ -11,6 +11,7 @@ struct HomeView: View {
 
     @State private var discover = DiscoverModel()
     @State private var forYou = ForYouModel()
+    @State private var genres = GenreModel()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -32,7 +33,10 @@ struct HomeView: View {
             }
             .navigationTitle("Inicio")
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear { BrowsingContext.current = nil }
+            .onAppear {
+                BrowsingContext.current = nil
+                genres.start()
+            }
             // Al volver a la app después de un rato, se actualiza lo guardado.
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
@@ -156,7 +160,7 @@ struct HomeView: View {
         }
     }
 
-    /// "Descubrir": recién salidos, sugerencias y categorías.
+    /// "Descubrir": recién salidos, sugerencias, de tus series, series nuevas, géneros y editoriales.
     @ViewBuilder
     private var discoverSection: some View {
         SectionTitle("Descubrir")
@@ -168,7 +172,7 @@ struct HomeView: View {
             .padding(.top, 22)
         ForYouRow(model: forYou)
 
-        HomeCategories(model: discover)
+        DiscoverMoreRows(model: discover, genres: genres)
     }
 }
 
