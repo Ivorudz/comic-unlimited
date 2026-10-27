@@ -132,6 +132,30 @@ struct ComicVineClient {
         return result
     }
 
+    /// Portadas de varias series, de a 100 por consulta (para las filas por género).
+    func volumeCovers(ids: [Int]) async -> [Int: URL] {
+        var result: [Int: URL] = [:]
+        let unique = Array(Set(ids)).sorted()
+        var start = 0
+        while start < unique.count {
+            let chunk = unique[start..<min(start + 100, unique.count)]
+            start += 100
+            do {
+                let page: CVResponse<CVVolumeSummary> = try await request("volumes", [
+                    "filter": "id:" + chunk.map(String.init).joined(separator: "|"),
+                    "field_list": "id,name,start_year,image",
+                    "limit": "100",
+                ])
+                for volume in page.results {
+                    if let url = volume.image?.small { result[volume.id] = url }
+                }
+            } catch {
+                break
+            }
+        }
+        return result
+    }
+
     // MARK: Buscador y fichas
 
     /// Busca series (por ejemplo "Batman") por nombre.

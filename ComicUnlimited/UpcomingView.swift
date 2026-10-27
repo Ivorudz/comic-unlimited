@@ -54,8 +54,10 @@ final class UpcomingModel {
     private(set) var state: LoadState = .idle
     /// true mientras ya se muestran algunos cómics pero siguen llegando más.
     private(set) var loadingMore = false
-    /// Cambia cada vez que se guardan o se borran cuentas, para volver a cargar.
-    private(set) var accountsVersion = 0
+    /// Cambia cada vez que se guardan o se borran cuentas (también desde Perfil), para volver a cargar.
+    var accountsVersion: Int { AccountsState.shared.version }
+    /// Con qué versión de las cuentas se armó `cache`.
+    private var cacheVersion = 0
     /// Semanas ya cargadas, para no volver a pedirlas mientras la app está abierta.
     private var cache: [String: ([UpcomingIssue], UpcomingSource)] = [:]
 
@@ -86,7 +88,7 @@ final class UpcomingModel {
     private func accountsChanged() {
         cache = [:]
         state = .idle
-        accountsVersion += 1
+        AccountsState.shared.changed()
     }
 
     /// Identifica lo que hay que mostrar: semana, editorial y cuentas.
@@ -112,6 +114,11 @@ final class UpcomingModel {
 
     func load(force: Bool = false) async {
         guard hasAnySource else { return }
+        // Si cambiaron las cuentas (por ejemplo en Perfil), lo guardado ya no sirve.
+        if cacheVersion != accountsVersion {
+            cache = [:]
+            cacheVersion = accountsVersion
+        }
         let key = loadKey
         loadingMore = false
         if !force, let cached = cache[key] {
@@ -201,7 +208,6 @@ struct UpcomingView: View {
     @State private var model = UpcomingModel()
     @State private var query = ""
     @State private var showAccounts = false
-    @State private var showDiagnostics = false
 
     var body: some View {
         ScrollView {
@@ -233,18 +239,6 @@ struct UpcomingView: View {
         }
         .refreshable {
             await model.load(force: true)
-        }
-        .sheet(isPresented: $showDiagnostics) {
-            NavigationStack {
-                DiagnosticsView()
-                    .navigationTitle("Revisar conexión")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Listo") { showDiagnostics = false }
-                        }
-                    }
-            }
         }
         .sheet(isPresented: $showAccounts) {
             NavigationStack {
@@ -297,22 +291,10 @@ struct UpcomingView: View {
             }
             footer(source)
         }
-        Button {
-            showAccounts = true
-        } label: {
-            Label("Cuentas de Metron y Comic Vine", systemImage: "person.badge.key")
-                .font(.footnote.weight(.semibold))
-        }
-        .foregroundStyle(Theme.ink2)
-        .padding(.top, 14)
-        Button {
-            showDiagnostics = true
-        } label: {
-            Label("Revisar conexión", systemImage: "stethoscope")
-                .font(.footnote.weight(.semibold))
-        }
-        .foregroundStyle(Theme.ink2)
-        .padding(.top, 8)
+        Text("Cuentas de Metron y Comic Vine, y Revisar conexión: en Perfil → Configuración.")
+            .font(.footnote)
+            .foregroundStyle(Theme.ink2)
+            .padding(.top, 14)
     }
 
     private var periodPicker: some View {
@@ -665,7 +647,30 @@ struct RemoteCover: View {
 
 // MARK: - Cuentas de Metron y Comic Vine
 
-private struct AccountsForm: View {
+/// Avisa a todas las pantallas cuando se guardan o se borran cuentas.
+@MainActor
+@Observable
+final class AccountsState {
+    static let shared = AccountsState()
+    private(set) var version = 0
+    func changed() { version += 1 }
+}
+
+/// Perfil → Configuración → Cuentas de Metron y Comic Vine.
+struct AccountsScreen: View {
+    @State private var model = UpcomingModel()
+
+    var body: some View {
+        ScrollView {
+            AccountsForm(model: model).padding(18)
+        }
+        .background(Theme.paper)
+        .navigationTitle("Cuentas")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct AccountsForm: View {
     let model: UpcomingModel
     @State private var metronUser = ""
     @State private var metronPassword = ""
@@ -675,7 +680,7 @@ private struct AccountsForm: View {
         VStack(alignment: .leading, spacing: 18) {
             card {
                 Text("Metron").font(.headline).foregroundStyle(Theme.ink)
-                Text("Recomendado para Próximos: muestra lo que sale cada semana y se puede filtrar por editorial.")
+                Text("Recomendado para Próximos (lo que sale cada semana, por editorial) y para los géneros de Inicio.")
                     .font(.subheadline).foregroundStyle(Theme.ink2)
                 if model.hasMetron {
                     Text("Conectado como \(MetronAccount.user)").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
@@ -695,7 +700,7 @@ private struct AccountsForm: View {
 
             card {
                 Text("Comic Vine").font(.headline).foregroundStyle(Theme.ink)
-                Text("Se usa en el buscador de cómics reales, y en Próximos si Metron no anda.")
+                Text("Se usa en el buscador de cómics, en las fichas y en Inicio, y en Próximos si Metron no anda.")
                     .font(.subheadline).foregroundStyle(Theme.ink2)
                 if model.hasComicVine {
                     Text("Clave guardada").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)

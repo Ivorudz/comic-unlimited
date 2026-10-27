@@ -26,6 +26,9 @@ enum LibraryRoute: Hashable {
     /// Perfil → Historial de lectura y Ajustes por serie.
     case history
     case readingProfiles
+    /// Perfil → Configuración: cuentas de Metron y Comic Vine, y Revisar conexión.
+    case accounts
+    case diagnostics
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.

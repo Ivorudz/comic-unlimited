@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.33 · Géneros de todas las épocas
+- Filas por **género** en Descubrir (Superhéroes, Terror, Ciencia ficción, Fantasía, Policiales, Humor…) con series de **cualquier época**, según los géneros de Metron. Se llenan solas de a poco cada vez que abrís la app.
+- Las categorías ahora son parte de Descubrir, y las editoriales dicen su nombre completo ("Image Comics").
+- **Cuentas de Metron y Comic Vine** y **Revisar conexión** se mudaron a Perfil → Configuración.
+
 ## 0.32.1 · Prueba de géneros
 - "Revisar conexión" → **Probar géneros y temas**: muestra qué temas tiene Comic Vine (zombis, vampiros, terror…) y qué géneros tienen las series en Metron, para decidir cómo armar las filas por género.
 

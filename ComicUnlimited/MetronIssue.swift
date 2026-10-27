@@ -48,7 +48,7 @@ struct MetronIssueView: View {
 
     private func load() async {
         guard let client = MetronClient.current else {
-            errorText = "Cargá tu usuario de Metron (en Próximos) para ver esta ficha."
+            errorText = "Cargá tu usuario de Metron (en Perfil → Configuración → Cuentas de Metron y Comic Vine) para ver esta ficha."
             return
         }
         loading = true

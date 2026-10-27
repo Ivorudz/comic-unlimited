@@ -11,7 +11,7 @@ enum CVRoute: Hashable {
     case arc(id: Int, name: String)
 }
 
-/// La clave de Comic Vine guardada en este iPhone (se carga en la pestaña Próximos).
+/// La clave de Comic Vine guardada en este iPhone (se carga en Perfil → Configuración → Cuentas).
 enum ComicVineKey {
     static let storageKey = "comicvine.apiKey"
     static var current: String { UserDefaults.standard.string(forKey: storageKey) ?? "" }
@@ -461,7 +461,7 @@ private struct NoKeyNotice: View {
             Text("Falta tu clave de Comic Vine")
                 .font(.headline)
                 .foregroundStyle(Theme.ink)
-            Text("Andá a la pestaña Próximos, pegá tu clave y tocá Guardar. Después volvé acá.")
+            Text("Andá a Perfil → Configuración → Cuentas de Metron y Comic Vine, pegá tu clave y tocá Guardar. Después volvé acá.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.ink2)
         }

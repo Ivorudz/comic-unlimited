@@ -110,6 +110,16 @@ struct ProfileView: View {
 
                     SectionTitle("Configuración")
                     VStack(alignment: .leading, spacing: 6) {
+                        settingsLink(LibraryRoute.accounts, title: "Cuentas de Metron y Comic Vine",
+                                     detail: "Tu usuario de Metron y tu clave de Comic Vine (quedan guardados solo en este iPhone).")
+
+                        Divider().padding(.vertical, 8)
+
+                        settingsLink(LibraryRoute.diagnostics, title: "Revisar conexión",
+                                     detail: "Prueba si Metron y Comic Vine responden, y arma un texto para copiar.")
+
+                        Divider().padding(.vertical, 8)
+
                         NavigationLink(value: LibraryRoute.readingProfiles) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 3) {
@@ -225,6 +235,27 @@ struct ProfileView: View {
             return "Cuando marques un cómic como Leído (o le pongas estrellas), va a aparecer acá."
         }
     }
+}
+
+/// Un renglón de Configuración que abre otra pantalla.
+@MainActor
+private func settingsLink(_ route: LibraryRoute, title: String, detail: String) -> some View {
+    NavigationLink(value: route) {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(Theme.ink2)
+                    .multilineTextAlignment(.leading)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").foregroundStyle(Theme.ink2)
+        }
+    }
+    .buttonStyle(.plain)
 }
 
 private struct StatTile: View {

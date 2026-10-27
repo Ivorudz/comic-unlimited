@@ -202,7 +202,7 @@ struct RecentReleasesRow: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 120)
             case .noKey:
-                notice("Para ver cómics, cargá tu clave de Comic Vine en la pestaña Próximos (abajo de todo, en \"Cuentas de Metron y Comic Vine\").")
+                notice("Para ver cómics, cargá tu clave de Comic Vine en Perfil → Configuración → Cuentas de Metron y Comic Vine.")
             case .failed(let message):
                 VStack(alignment: .leading, spacing: 10) {
                     notice(message)

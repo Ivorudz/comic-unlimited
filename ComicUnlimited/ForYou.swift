@@ -175,7 +175,7 @@ struct ForYouRow: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 120)
             case .noKey:
-                notice("Para sugerirte cómics, cargá tu clave de Comic Vine en la pestaña Próximos (abajo de todo, en \"Cuentas de Metron y Comic Vine\").")
+                notice("Para sugerirte cómics, cargá tu clave de Comic Vine en Perfil → Configuración → Cuentas de Metron y Comic Vine.")
             case .noHistory:
                 notice("Puntuá cómics o sumalos a Leyendo o Quiero leer desde su ficha (tocá uno en Recién salidos o usá Buscar cómics), y acá te vamos a sugerir otros parecidos.")
             case .failed(let message):

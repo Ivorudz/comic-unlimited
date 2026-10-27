@@ -26,6 +26,11 @@ struct AppDestinations: ViewModifier {
                 case .metronIssue(let id): MetronIssueView(metronID: id)
                 case .history: ReadingHistoryView()
                 case .readingProfiles: ReadingProfilesView()
+                case .accounts: AccountsScreen()
+                case .diagnostics:
+                    DiagnosticsView()
+                        .navigationTitle("Revisar conexión")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             }
             .navigationDestination(for: CommunityRoute.self) { route in
