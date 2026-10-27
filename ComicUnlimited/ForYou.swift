@@ -1,13 +1,15 @@
 import SwiftUI
 import Observation
 
-// "Para vos" en Inicio: sugerencias de cómics reales según tus puntajes y tus listas
+// "Para vos" en Inicio: sugerencias de series según tus puntajes y tus listas
 // (Quiero leer, Leyendo, Leído). Se busca qué guionistas y personajes te gustan más
 // y se le piden a Comic Vine otras series de ellos.
+// Las últimas sugerencias quedan guardadas en el iPhone (solo datos y links, no imágenes):
+// se muestran al abrir la app y se recalculan si cambiaron tus listas o pasó un día.
 
 // MARK: - Sugerencias
 
-struct Suggestion: Identifiable {
+struct Suggestion: Identifiable, Codable {
     let id: Int
     let name: String
     let coverURL: URL?
@@ -27,14 +29,35 @@ final class ForYouModel {
     }
 
     private(set) var state: Phase = .idle
+    /// Se están buscando sugerencias nuevas (mientras tanto se ven las guardadas).
+    private(set) var refreshing = false
     /// Qué historial se usó la última vez; si cambia, se vuelve a calcular.
     private var lastSignature = ""
+    private var updatedAt: Date?
 
     private static let maxSuggestions = 16
     private static let perSeed = 4
+    /// Con el mismo historial, se recalcula una vez por día (cuida el límite de Comic Vine).
+    private static let maxAge: TimeInterval = 24 * 60 * 60
+
+    private struct Saved: Codable {
+        var date: Date
+        var signature: String
+        var items: [Suggestion]
+    }
+    private static let cacheName = "inicio-para-vos.json"
+
+    init() {
+        if let saved: Saved = HomeCache.read(Self.cacheName), !saved.items.isEmpty {
+            lastSignature = saved.signature
+            updatedAt = saved.date
+            state = .loaded(saved.items)
+        }
+    }
 
     func loadIfNeeded() async {
         guard !ComicVineKey.current.isEmpty else {
+            if case .loaded = state { return }
             state = .noKey
             return
         }
@@ -45,14 +68,21 @@ final class ForYouModel {
             return
         }
         let signature = library.signature
+        if refreshing { return }
         if case .loading = state { return }
-        if signature == lastSignature, case .loaded = state { return }
+        if signature == lastSignature, case .loaded = state,
+           let updatedAt, Date().timeIntervalSince(updatedAt) < Self.maxAge { return }
         lastSignature = signature
-        await load(Array(library.entries.values))
+        await load(Array(library.entries.values), signature: signature)
     }
 
-    private func load(_ entries: [RealLibrary.Entry]) async {
-        state = .loading
+    private func load(_ entries: [RealLibrary.Entry], signature: String) async {
+        // Si ya hay sugerencias guardadas, se siguen viendo hasta que estén las nuevas.
+        let keepOld: Bool
+        if case .loaded(let old) = state, !old.isEmpty { keepOld = true } else { keepOld = false }
+        refreshing = true
+        defer { refreshing = false }
+        if !keepOld { state = .loading }
         let client = ComicVineKey.client
         // No sugerimos series que ya tenés en tus listas.
         let mine = Set(entries.compactMap { $0.series?.id })
@@ -102,8 +132,8 @@ final class ForYouModel {
                         coverURL: detail?.image?.small,
                         reason: reason + source
                     ))
-                    // Se muestran a medida que llegan.
-                    state = .loaded(results)
+                    // Si no había nada guardado, se muestran a medida que llegan.
+                    if !keepOld { state = .loaded(results) }
                 }
             } catch {
                 lastError = error
@@ -111,14 +141,19 @@ final class ForYouModel {
         }
 
         if results.isEmpty, let lastError {
-            state = .failed(CVText.message(for: lastError))
+            if !keepOld { state = .failed(CVText.message(for: lastError)) }
+        } else if results.isEmpty && keepOld {
+            // Nada nuevo: quedan las guardadas.
         } else {
             state = .loaded(results)
+            updatedAt = Date()
+            HomeCache.write(Saved(date: Date(), signature: signature, items: results), Self.cacheName)
         }
     }
 
     func retry() async {
         lastSignature = ""
+        updatedAt = nil
         state = .idle
         await loadIfNeeded()
     }
@@ -140,9 +175,9 @@ struct ForYouRow: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 120)
             case .noKey:
-                notice("Para sugerirte cómics reales, cargá tu clave de Comic Vine en la pestaña Próximos (abajo de todo, en \"Cuentas de Metron y Comic Vine\").")
+                notice("Para sugerirte cómics, cargá tu clave de Comic Vine en la pestaña Próximos (abajo de todo, en \"Cuentas de Metron y Comic Vine\").")
             case .noHistory:
-                notice("Puntuá cómics reales o sumalos a Leyendo o Quiero leer desde su ficha (tocá uno en Recién salidos o usá Buscar cómics reales), y acá te vamos a sugerir otros parecidos.")
+                notice("Puntuá cómics o sumalos a Leyendo o Quiero leer desde su ficha (tocá uno en Recién salidos o usá Buscar cómics), y acá te vamos a sugerir otros parecidos.")
             case .failed(let message):
                 VStack(alignment: .leading, spacing: 10) {
                     notice(message)
@@ -152,7 +187,7 @@ struct ForYouRow: View {
                 }
             case .loaded(let items):
                 if items.isEmpty {
-                    notice("No encontré series parecidas todavía. Puntuá o sumá a tus listas algunos cómics reales más.")
+                    notice("No encontré series parecidas todavía. Puntuá o sumá a tus listas algunos cómics más.")
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 12) {

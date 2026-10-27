@@ -6,7 +6,7 @@ import UIKit
 // Las portadas se cargan desde internet al momento de verlas: no se guardan en el iPhone.
 
 /// Un cómic que va a salir, listo para mostrar en la pestaña Próximos.
-struct UpcomingIssue: Identifiable, Hashable {
+struct UpcomingIssue: Identifiable, Hashable, Codable {
     let id: Int
     let series: String
     let number: String

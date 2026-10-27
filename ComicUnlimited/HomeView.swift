@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// Pestaña Inicio: acceso al buscador de cómics reales, "Seguir leyendo" y "Descubrir".
+// Pestaña Inicio: barra para buscar cómics, "Seguir leyendo" y "Descubrir" (Recién salidos, Para vos y categorías).
 struct HomeView: View {
     @Environment(ReadingStore.self) private var store
     /// Se usa para abrir el lector desde cualquier pantalla.
@@ -11,13 +11,14 @@ struct HomeView: View {
 
     @State private var discover = DiscoverModel()
     @State private var forYou = ForYouModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                    realComicsLink
+                    searchBar
                     continueReading
                     discoverSection
                 }
@@ -32,6 +33,14 @@ struct HomeView: View {
             .navigationTitle("Inicio")
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { BrowsingContext.current = nil }
+            // Al volver a la app después de un rato, se actualiza lo guardado.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task {
+                    await discover.refreshIfStale()
+                    await forYou.loadIfNeeded()
+                }
+            }
         }
     }
 
@@ -46,32 +55,45 @@ struct HomeView: View {
             .padding(.top, 10)
     }
 
-    /// Entrada al buscador de cómics reales (Comic Vine).
-    private var realComicsLink: some View {
+    /// Barra para buscar cómics (abre el buscador de Comic Vine).
+    /// Forma de cápsula con borde de tinta y una sombra magenta corrida, como un globo de historieta.
+    private var searchBar: some View {
         NavigationLink(value: CVRoute.search) {
             HStack(spacing: 12) {
-                Image(systemName: "sparkle.magnifyingglass")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Theme.magenta)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Buscar cómics reales")
-                        .font(.system(size: 16, weight: .bold))
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .heavy))
+                    .foregroundStyle(Theme.paper)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.magenta, in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Buscar cómics")
+                        .font(.system(size: 16, weight: .heavy))
                         .foregroundStyle(Theme.ink)
-                    Text("Series, números, autores y personajes, desde Comic Vine")
-                        .font(.footnote)
+                    Text("Series, números, autores o personajes")
+                        .font(.caption)
                         .foregroundStyle(Theme.ink2)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.bold))
+                Text("Comic Vine")
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.ink2)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.chip, in: Capsule())
             }
-            .padding(14)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .padding(.vertical, 8)
+            .background(Theme.card, in: Capsule())
+            .overlay(Capsule().stroke(Theme.ink, lineWidth: 2))
+            .background(Capsule().fill(Theme.magenta).offset(x: 4, y: 4))
+            .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
-        .padding(.top, 18)
+        .buttonStyle(SearchBarPressStyle())
+        .padding(.top, 20)
+        .padding(.trailing, 4)
+        .accessibilityLabel("Buscar cómics: series, números, autores o personajes")
     }
 
     /// Una sola fila con lo último que leíste (cómics de la app y tus archivos), lo más reciente primero.
@@ -134,17 +156,19 @@ struct HomeView: View {
         }
     }
 
-    /// "Descubrir": cómics reales recién salidos y sugerencias de la app.
+    /// "Descubrir": recién salidos, sugerencias y categorías.
     @ViewBuilder
     private var discoverSection: some View {
         SectionTitle("Descubrir")
 
-        RowTitle(title: "Recién salidos", subtitle: "Cómics reales de la última semana, desde Comic Vine")
+        RowTitle(title: "Recién salidos", subtitle: "De la última semana, desde Comic Vine")
         RecentReleasesRow(model: discover)
 
-        RowTitle(title: "Para vos", subtitle: "Series reales según tus puntajes y tus listas")
+        RowTitle(title: "Para vos", subtitle: "Series según tus puntajes y tus listas")
             .padding(.top, 22)
         ForYouRow(model: forYou)
+
+        HomeCategories(model: discover)
     }
 }
 
@@ -225,6 +249,15 @@ private struct RowTitle: View {
 }
 
 // MARK: - Piezas reutilizables
+
+/// Al apretar la barra de búsqueda, se achica un poquito (como un botón de verdad).
+private struct SearchBarPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
 
 struct SectionTitle: View {
     let text: String
