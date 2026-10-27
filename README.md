@@ -23,6 +23,8 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 - **TPB (tomos recopilatorios):** cada tomo sabe qué números trae, y esos números cuentan como tuyos en arcos, series y órdenes de lectura.
 - **Sin repetidos**, ni por nombre de archivo ni por ficha.
 
+- **Ver en la compu:** leé tus cómics en el navegador de la compu, por tu Wi-Fi, incluso con el iPhone bloqueado.
+
 ### 🔎 Fichas de Comic Vine
 - Cada archivo se une **solo** con su ficha a partir del nombre (serie, número y año), y se puede revisar o corregir a mano.
 - La ficha muestra de qué se trata (con **traducción automática**), autores, personajes y arcos con imagen.

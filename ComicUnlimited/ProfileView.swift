@@ -110,6 +110,11 @@ struct ProfileView: View {
 
                     SectionTitle("Configuración")
                     VStack(alignment: .leading, spacing: 6) {
+                        settingsLink(LibraryRoute.webShare, title: "Ver en la compu",
+                                     detail: "Leé tus cómics en el navegador de la compu, por tu Wi-Fi.")
+
+                        Divider().padding(.vertical, 8)
+
                         settingsLink(LibraryRoute.accounts, title: "Cuentas de Metron y Comic Vine",
                                      detail: "Tu usuario de Metron y tu clave de Comic Vine (quedan guardados solo en este iPhone).")
 

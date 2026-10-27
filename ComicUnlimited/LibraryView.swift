@@ -145,6 +145,26 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             .padding(.top, 10)
 
+            NavigationLink(value: LibraryRoute.webShare) {
+                HStack(spacing: 12) {
+                    Image(systemName: "desktopcomputer")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Theme.magenta)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ver en la compu").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
+                        Text(WebShare.shared.isOn ? "Compartiendo ahora" : "Leé tus cómics en el navegador, por tu Wi-Fi")
+                            .font(.caption).foregroundStyle(WebShare.shared.isOn ? Theme.magenta : Theme.ink2)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.footnote.weight(.bold)).foregroundStyle(Theme.ink2)
+                }
+                .padding(14)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 10)
+
             if library.importing {
                 HStack(spacing: 10) {
                     ProgressView()

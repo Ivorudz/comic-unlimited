@@ -29,6 +29,8 @@ enum LibraryRoute: Hashable {
     /// Perfil → Configuración: cuentas de Metron y Comic Vine, y Revisar conexión.
     case accounts
     case diagnostics
+    /// "Ver en la compu": leer tus cómics en el navegador de la compu por Wi-Fi.
+    case webShare
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.

@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.34 · Ver en la compu
+- **Ver en la compu** (Biblioteca o Perfil → Configuración): el iPhone comparte tus cómics por tu Wi-Fi y la compu los lee en el navegador, con un código de 6 números. Nada se sube a internet.
+- Lector en la compu: flechas o clic, una o dos páginas, entera o al ancho, pantalla completa. Guarda todo el cómic al abrirlo y la página donde quedaste vuelve al iPhone.
+- **Seguir con el teléfono bloqueado** (prendido de entrada): la app reproduce un silencio mientras comparte para que iOS no la duerma. Se apaga sola tras 30 minutos sin uso.
+
 ## 0.33.1 · Ficha más clara
 - En la ficha de cada número, "De qué se trata" aparece justo debajo de Leer / Descargar.
 - Se quitó la aclaración "Lo busca en tus fuentes" debajo de Descargar.

@@ -9,7 +9,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.33.1"
+    MARKETING_VERSION: "0.34"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   ComicUnlimited:
@@ -29,6 +29,11 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         # La app va derecha; solo el lector de tus archivos deja girar el teléfono (ver Orientation.swift).
+        # "Ver en la compu" (WebShare.swift): permiso para la red local y audio en segundo plano
+        # (un silencio que mantiene la app despierta con el teléfono bloqueado).
+        NSLocalNetworkUsageDescription: "Para que la compu pueda leer tus cómics por tu Wi-Fi (Ver en la compu)."
+        UIBackgroundModes:
+          - audio
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
