@@ -136,10 +136,6 @@ struct LibraryAvailability: View {
                         .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
-                Text("Lo busca en tus fuentes (catálogos y tu página WordPress).")
-                    .font(.caption)
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.top, 6)
                 if detail.volume != nil && !library.items.isEmpty {
                     Button {
                         choosingFile = true

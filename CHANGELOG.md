@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.33.1 · Ficha más clara
+- En la ficha de cada número, "De qué se trata" aparece justo debajo de Leer / Descargar.
+- Se quitó la aclaración "Lo busca en tus fuentes" debajo de Descargar.
+
 ## 0.33 · Géneros de todas las épocas
 - Filas por **género** en Descubrir (Superhéroes, Terror, Ciencia ficción, Fantasía, Policiales, Humor…) con series de **cualquier época**, según los géneros de Metron. Se llenan solas de a poco cada vez que abrís la app.
 - Las categorías ahora son parte de Descubrir, y las editoriales dicen su nombre completo ("Image Comics").

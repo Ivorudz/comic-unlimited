@@ -369,14 +369,15 @@ struct IssueView: View {
 
         LibraryAvailability(detail: d)
 
-        RealLibraryControls(detail: d)
-        MetronCommunityRating(cvID: d.id)
-        ReviewSection(template: RealLibrary.makeEntry(d))
-
+        // "De qué se trata" va justo debajo de Leer / Descargar.
         if ComicVineSummary.hasContent(deck: d.deck, description: d.description) {
             SectionTitle("De qué se trata")
             ComicVineSummary(deck: d.deck, description: d.description)
         }
+
+        RealLibraryControls(detail: d)
+        MetronCommunityRating(cvID: d.id)
+        ReviewSection(template: RealLibrary.makeEntry(d))
 
         let credits = CVText.groupCredits(d.personCredits ?? [])
         if !credits.isEmpty {
