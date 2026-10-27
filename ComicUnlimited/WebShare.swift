@@ -304,6 +304,12 @@ final class WebServer: @unchecked Sendable {
             guard let self else { connection.cancel(); return }
             var buffer = buffer
             if let data { buffer.append(data) }
+            // Si el navegador prueba con "https" (conexión segura), cortamos enseguida: así se pasa solo a
+            // "http" en vez de quedarse esperando hasta decir "tardó demasiado en responder".
+            if let first = buffer.first, !(65...90).contains(first) {
+                connection.cancel()
+                return
+            }
             if let end = buffer.range(of: Data("\r\n\r\n".utf8)) {
                 let head = String(decoding: buffer[..<end.lowerBound], as: UTF8.self)
                 guard let request = Self.parse(head) else { connection.cancel(); return }
@@ -404,7 +410,7 @@ struct WebShareView: View {
                         Label("Compartiendo", systemImage: "dot.radiowaves.left.and.right")
                             .font(.headline)
                             .foregroundStyle(Theme.magenta)
-                        Text("En la compu, abrí el navegador y escribí:")
+                        Text("En la compu, abrí el navegador y escribí la dirección completa, con http:// adelante:")
                             .font(.subheadline)
                             .foregroundStyle(Theme.ink)
                         Text(address)
@@ -477,6 +483,7 @@ struct WebShareView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Bueno saber").font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
                     Group {
+                        Text("• Escribí la dirección completa, con http:// adelante. Si el navegador dice \"tardó demasiado en responder\", fijate eso primero.")
                         Text("• El iPhone y la compu tienen que estar en el mismo Wi-Fi.")
                         Text("• La primera vez el iPhone pide permiso para \"buscar dispositivos en la red local\": tocá Permitir.")
                         Text("• Al abrir un cómic, la compu guarda todas sus páginas: si se corta la conexión, ese cómic se sigue leyendo.")

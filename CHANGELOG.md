@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.34.1 · Ver en la compu, sin esperas
+- Si el navegador de la compu prueba con "https", la app corta enseguida y el navegador pasa solo a "http" (antes se quedaba esperando).
+- La pantalla avisa que hay que escribir la dirección completa, con http:// adelante.
+
 ## 0.34 · Ver en la compu
 - **Ver en la compu** (Biblioteca o Perfil → Configuración): el iPhone comparte tus cómics por tu Wi-Fi y la compu los lee en el navegador, con un código de 6 números. Nada se sube a internet.
 - Lector en la compu: flechas o clic, una o dos páginas, entera o al ancho, pantalla completa. Guarda todo el cómic al abrirlo y la página donde quedaste vuelve al iPhone.
