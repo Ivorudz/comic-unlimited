@@ -124,14 +124,17 @@ final class DiscoverModel {
         let issues: [UpcomingIssue]
     }
 
-    /// Filas de abajo de "Para vos": de tus series, nuevas series (#1) y por editorial.
-    var categories: [Category] {
+    private func category(_ id: String, _ title: String, _ subtitle: String, _ issues: [UpcomingIssue]) -> Category? {
+        issues.isEmpty ? nil : Category(id: id, title: title, subtitle: subtitle,
+                                        issues: Array(Self.sorted(issues).prefix(Self.limit)))
+    }
+
+    /// Filas de abajo de "Para vos" (antes de los géneros): de tus series y series nuevas (#1).
+    var topCategories: [Category] {
         guard !all.isEmpty else { return [] }
         var result: [Category] = []
         func add(_ id: String, _ title: String, _ subtitle: String, _ issues: [UpcomingIssue]) {
-            guard !issues.isEmpty else { return }
-            result.append(Category(id: id, title: title, subtitle: subtitle,
-                                   issues: Array(Self.sorted(issues).prefix(Self.limit))))
+            if let c = category(id, title, subtitle, issues) { result.append(c) }
         }
 
         let mySeries = Set(RealLibrary.shared.entries.values.compactMap { $0.series?.id })
@@ -142,19 +145,26 @@ final class DiscoverModel {
         if firsts.count >= 2 {
             add("nuevas", "Series nuevas", "Números #1 de la última semana", firsts)
         }
+        return result
+    }
 
-        // Editoriales con más cómics esta semana (como mucho 5), y el resto junto.
+    /// Filas por editorial (las que más sacaron esta semana, como mucho 4) y el resto junto.
+    var publisherCategories: [Category] {
+        guard !all.isEmpty else { return [] }
+        var result: [Category] = []
         let byPublisher = Dictionary(grouping: all) { $0.publisher ?? "" }
         let top = byPublisher.filter { !$0.key.isEmpty && $0.value.count >= 3 }
             .sorted { $0.value.count > $1.value.count }
-            .prefix(5)
+            .prefix(4)
         for (publisher, issues) in top {
-            add("ed-\(publisher)", publisher, "\(issues.count) cómics de la última semana", issues)
+            if let c = category("ed-\(publisher)", ComicPublishers.displayName(publisher),
+                                "Editorial · \(issues.count) cómics de la semana", issues) { result.append(c) }
         }
         let shown = Set(top.map { $0.key })
         let others = all.filter { !shown.contains($0.publisher ?? "") }
-        if others.count >= 3 {
-            add("otras", "Otras editoriales", "Independientes y editoriales más chicas", others)
+        if others.count >= 3, let c = category("otras", "Otras editoriales",
+                                                "Independientes y editoriales más chicas", others) {
+            result.append(c)
         }
         return result
     }
@@ -222,7 +232,8 @@ struct RecentReleasesRow: View {
     }
 }
 
-/// Fila deslizable de cómics (portada, título y editorial). Tocar uno abre su ficha.
+/// Fila deslizable de cómics (portada, título y editorial). Tocar uno abre su ficha
+/// (la de Comic Vine; si viene de Metron, la de Metron, que pasa sola a Comic Vine si la tiene).
 struct IssueCardsRow: View {
     let issues: [UpcomingIssue]
 
@@ -230,8 +241,12 @@ struct IssueCardsRow: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 12) {
                 ForEach(issues) { issue in
-                    NavigationLink(value: CVRoute.issue(id: issue.id, title: issue.title)) {
-                        ReleaseCard(issue: issue)
+                    Group {
+                        if let metronID = issue.metronID {
+                            NavigationLink(value: LibraryRoute.metronIssue(metronID)) { ReleaseCard(issue: issue) }
+                        } else {
+                            NavigationLink(value: CVRoute.issue(id: issue.id, title: issue.title)) { ReleaseCard(issue: issue) }
+                        }
                     }
                     .buttonStyle(.plain)
                 }
@@ -242,26 +257,40 @@ struct IssueCardsRow: View {
     }
 }
 
-/// Categorías de abajo de "Para vos" (salen de los cómics de la última semana).
-struct HomeCategories: View {
+/// Más filas de Descubrir, abajo de "Para vos": de tus series, series nuevas, géneros (terror,
+/// superhéroes…) y editoriales. Todo es parte de Descubrir (sin otro título).
+struct DiscoverMoreRows: View {
     let model: DiscoverModel
+    let genres: GenreModel
 
     var body: some View {
-        let categories = model.categories
-        if !categories.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                SectionTitle("Categorías")
-                ForEach(categories) { category in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(category.title).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
-                        Text(category.subtitle).font(.caption).foregroundStyle(Theme.ink2)
-                    }
-                    .padding(.bottom, 10)
-                    IssueCardsRow(issues: category.issues)
-                        .padding(.bottom, 22)
-                }
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(model.topCategories) { row($0) }
+            GenreRows(model: genres)
+            ForEach(model.publisherCategories) { row($0) }
         }
+        .padding(.top, 22)
+    }
+
+    @ViewBuilder
+    private func row(_ category: DiscoverModel.Category) -> some View {
+        DiscoverRowTitle(title: category.title, subtitle: category.subtitle)
+        IssueCardsRow(issues: category.issues)
+            .padding(.bottom, 22)
+    }
+}
+
+/// Título y subtítulo de una fila de Descubrir.
+struct DiscoverRowTitle: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
+            Text(subtitle).font(.caption).foregroundStyle(Theme.ink2)
+        }
+        .padding(.bottom, 10)
     }
 }
 
@@ -302,6 +331,18 @@ enum ComicPublishers {
                                 "black mask", "scout", "abstract studio", "humanoids", "fantagraphics",
                                 "drawn & quarterly", "dstlry", "tko", "massive", "rebellion", "2000 ad",
                                 "behemoth", "heavy metal", "source point", "bad idea", "magnetic", "first second"]
+
+    /// Nombre completo para mostrar ("Image" → "Image Comics").
+    static func displayName(_ publisher: String) -> String {
+        switch publisher.lowercased() {
+        case "image": return "Image Comics"
+        case "marvel": return "Marvel Comics"
+        case "boom", "boom!": return "BOOM! Studios"
+        case "idw": return "IDW Publishing"
+        case "dark horse": return "Dark Horse Comics"
+        default: return publisher
+        }
+    }
 
     static func isComics(_ publisher: String?) -> Bool {
         guard let p = publisher?.lowercased() else { return false }
