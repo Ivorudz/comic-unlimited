@@ -375,6 +375,12 @@ struct IssueView: View {
             ComicVineSummary(deck: d.deck, description: d.description)
         }
 
+        AddToListButton(item: .comicVine(d.id,
+                                         title: CVText.issueTitle(series: d.volume?.name ?? title, number: d.issueNumber),
+                                         series: d.volume?.name, number: d.issueNumber,
+                                         year: d.coverDate.map { String($0.prefix(4)) },
+                                         cover: d.image?.small?.absoluteString))
+
         RealLibraryControls(detail: d)
         MetronCommunityRating(cvID: d.id)
         ReviewSection(template: RealLibrary.makeEntry(d))

@@ -72,6 +72,7 @@ struct LocalComicDetailView: View {
 
             TPBContentsButton(comic: comic)
                 .padding(.top, 14)
+            AddToListButton(item: .from(comic))
 
             VStack(spacing: 0) {
                 actionRow("Buscar su ficha en Comic Vine", icon: "sparkle.magnifyingglass") {

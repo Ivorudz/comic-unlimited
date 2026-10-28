@@ -21,6 +21,7 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 - Carpetas por **serie, arco, editorial y estado** (sin empezar, leyendo, leídos), con buscador y orden por fecha de publicación.
 - Los **números que te faltan aparecen en gris**, con "Tenés X de Y" y un botón para buscarlos en tus fuentes.
 - **TPB (tomos recopilatorios):** cada tomo sabe qué números trae, y esos números cuentan como tuyos en arcos, series y órdenes de lectura.
+- **Mis listas:** listas propias con tu orden (arrastrando) o subiendo una lista .cbl; los que te faltan aparecen en gris con "Descargar".
 - **Sin repetidos**, ni por nombre de archivo ni por ficha.
 
 - **Ver en la compu:** leé tus cómics en el navegador de la compu, por tu Wi-Fi, incluso con el iPhone bloqueado.

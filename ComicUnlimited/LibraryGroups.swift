@@ -31,6 +31,8 @@ enum LibraryRoute: Hashable {
     case diagnostics
     /// "Ver en la compu": leer tus cómics en el navegador de la compu por Wi-Fi.
     case webShare
+    /// Una de tus listas (Biblioteca → Listas).
+    case customList(Int)
 }
 
 /// Acciones del menú de cada cómic. Las pantallas de abajo (carpetas) las comparten.
@@ -43,6 +45,8 @@ final class LibraryActions {
     var renaming: LocalComic?
     /// TPB al que le estás eligiendo qué números trae.
     var editingContents: LocalComic?
+    /// Cómic que estás agregando a una de tus listas.
+    var addingToList: ListItem?
 
     init(onRead: @escaping (LocalComic) -> Void) { self.onRead = onRead }
 }
@@ -189,6 +193,9 @@ struct LocalComicTile: View {
             }
             Button { actions.linking = comic } label: {
                 Label("Elegir ficha de Comic Vine", systemImage: "list.bullet.rectangle")
+            }
+            Button { actions.addingToList = ListItem.from(comic) } label: {
+                Label("Agregar a una lista", systemImage: "text.badge.plus")
             }
             Button { actions.editingContents = comic } label: {
                 Label(comic.isCollection ? "Números del TPB" : "¿Es un TPB? Qué números trae", systemImage: "books.vertical")

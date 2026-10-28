@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.35 · Mis listas
+- **Listas propias** (Biblioteca → Listas): creá listas con tu propio orden, agregá cómics desde el menú de cada cómic o desde la ficha de cualquier número (aunque no lo tengas) y ordenalos arrastrando.
+- **Subir una lista .cbl** (archivo, link o buscándola en la colección CBL-ReadingLists): trae todos los números en orden; los que tenés a color y los que te faltan en gris, con "Descargar".
+- **Leer en orden**: "Siguiente número" sigue la lista.
+
 ## 0.34.1 · Ver en la compu, sin esperas
 - Si el navegador de la compu prueba con "https", la app corta enseguida y el navegador pasa solo a "http" (antes se quedaba esperando).
 - La pantalla avisa que hay que escribir la dirección completa, con http:// adelante.

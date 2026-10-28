@@ -14,6 +14,7 @@ struct LibraryView: View {
         case arcs = "Arcos"
         case publishers = "Editoriales"
         case status = "Estado"
+        case lists = "Listas"
         var id: String { rawValue }
     }
 
@@ -61,6 +62,7 @@ struct LibraryView: View {
                         case .arcs: arcsView
                         case .publishers: publishersView
                         case .status: statusView
+                        case .lists: CustomListsSection()
                         }
                         Text("Tocá un cómic para leerlo. Mantenelo apretado para ver su ficha, cambiarle el nombre, elegir otra ficha de Comic Vine o borrarlo.")
                             .font(.footnote)

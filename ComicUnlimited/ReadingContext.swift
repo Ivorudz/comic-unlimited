@@ -5,13 +5,19 @@ import Foundation
 
 /// Un arco o una serie desde donde abriste un cómic.
 struct ReadContext: Codable, Hashable {
-    enum Kind: String, Codable { case series, arc }
+    enum Kind: String, Codable { case series, arc, list }
     let kind: Kind
     let id: Int
     let name: String
 
     /// Texto chiquito para "Seguir leyendo".
-    var label: String { kind == .arc ? "Arco: \(name)" : "Serie: \(name)" }
+    var label: String {
+        switch kind {
+        case .arc: return "Arco: \(name)"
+        case .series: return "Serie: \(name)"
+        case .list: return "Lista: \(name)"
+        }
+    }
 }
 
 /// Lo que estás mirando ahora (lo marcan las carpetas de arco y de serie al aparecer;
@@ -32,6 +38,8 @@ extension LocalLibrary {
             let listed = Set(ReadingOrderStore.shared.orders[context.id]?.items.compactMap(\.cvID) ?? [])
             if let cv = comic.cvIssueID, listed.contains(cv) { return true }
             return comic.contents?.contains { listed.contains($0.cvID) } == true
+        case .list:
+            return CustomListStore.shared.list(context.id)?.items.contains { isIn(comic, $0) } == true
         }
     }
 
@@ -41,12 +49,25 @@ extension LocalLibrary {
         if let context, context.kind == .arc, let found = nextInArc(after: comic, arc: context) {
             return (found, "Siguiente en \(context.name)")
         }
+        if let context, context.kind == .list, let found = nextInList(after: comic, listID: context.id) {
+            return (found, "Siguiente en \(context.name)")
+        }
         guard let series = comic.cvSeriesID else { return nil }
         let list = items.filter { $0.cvSeriesID == series && $0.id != comic.id }
             .filter { $0.numberForSorting > comic.numberForSorting }
             .sorted(by: LibraryGrouping.byNumber)
         guard let found = list.first else { return nil }
         return (found, "Siguiente en \(comic.cvSeriesName ?? "la serie")")
+    }
+
+    /// El siguiente de la lista que tengas (suelto, en un TPB o archivo sin ficha).
+    private func nextInList(after comic: LocalComic, listID: Int) -> LocalComic? {
+        guard let list = CustomListStore.shared.list(listID),
+              let position = list.items.lastIndex(where: { isIn(comic, $0) }) else { return nil }
+        for item in list.items[(position + 1)...] {
+            if let next = owned(item), next.id != comic.id { return next }
+        }
+        return nil
     }
 
     private func nextInArc(after comic: LocalComic, arc: ReadContext) -> LocalComic? {

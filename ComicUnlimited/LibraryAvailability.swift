@@ -28,6 +28,7 @@ struct AppDestinations: ViewModifier {
                 case .readingProfiles: ReadingProfilesView()
                 case .accounts: AccountsScreen()
                 case .webShare: WebShareView()
+                case .customList(let id): CustomListView(listID: id)
                 case .diagnostics:
                     DiagnosticsView()
                         .navigationTitle("Revisar conexión")

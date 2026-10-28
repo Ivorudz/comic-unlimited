@@ -10,7 +10,7 @@ Lo que falta confirmar y las ideas para las próximas versiones. Lo que ya está
 ## Próximas
 | Idea | Qué es | Esfuerzo |
 |---|---|---|
-| Colecciones propias | Crear colecciones, ordenarlas arrastrando y "Crear colección con este arco" | Medio |
+| Más listas | "Crear lista con este arco" y "Descargar todos los que faltan" de una lista | Chico |
 | Series que seguís | La "pull list" de Metron, con aviso la semana que sale cada número | Medio |
 | Respaldo | Guardar y recuperar listas, puntajes, comentarios, marcadores y por dónde vas | Chico |
 | Estadísticas | Cómics y páginas por mes, editoriales y autores más leídos, resumen del año | Chico |
