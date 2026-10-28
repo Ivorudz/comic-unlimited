@@ -26,9 +26,9 @@ final class RealLibrary {
         }
     }
 
-    /// Si es un número suelto o una serie completa.
+    /// Si es un número suelto, una serie completa o un arco argumental.
     enum Kind: String, Codable {
-        case issue, series
+        case issue, series, arc
     }
 
     struct Ref: Codable, Hashable {
@@ -57,8 +57,17 @@ final class RealLibrary {
         var metronCollectionID: Int? = nil
 
         var isSeries: Bool { kind == .series }
-        /// Clave única: un número y una serie pueden tener el mismo id en Comic Vine.
-        var key: String { "\(isSeries ? "series" : "issue")-\(id)" }
+        var isArc: Bool { kind == .arc }
+        /// Un número suelto (no una serie ni un arco).
+        var isIssue: Bool { !isSeries && !isArc }
+        /// Clave única: un número, una serie y un arco pueden tener el mismo id en Comic Vine.
+        var key: String {
+            switch kind {
+            case .series: return "series-\(id)"
+            case .arc: return "arc-\(id)"
+            default: return "issue-\(id)"
+            }
+        }
 
         /// Cuánto pesa este cómic en las sugerencias. Negativo = no te gustó.
         var weight: Double {
@@ -143,7 +152,7 @@ final class RealLibrary {
         guard !movingMetron, let client = MetronClient.current else { return }
         movingMetron = true
         defer { movingMetron = false }
-        let pending = entries.values.filter { $0.id < 0 && !$0.isSeries }.prefix(10)
+        let pending = entries.values.filter { $0.id < 0 && $0.isIssue }.prefix(10)
         for old in pending {
             guard let detail = try? await client.issueDetail(id: -old.id), let cv = detail.cvId else { continue }
             var moved = old
@@ -193,7 +202,7 @@ final class RealLibrary {
     private var fillingCovers = false
     func fillMissingCovers() async {
         guard !fillingCovers, !ComicVineKey.current.isEmpty else { return }
-        let ids = entries.values.filter { $0.coverURL == nil && $0.id > 0 && !$0.isSeries }.map(\.id)
+        let ids = entries.values.filter { $0.coverURL == nil && $0.id > 0 && $0.isIssue }.map(\.id)
         guard !ids.isEmpty else { return }
         fillingCovers = true
         defer { fillingCovers = false }
@@ -273,6 +282,22 @@ final class RealLibrary {
         )
     }
 
+    /// Datos para guardar un arco argumental.
+    static func makeEntry(_ d: CVArcDetail) -> Entry {
+        Entry(
+            id: d.id,
+            kind: .arc,
+            title: d.name ?? "Arco",
+            coverURL: d.image?.smallUrl ?? d.image?.thumbUrl,
+            series: nil,
+            writers: [],
+            characters: [],
+            status: nil,
+            rating: nil,
+            updated: Date().timeIntervalSince1970
+        )
+    }
+
     /// Datos para guardar una serie completa: sus autores y personajes más frecuentes.
     static func makeEntry(_ d: CVVolumeDetail) -> Entry {
         func top(_ list: [CVCountRef]?, _ n: Int) -> [Ref] {
@@ -312,6 +337,7 @@ struct RealLibraryControls: View {
         self.showsStatus = showsStatus
     }
     init(series: CVVolumeDetail) { template = RealLibrary.makeEntry(series) }
+    init(arc: CVArcDetail) { template = RealLibrary.makeEntry(arc) }
 
     var body: some View {
         let entry = library.entry(template.key)

@@ -196,6 +196,8 @@ struct EntryLink<Label: View>: View {
         Group {
             if entry.id < 0 {
                 NavigationLink(value: LibraryRoute.metronIssue(-entry.id)) { label() }
+            } else if entry.isArc {
+                NavigationLink(value: CVRoute.arc(id: entry.id, name: entry.title)) { label() }
             } else if entry.isSeries {
                 NavigationLink(value: CVRoute.series(id: entry.id, name: entry.title)) { label() }
             } else {
@@ -703,7 +705,9 @@ struct RemoteReviewLink<Label: View>: View {
 
     var body: some View {
         Group {
-            if let cv = review.cvId, review.kind == "series" {
+            if let cv = review.cvId, review.kind == "arc" {
+                NavigationLink(value: CVRoute.arc(id: cv, name: review.title)) { label() }
+            } else if let cv = review.cvId, review.kind == "series" {
                 NavigationLink(value: CVRoute.series(id: cv, name: review.title)) { label() }
             } else if let cv = review.cvId {
                 NavigationLink(value: CVRoute.issue(id: cv, title: review.title)) { label() }

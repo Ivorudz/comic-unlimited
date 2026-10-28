@@ -2,6 +2,9 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.35.1 · Arcos en tus listas
+- Cada arco tiene los botones **Quiero leer / Leyendo / Leído** y tu puntaje: aparece en tus listas de Perfil con la etiqueta "Arco" y tocándolo se abre.
+
 ## 0.35 · Mis listas
 - **Listas propias** (Biblioteca → Listas): creá listas con tu propio orden, agregá cómics desde el menú de cada cómic o desde la ficha de cualquier número (aunque no lo tengas) y ordenalos arrastrando.
 - **Subir una lista .cbl** (archivo, link o buscándola en la colección CBL-ReadingLists): trae todos los números en orden; los que tenés a color y los que te faltan en gris, con "Descargar".

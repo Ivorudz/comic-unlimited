@@ -408,7 +408,7 @@ final class Community {
                                     prefer: "return=minimal")
             }
             // Cuántos leíste (para tu perfil).
-            let read = entries.filter { $0.status == .read && !$0.isSeries }.count
+            let read = entries.filter { $0.status == .read && $0.isIssue }.count
             _ = try? await rest("PATCH", "profiles?id=eq.\(session.userID)", body: ["read_count": read], prefer: "return=minimal")
         }
         await loadFriends()
@@ -425,7 +425,7 @@ final class Community {
         var row: [String: Any] = [
             "user_id": user,
             "comic_key": e.key,
-            "kind": e.isSeries ? "series" : "issue",
+            "kind": e.isArc ? "arc" : (e.isSeries ? "series" : "issue"),
             "title": e.title,
             "updated_at": ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: e.reviewDate ?? e.updated)),
         ]

@@ -179,6 +179,12 @@ struct ArcFolderView: View {
                     .padding(.top, 10)
                 }
 
+                // Quiero leer / Leyendo / Leído (Perfil) y tu puntaje del arco.
+                if let arc {
+                    RealLibraryControls(arc: arc)
+                        .padding(.top, 14)
+                }
+
                 readingOrderControls
 
                 ComicVineSummary(deck: arc?.deck, description: arc?.description)

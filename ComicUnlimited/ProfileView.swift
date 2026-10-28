@@ -65,7 +65,9 @@ struct ProfileView: View {
                                     // Guardado desde una ficha de Metron (Comic Vine todavía no lo tenía).
                                     NavigationLink(value: LibraryRoute.metronIssue(-entry.id)) { EntryRow(entry: entry) }
                                 } else {
-                                    NavigationLink(value: entry.isSeries
+                                    NavigationLink(value: entry.isArc
+                                                   ? CVRoute.arc(id: entry.id, name: entry.title)
+                                                   : entry.isSeries
                                                    ? CVRoute.series(id: entry.id, name: entry.title)
                                                    : CVRoute.issue(id: entry.id, title: entry.title)) {
                                         EntryRow(entry: entry)
@@ -294,8 +296,8 @@ private struct EntryRow: View {
             RemoteCover(url: entry.coverURL.flatMap { URL(string: $0) })
                 .frame(width: 52)
             VStack(alignment: .leading, spacing: 4) {
-                if entry.isSeries {
-                    Text("Serie")
+                if entry.isSeries || entry.isArc {
+                    Text(entry.isArc ? "Arco" : "Serie")
                         .font(.system(size: 10, weight: .bold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
