@@ -244,6 +244,10 @@ struct ArcFolderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .task { if arc == nil { await load() } }
+        .onChange(of: arc?.id) { _, _ in
+            // Si el arco pasó solo a "Leyendo" antes de abrir esta pantalla, le completamos la portada.
+            if let arc { RealLibrary.shared.completeArc(RealLibrary.makeEntry(arc)) }
+        }
         .task(id: order?.listID) { await loadListDetails() }
         .sheet(isPresented: $choosingOrder) {
             ReadingOrderPicker(arcID: arcID, arcName: arc?.name ?? name)

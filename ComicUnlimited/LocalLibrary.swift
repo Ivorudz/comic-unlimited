@@ -310,6 +310,8 @@ final class LocalLibrary {
         // El que viene de "Siguiente número" sigue en el mismo arco o serie.
         if let context = fromPrevious ?? BrowsingContext.current, belongs(comic, to: context) {
             update(comic.id) { c in c.lastContext = context }
+            // Empezar a leer desde un arco pasa el arco a "Leyendo" (en Perfil).
+            if context.kind == .arc { RealLibrary.shared.startedArc(id: context.id, name: context.name) }
         }
         return openPage(comic)
     }

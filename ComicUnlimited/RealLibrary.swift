@@ -282,6 +282,26 @@ final class RealLibrary {
         )
     }
 
+    /// Al empezar a leer un cómic desde un arco: el arco pasa a "Leyendo"
+    /// (si ya estaba en "Leyendo" o en "Leído", no cambia).
+    func startedArc(id: Int, name: String) {
+        let key = "arc-\(id)"
+        var entry = entries[key] ?? Entry(id: id, kind: .arc, title: name, coverURL: nil, series: nil,
+                                          writers: [], characters: [], status: nil, rating: nil,
+                                          updated: Date().timeIntervalSince1970)
+        guard entry.status != .reading && entry.status != .read else { return }
+        entry.status = .reading
+        save(entry)
+        shareWithFriends(key)
+    }
+
+    /// Completa la portada de un arco guardado sin portada (cuando se abre su pantalla).
+    func completeArc(_ template: Entry) {
+        guard var entry = entries[template.key], entry.coverURL == nil, let cover = template.coverURL else { return }
+        entry.coverURL = cover
+        save(entry)
+    }
+
     /// Datos para guardar un arco argumental.
     static func makeEntry(_ d: CVArcDetail) -> Entry {
         Entry(

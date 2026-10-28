@@ -4,6 +4,7 @@ Cada versión se compila sola en GitHub y aparece en [Releases](https://github.c
 
 ## 0.35.1 · Arcos en tus listas
 - Cada arco tiene los botones **Quiero leer / Leyendo / Leído** y tu puntaje: aparece en tus listas de Perfil con la etiqueta "Arco" y tocándolo se abre.
+- Empezar a leer un cómic desde un arco pasa el arco solo a "Leyendo".
 
 ## 0.35 · Mis listas
 - **Listas propias** (Biblioteca → Listas): creá listas con tu propio orden, agregá cómics desde el menú de cada cómic o desde la ficha de cualquier número (aunque no lo tengas) y ordenalos arrastrando.
