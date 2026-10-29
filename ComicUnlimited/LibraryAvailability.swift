@@ -41,6 +41,8 @@ struct AppDestinations: ViewModifier {
                 case .settings: CommunitySettingsView()
                 case .profile(let id): FriendProfileView(userID: id)
                 case .editProfile: EditProfileView()
+                case .startGuide: StartGuideView()
+                case .guidePick(let id): GuidePickView(pickID: id)
                 }
             }
     }

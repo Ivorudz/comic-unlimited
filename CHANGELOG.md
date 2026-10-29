@@ -2,6 +2,9 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.36 · Por dónde empezar
+- Botón grande **"¿No sabés por dónde empezar a leer?"** abajo de todo en Comunidad: una guía con lo básico (número, serie, arco, tomo, evento) y recomendaciones por tema (primer cómic, superhéroes, terror, ciencia ficción, fantasía, policiales, clásicos y grandes eventos), con portada y ficha de Comic Vine.
+
 ## 0.35.1 · Arcos en tus listas
 - Cada arco tiene los botones **Quiero leer / Leyendo / Leído** y tu puntaje: aparece en tus listas de Perfil con la etiqueta "Arco" y tocándolo se abre.
 - Empezar a leer un cómic desde un arco pasa el arco solo a "Leyendo".

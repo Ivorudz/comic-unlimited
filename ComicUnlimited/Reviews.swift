@@ -262,6 +262,35 @@ struct CommunityView: View {
                     ForEach(reviews, id: \.key) { entry in
                         EntryLink(entry: entry) { ReviewRow(entry: entry) }
                     }
+
+                    // Botón grande gris: guía para empezar a leer.
+                    NavigationLink(value: CommunityRoute.startGuide) {
+                        HStack(spacing: 14) {
+                            Image(systemName: "books.vertical.fill")
+                                .font(.system(size: 26, weight: .semibold))
+                                .foregroundStyle(Theme.magenta)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("¿No sabés por dónde empezar a leer?")
+                                    .font(.system(size: 18, weight: .heavy))
+                                    .foregroundStyle(Theme.ink)
+                                    .multilineTextAlignment(.leading)
+                                Text("Una guía con qué leer según lo que te gusta")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Theme.ink2)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.body.weight(.bold))
+                                .foregroundStyle(Theme.ink2)
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.chip, in: RoundedRectangle(cornerRadius: 18))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 32)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 30)
@@ -329,6 +358,9 @@ enum CommunityRoute: Hashable {
     case friends, settings, editProfile
     /// Perfil de un amigo (por su id en la comunidad).
     case profile(String)
+    /// "¿No sabés por dónde empezar a leer?" y cada recomendación (StartGuide.swift).
+    case startGuide
+    case guidePick(String)
 }
 
 // MARK: - Configurar (primera vez)
