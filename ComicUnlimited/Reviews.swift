@@ -274,7 +274,7 @@ struct CommunityView: View {
                                     .font(.system(size: 18, weight: .heavy))
                                     .foregroundStyle(Theme.ink)
                                     .multilineTextAlignment(.leading)
-                                Text("Una guía con qué leer según lo que te gusta")
+                                Text("Rutas de lectura en orden, con puntos y medallas")
                                     .font(.subheadline)
                                     .foregroundStyle(Theme.ink2)
                                     .multilineTextAlignment(.leading)
@@ -358,9 +358,10 @@ enum CommunityRoute: Hashable {
     case friends, settings, editProfile
     /// Perfil de un amigo (por su id en la comunidad).
     case profile(String)
-    /// "¿No sabés por dónde empezar a leer?" y cada recomendación (StartGuide.swift).
+    /// "¿No sabés por dónde empezar a leer?", cada ruta y la ficha de una serie de la guía (StartGuide.swift).
     case startGuide
-    case guidePick(String)
+    case guideRoute(String)
+    case guideSeries(String, Int, String)
 }
 
 // MARK: - Configurar (primera vez)

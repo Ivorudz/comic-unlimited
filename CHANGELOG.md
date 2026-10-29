@@ -3,7 +3,10 @@
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
 ## 0.36 · Por dónde empezar
-- Botón grande **"¿No sabés por dónde empezar a leer?"** abajo de todo en Comunidad: una guía con lo básico (número, serie, arco, tomo, evento) y recomendaciones por tema (primer cómic, superhéroes, terror, ciencia ficción, fantasía, policiales, clásicos y grandes eventos), con portada y ficha de Comic Vine.
+- Botón grande **"¿No sabés por dónde empezar a leer?"** abajo de todo en Comunidad.
+- **Rutas de lectura** en orden: Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia. Cada etapa dice qué tomos leer (serie y números), marca dónde empezar y te muestra **qué sigue**.
+- **Puntos, niveles y medallas:** cada número de una ruta que terminás suma 10 puntos (o marcás el tomo como leído); cada etapa completa da una medalla, y cada ruta, un trofeo.
+- Abajo, recomendaciones sueltas por si no sabés qué te gusta.
 
 ## 0.35.1 · Arcos en tus listas
 - Cada arco tiene los botones **Quiero leer / Leyendo / Leído** y tu puntaje: aparece en tus listas de Perfil con la etiqueta "Arco" y tocándolo se abre.

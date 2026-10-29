@@ -1,162 +1,167 @@
 import SwiftUI
+import Observation
 
 // "¿No sabés por dónde empezar a leer?" (botón grande abajo de todo en Comunidad).
-// Una guía para empezar: lo básico (números, series, arcos, tomos, eventos) y recomendaciones según
-// lo que te gusta. Las recomendaciones son información (título, año, autores, editorial) con textos propios;
-// la portada y la ficha salen de Comic Vine: la app busca cada serie por su nombre y año la primera vez
-// que se ve y guarda solo su código y el link de la portada (nunca la imagen).
+// - Rutas de lectura (GuideRoutes.swift): Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia,
+//   con etapas en orden, los tomos de cada una y "Empezá por acá".
+// - Juego de puntos: cada número que leés de una ruta suma 10 puntos (se cuentan solos los cómics de tu
+//   Biblioteca que terminaste, o marcás un tomo como leído). Completar una etapa da una medalla y 50 puntos;
+//   completar una ruta, 300. Con los puntos subís de nivel.
+// - "Si no sabés qué te gusta": recomendaciones sueltas por tema.
+// Todo es información (títulos, años, autores, editoriales) con textos propios. Las portadas y fichas salen
+// de Comic Vine: cada serie se busca una vez por nombre y año y se guarda solo su código y el link de la portada.
 
-struct GuidePick: Identifiable, Hashable {
-    /// Nombre para buscar en Comic Vine (como figura allá).
-    let query: String
-    /// Nombre para mostrar (en español si se conoce así).
-    let title: String
-    let year: Int
-    let creators: String
-    let publisher: String
-    /// Por qué es un buen comienzo (texto propio).
-    let why: String
-    var adults = false
+// MARK: - Progreso y puntos
 
-    var id: String { "\(query)|\(year)" }
-}
+@MainActor
+@Observable
+final class GuideProgress {
+    static let shared = GuideProgress()
+    private static let manualKey = "guide.manualBooks"
 
-struct GuideSection: Identifiable {
-    let id: String
-    let title: String
-    let intro: String
-    let picks: [GuidePick]
-}
+    /// Tomos marcados a mano como leídos.
+    private(set) var manual: Set<String>
 
-enum StartGuide {
-    static let sections: [GuideSection] = [
-        GuideSection(id: "primeros", title: "Para tu primer cómic",
-                     intro: "Historias cerradas, que se entienden sin haber leído nada antes.",
-                     picks: [
-            GuidePick(query: "Batman: Year One", title: "Batman: Año Uno", year: 1987,
-                      creators: "Frank Miller y David Mazzucchelli", publisher: "DC",
-                      why: "El primer año de Batman en Ciudad Gótica. Corto, policial y perfecto para arrancar."),
-            GuidePick(query: "All Star Superman", title: "All-Star Superman", year: 2006,
-                      creators: "Grant Morrison y Frank Quitely", publisher: "DC",
-                      why: "Doce números que cuentan todo lo que hace grande a Superman, sin necesitar nada previo."),
-            GuidePick(query: "Ms. Marvel", title: "Ms. Marvel", year: 2014,
-                      creators: "G. Willow Wilson y Adrian Alphona", publisher: "Marvel",
-                      why: "Kamala Khan descubre sus poderes. Divertido, cercano y muy fácil de seguir."),
-            GuidePick(query: "Hawkeye", title: "Hawkeye (Ojo de Halcón)", year: 2012,
-                      creators: "Matt Fraction y David Aja", publisher: "Marvel",
-                      why: "Lo que hace un Vengador en sus días libres. Mucho humor y un dibujo muy original."),
-            GuidePick(query: "The Unbeatable Squirrel Girl", title: "La imbatible Chica Ardilla", year: 2015,
-                      creators: "Ryan North y Erica Henderson", publisher: "Marvel",
-                      why: "Superhéroes en clave de comedia, para todas las edades."),
-        ]),
-        GuideSection(id: "heroes", title: "Superhéroes",
-                     intro: "Puntos de entrada a los personajes más conocidos.",
-                     picks: [
-            GuidePick(query: "Ultimate Spider-Man", title: "Ultimate Spider-Man", year: 2000,
-                      creators: "Brian Michael Bendis y Mark Bagley", publisher: "Marvel",
-                      why: "Peter Parker desde cero, en el colegio. Una serie larga para engancharse."),
-            GuidePick(query: "Batman: The Long Halloween", title: "Batman: El largo Halloween", year: 1996,
-                      creators: "Jeph Loeb y Tim Sale", publisher: "DC",
-                      why: "Un asesino que ataca en cada feriado durante un año. Misterio con los villanos clásicos."),
-            GuidePick(query: "Mister Miracle", title: "Mister Miracle", year: 2017,
-                      creators: "Tom King y Mitch Gerads", publisher: "DC",
-                      why: "Un superhéroe que escapa de todo, menos de sus problemas. Distinto y muy premiado."),
-            GuidePick(query: "Daredevil", title: "Daredevil", year: 2011,
-                      creators: "Mark Waid y Paolo Rivera", publisher: "Marvel",
-                      why: "El abogado ciego vuelve con aventuras luminosas. Se lee solo, sin saber nada antes."),
-        ]),
-        GuideSection(id: "terror", title: "Terror",
-                     intro: "Para leer con la luz prendida.",
-                     picks: [
-            GuidePick(query: "Locke & Key: Welcome to Lovecraft", title: "Locke & Key", year: 2008,
-                      creators: "Joe Hill y Gabriel Rodríguez", publisher: "IDW",
-                      why: "Una casa llena de llaves mágicas y una familia que las descubre. Terror y aventura."),
-            GuidePick(query: "Something is Killing the Children", title: "Something is Killing the Children", year: 2019,
-                      creators: "James Tynion IV y Werther Dell'Edera", publisher: "BOOM! Studios",
-                      why: "En un pueblo desaparecen chicos y llega una cazadora de monstruos. Atrapa enseguida."),
-            GuidePick(query: "Gideon Falls", title: "Gideon Falls", year: 2018,
-                      creators: "Jeff Lemire y Andrea Sorrentino", publisher: "Image",
-                      why: "Un granero negro que aparece donde no debería. Misterio inquietante."),
-            GuidePick(query: "Hellboy: Seed of Destruction", title: "Hellboy: Semilla de destrucción", year: 1994,
-                      creators: "Mike Mignola y John Byrne", publisher: "Dark Horse",
-                      why: "Un demonio que caza monstruos para los buenos. El comienzo de un clásico."),
-        ]),
-        GuideSection(id: "scifi", title: "Ciencia ficción",
-                     intro: "Futuros, viajes y mundos raros.",
-                     picks: [
-            GuidePick(query: "Saga", title: "Saga", year: 2012,
-                      creators: "Brian K. Vaughan y Fiona Staples", publisher: "Image",
-                      why: "Una familia escapando de una guerra entre planetas. Épica y emotiva.", adults: true),
-            GuidePick(query: "Paper Girls", title: "Paper Girls", year: 2015,
-                      creators: "Brian K. Vaughan y Cliff Chiang", publisher: "Image",
-                      why: "Cuatro chicas que reparten diarios en 1988 terminan viajando en el tiempo."),
-            GuidePick(query: "Y: The Last Man", title: "Y: El último hombre", year: 2002,
-                      creators: "Brian K. Vaughan y Pia Guerra", publisher: "Vertigo (DC)",
-                      why: "Todos los hombres del planeta mueren de golpe, menos uno.", adults: true),
-            GuidePick(query: "Descender", title: "Descender", year: 2015,
-                      creators: "Jeff Lemire y Dustin Nguyen", publisher: "Image",
-                      why: "Un nene robot en un universo que les tiene miedo a las máquinas. Dibujo en acuarela."),
-        ]),
-        GuideSection(id: "fantasia", title: "Fantasía",
-                     intro: "Magia, criaturas y mundos inventados.",
-                     picks: [
-            GuidePick(query: "Bone", title: "Bone", year: 1991,
-                      creators: "Jeff Smith", publisher: "Cartoon Books",
-                      why: "Tres primos perdidos en un valle con dragones. Para todas las edades."),
-            GuidePick(query: "The Sandman", title: "The Sandman", year: 1989,
-                      creators: "Neil Gaiman y varios dibujantes", publisher: "DC (Vertigo)",
-                      why: "El señor de los sueños y sus historias. Uno de los cómics más importantes.", adults: true),
-            GuidePick(query: "Monstress", title: "Monstress", year: 2015,
-                      creators: "Marjorie Liu y Sana Takeda", publisher: "Image",
-                      why: "Una chica con un monstruo adentro, en un mundo en guerra. Dibujo deslumbrante.", adults: true),
-        ]),
-        GuideSection(id: "policial", title: "Policiales y suspenso",
-                     intro: "Crímenes, mafias y misterios sin superpoderes.",
-                     picks: [
-            GuidePick(query: "Criminal", title: "Criminal", year: 2006,
-                      creators: "Ed Brubaker y Sean Phillips", publisher: "Icon (Marvel)",
-                      why: "Historias de ladrones y perdedores, cada tomo se lee por separado.", adults: true),
-            GuidePick(query: "100 Bullets", title: "100 balas", year: 1999,
-                      creators: "Brian Azzarello y Eduardo Risso", publisher: "Vertigo (DC)",
-                      why: "Un desconocido te da un arma y 100 balas imposibles de rastrear. Dibujo de un argentino.", adults: true),
-        ]),
-        GuideSection(id: "clasicos", title: "Clásicos que cambiaron todo",
-                     intro: "Para cuando quieras leer los que todos nombran.",
-                     picks: [
-            GuidePick(query: "Watchmen", title: "Watchmen", year: 1986,
-                      creators: "Alan Moore y Dave Gibbons", publisher: "DC",
-                      why: "Superhéroes en un mundo real y oscuro. Una historia cerrada de 12 números.", adults: true),
-            GuidePick(query: "Batman: The Dark Knight Returns", title: "Batman: El regreso del Caballero Oscuro", year: 1986,
-                      creators: "Frank Miller", publisher: "DC",
-                      why: "Un Batman viejo que vuelve a la acción. Cambió cómo se contaban los superhéroes."),
-            GuidePick(query: "El Eternauta", title: "El Eternauta", year: 1957,
-                      creators: "Héctor G. Oesterheld y Francisco Solano López", publisher: "Hora Cero",
-                      why: "Una nevada mortal cae sobre Buenos Aires. El gran clásico de la historieta argentina."),
-            GuidePick(query: "Maus", title: "Maus", year: 1986,
-                      creators: "Art Spiegelman", publisher: "Pantheon",
-                      why: "La historia real del padre del autor en el Holocausto, contada con ratones y gatos."),
-        ]),
-        GuideSection(id: "eventos", title: "Grandes eventos",
-                     intro: "Historias donde se juntan muchos personajes. Conviene leerlas con su orden de lectura.",
-                     picks: [
-            GuidePick(query: "Civil War", title: "Civil War", year: 2006,
-                      creators: "Mark Millar y Steve McNiven", publisher: "Marvel",
-                      why: "Los héroes de Marvel se dividen en dos bandos. Se entiende bastante bien sola."),
-            GuidePick(query: "The Infinity Gauntlet", title: "El Guantelete del Infinito", year: 1991,
-                      creators: "Jim Starlin, George Pérez y Ron Lim", publisher: "Marvel",
-                      why: "Thanos junta las gemas del infinito. La historia que inspiró las películas."),
-            GuidePick(query: "Crisis on Infinite Earths", title: "Crisis en Tierras Infinitas", year: 1985,
-                      creators: "Marv Wolfman y George Pérez", publisher: "DC",
-                      why: "El evento que reordenó todo el universo de DC."),
-        ]),
+    static let pointsPerIssue = 10
+    static let pointsPerStage = 50
+    static let pointsPerRoute = 300
+
+    /// Niveles: desde cuántos puntos.
+    static let levels: [(points: Int, name: String)] = [
+        (0, "Lector curioso"),
+        (100, "Aprendiz de comiquería"),
+        (300, "Lector de grapas"),
+        (600, "Coleccionista"),
+        (1000, "Experto en continuidad"),
+        (1600, "Maestro de los crossovers"),
+        (2500, "Guardián del multiverso"),
+        (4000, "Leyenda de los cómics"),
     ]
 
-    static func pick(_ id: String) -> GuidePick? {
-        sections.lazy.flatMap(\.picks).first { $0.id == id }
+    private init() {
+        manual = Set(UserDefaults.standard.stringArray(forKey: Self.manualKey) ?? [])
     }
 
-    // MARK: Ficha de Comic Vine de cada recomendación (se busca una vez y se guarda el código)
+    func isMarked(_ book: GuideBook) -> Bool { manual.contains(book.id) }
 
+    func toggle(_ book: GuideBook) {
+        if manual.contains(book.id) { manual.remove(book.id) } else { manual.insert(book.id) }
+        UserDefaults.standard.set(Array(manual), forKey: Self.manualKey)
+    }
+
+    // MARK: Lo que leíste (tus archivos terminados)
+
+    /// Números terminados de tu Biblioteca, por serie (nombre normalizado) → (año de la serie, número).
+    struct Finished {
+        var bySeries: [String: [(year: Int?, number: Double)]] = [:]
+    }
+
+    static func normalized(_ name: String) -> String {
+        var text = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+        if text.hasPrefix("the ") { text.removeFirst(4) }
+        return text.replacingOccurrences(of: "&", with: "and").filter { $0.isLetter || $0.isNumber }
+    }
+
+    func finished() -> Finished {
+        var result = Finished()
+        for comic in LocalLibrary.shared.items where comic.isFinished {
+            guard let series = comic.cvSeriesName, let number = comic.cvIssueNumber.flatMap(Double.init) else { continue }
+            result.bySeries[Self.normalized(series), default: []]
+                .append((year: comic.cvSeriesYear.flatMap { Int($0) }, number: number))
+        }
+        return result
+    }
+
+    /// Cuántos números de ese tomo leíste.
+    func read(_ book: GuideBook, _ finished: Finished) -> Int {
+        if let count = book.issueCount, manual.contains(book.id) { return count }
+        let list = finished.bySeries[Self.normalized(book.series)] ?? []
+        let numbers = Set(list.filter { item in
+            guard let year = item.year, abs(year - book.year) <= 1 else { return false }
+            return item.number >= book.first && item.number <= (book.last ?? .greatestFiniteMagnitude)
+        }.map { $0.number })
+        return book.issueCount.map { min(numbers.count, $0) } ?? numbers.count
+    }
+
+    func isDone(_ book: GuideBook, _ finished: Finished) -> Bool {
+        guard let count = book.issueCount else { return false }   // las series en curso no terminan
+        return read(book, finished) >= count
+    }
+
+    func stageDone(_ stage: GuideStage, _ finished: Finished) -> Bool {
+        let closed = stage.books.filter { $0.issueCount != nil }
+        return !closed.isEmpty && closed.allSatisfy { isDone($0, finished) }
+    }
+
+    struct Score {
+        var points = 0
+        var issues = 0
+        var stagesDone = 0
+        var stages = 0
+        var routesDone = 0
+
+        static func + (a: Score, b: Score) -> Score {
+            Score(points: a.points + b.points, issues: a.issues + b.issues, stagesDone: a.stagesDone + b.stagesDone,
+                  stages: a.stages + b.stages, routesDone: a.routesDone + b.routesDone)
+        }
+    }
+
+    func score(_ route: GuideRoute, _ finished: Finished) -> Score {
+        var score = Score()
+        for stage in route.stages {
+            score.stages += 1
+            for book in stage.books { score.issues += read(book, finished) }
+            if stageDone(stage, finished) { score.stagesDone += 1 }
+        }
+        let done = score.stagesDone == route.stages.count
+        if done { score.routesDone = 1 }
+        score.points = score.issues * Self.pointsPerIssue + score.stagesDone * Self.pointsPerStage
+            + (done ? Self.pointsPerRoute : 0)
+        return score
+    }
+
+    func total(_ finished: Finished) -> Score {
+        GuideRoutes.all.map { score($0, finished) }.reduce(Score(), +)
+    }
+
+    static func level(for points: Int) -> (index: Int, name: String, from: Int, next: Int?) {
+        let index = levels.lastIndex { points >= $0.points } ?? 0
+        let next = index + 1 < levels.count ? levels[index + 1].points : nil
+        return (index, levels[index].name, levels[index].points, next)
+    }
+
+    /// Qué sigue en la ruta: si no empezaste, el primer "Empezá por acá"; si no, el primer tomo sin terminar
+    /// después del último que tocaste.
+    func next(in route: GuideRoute, _ finished: Finished) -> (stage: GuideStage, book: GuideBook)? {
+        let all = route.stages.flatMap { stage in stage.books.map { (stage: stage, book: $0) } }
+        guard let lastTouched = all.lastIndex(where: { read($0.book, finished) > 0 }) else {
+            let start = route.stages.first { $0.start } ?? route.stages.first
+            return start.flatMap { stage in stage.books.first.map { (stage: stage, book: $0) } }
+        }
+        let current = all[lastTouched]
+        if !isDone(current.book, finished) { return current }
+        return all[(lastTouched + 1)...].first { !isDone($0.book, finished) }
+    }
+
+    /// Para el lector: ¿este cómic suma puntos en alguna ruta?
+    func routes(for comic: LocalComic) -> [GuideRoute] {
+        guard let series = comic.cvSeriesName, let number = comic.cvIssueNumber.flatMap(Double.init),
+              let year = comic.cvSeriesYear.flatMap({ Int($0) }) else { return [] }
+        let name = Self.normalized(series)
+        return GuideRoutes.all.filter { route in
+            route.stages.contains { stage in
+                stage.books.contains { book in
+                    Self.normalized(book.series) == name && abs(book.year - year) <= 1
+                        && number >= book.first && number <= (book.last ?? .greatestFiniteMagnitude)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Ficha de Comic Vine de cada serie (se busca una vez y se guarda el código)
+
+enum GuideLookup {
     struct Found: Codable {
         let cvID: Int
         let name: String
@@ -165,48 +170,44 @@ enum StartGuide {
 
     private static let storeKey = "startGuide.found"
 
-    static func found(_ pick: GuidePick) -> Found? {
+    static func key(_ query: String, _ year: Int) -> String { "\(query)|\(year)" }
+
+    static func found(_ query: String, _ year: Int) -> Found? {
         guard let data = UserDefaults.standard.data(forKey: storeKey),
               let all = try? JSONDecoder().decode([String: Found].self, from: data) else { return nil }
-        return all[pick.id]
+        return all[key(query, year)]
     }
 
-    private static func remember(_ found: Found, for pick: GuidePick) {
+    private static func remember(_ found: Found, _ query: String, _ year: Int) {
         var all: [String: Found] = [:]
         if let data = UserDefaults.standard.data(forKey: storeKey),
            let saved = try? JSONDecoder().decode([String: Found].self, from: data) { all = saved }
-        all[pick.id] = found
+        all[key(query, year)] = found
         if let data = try? JSONEncoder().encode(all) { UserDefaults.standard.set(data, forKey: storeKey) }
     }
 
     /// Busca la serie en Comic Vine por nombre y año (1 consulta) y guarda su código y portada.
-    static func resolve(_ pick: GuidePick) async throws -> Found? {
-        if let found = found(pick) { return found }
+    static func resolve(_ query: String, _ year: Int) async throws -> Found? {
+        if let found = found(query, year) { return found }
         guard !ComicVineKey.current.isEmpty else { return nil }
-        let results = try await ComicVineKey.client.searchSeries(pick.query)
-        guard let best = best(results, for: pick) else { return nil }
-        let found = Found(cvID: best.id, name: best.name ?? pick.title, cover: best.image?.small?.absoluteString)
-        remember(found, for: pick)
+        let results = try await ComicVineKey.client.searchSeries(query)
+        guard let best = best(results, query: query, year: year) else { return nil }
+        let found = Found(cvID: best.id, name: best.name ?? query, cover: best.image?.small?.absoluteString)
+        remember(found, query, year)
         return found
     }
 
-    private static func normalized(_ text: String) -> String {
-        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
-            .replacingOccurrences(of: "&", with: "and")
-            .filter { $0.isLetter || $0.isNumber }
-    }
-
     /// El resultado que mejor coincide: mismo nombre y año parecido.
-    private static func best(_ results: [CVVolumeSummary], for pick: GuidePick) -> CVVolumeSummary? {
-        let target = normalized(pick.query)
+    private static func best(_ results: [CVVolumeSummary], query: String, year: Int) -> CVVolumeSummary? {
+        let target = GuideProgress.normalized(query)
         var bestScore = 0
         var best: CVVolumeSummary?
         for result in results {
-            let name = normalized(result.name ?? "")
+            let name = GuideProgress.normalized(result.name ?? "")
             var score = 0
             if name == target { score += 10 } else if !name.isEmpty && (name.contains(target) || target.contains(name)) { score += 4 }
-            if let year = Int(result.startYear ?? "") {
-                let gap = abs(year - pick.year)
+            if let start = Int(result.startYear ?? "") {
+                let gap = abs(start - year)
                 score += gap <= 1 ? 6 : (gap <= 3 ? 2 : 0)
             }
             score += min(result.countOfIssues ?? 0, 50) / 25
@@ -220,17 +221,80 @@ enum StartGuide {
 actor GuideResolver {
     static let shared = GuideResolver()
 
-    func resolve(_ pick: GuidePick) async -> StartGuide.Found? {
-        if let found = StartGuide.found(pick) { return found }
+    func resolve(_ query: String, _ year: Int) async -> GuideLookup.Found? {
+        if let found = GuideLookup.found(query, year) { return found }
         try? await Task.sleep(for: .milliseconds(400))
-        return try? await StartGuide.resolve(pick)
+        return try? await GuideLookup.resolve(query, year)
     }
 }
 
-// MARK: - Pantalla de la guía
+// MARK: - Recomendaciones sueltas ("Si no sabés qué te gusta")
+
+struct GuidePick: Identifiable, Hashable {
+    let query: String
+    let title: String
+    let year: Int
+    let publisher: String
+    let why: String
+    var adults = false
+    var id: String { GuideLookup.key(query, year) }
+}
+
+struct PickGroup: Identifiable {
+    let title: String
+    let picks: [GuidePick]
+    var id: String { title }
+}
+
+enum StartGuide {
+    static let picks: [PickGroup] = [
+        PickGroup(title: "Historias cerradas para tu primer cómic", picks: [
+            GuidePick(query: "Batman: Year One", title: "Batman: Año Uno", year: 1987, publisher: "DC",
+                      why: "El primer año de Batman. Corto, policial y perfecto para arrancar."),
+            GuidePick(query: "All Star Superman", title: "All-Star Superman", year: 2006, publisher: "DC",
+                      why: "Doce números que cuentan todo lo que hace grande a Superman."),
+            GuidePick(query: "Ms. Marvel", title: "Ms. Marvel", year: 2014, publisher: "Marvel",
+                      why: "Kamala Khan descubre sus poderes. Divertido y fácil de seguir."),
+            GuidePick(query: "Hawkeye", title: "Hawkeye (Ojo de Halcón)", year: 2012, publisher: "Marvel",
+                      why: "Lo que hace un Vengador en sus días libres. Humor y un dibujo original."),
+        ]),
+        PickGroup(title: "Terror", picks: [
+            GuidePick(query: "Locke & Key: Welcome to Lovecraft", title: "Locke & Key", year: 2008, publisher: "IDW",
+                      why: "Una casa llena de llaves mágicas. Terror y aventura."),
+            GuidePick(query: "Something is Killing the Children", title: "Something is Killing the Children", year: 2019,
+                      publisher: "BOOM! Studios", why: "Una cazadora de monstruos llega a un pueblo aterrado."),
+            GuidePick(query: "Gideon Falls", title: "Gideon Falls", year: 2018, publisher: "Image",
+                      why: "Un granero negro que aparece donde no debería."),
+        ]),
+        PickGroup(title: "Ciencia ficción y fantasía", picks: [
+            GuidePick(query: "Saga", title: "Saga", year: 2012, publisher: "Image",
+                      why: "Una familia escapando de una guerra entre planetas.", adults: true),
+            GuidePick(query: "Paper Girls", title: "Paper Girls", year: 2015, publisher: "Image",
+                      why: "Cuatro chicas de 1988 terminan viajando en el tiempo."),
+            GuidePick(query: "Bone", title: "Bone", year: 1991, publisher: "Cartoon Books",
+                      why: "Tres primos perdidos en un valle con dragones. Para todas las edades."),
+            GuidePick(query: "The Sandman", title: "The Sandman", year: 1989, publisher: "DC (Vertigo)",
+                      why: "El señor de los sueños y sus historias.", adults: true),
+        ]),
+        PickGroup(title: "Clásicos que todos nombran", picks: [
+            GuidePick(query: "Watchmen", title: "Watchmen", year: 1986, publisher: "DC",
+                      why: "Superhéroes en un mundo real y oscuro. Una historia cerrada.", adults: true),
+            GuidePick(query: "El Eternauta", title: "El Eternauta", year: 1957, publisher: "Hora Cero",
+                      why: "Una nevada mortal sobre Buenos Aires. El gran clásico argentino."),
+            GuidePick(query: "Maus", title: "Maus", year: 1986, publisher: "Pantheon",
+                      why: "La historia real del padre del autor en el Holocausto."),
+        ]),
+    ]
+}
+
+// MARK: - Pantalla principal de la guía
 
 struct StartGuideView: View {
+    private var progress: GuideProgress { GuideProgress.shared }
+
     var body: some View {
+        let finished = progress.finished()
+        let total = progress.total(finished)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Por dónde empezar")
@@ -238,25 +302,36 @@ struct StartGuideView: View {
                     .foregroundStyle(Theme.ink)
                     .misprint(0.6)
                     .padding(.top, 8)
-                Text("No hace falta leer todo lo anterior: cualquier buen comienzo sirve. Elegí algo que te tiente y tirate de cabeza.")
+                Text("Elegí una ruta, empezá donde dice \"Empezá por acá\" y seguí las etapas en orden. Cada número que leas suma puntos.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.ink2)
                     .padding(.top, 6)
 
+                LevelCard(score: total)
+                    .padding(.top, 16)
+
+                SectionTitle("Rutas de lectura")
+                VStack(spacing: 12) {
+                    ForEach(GuideRoutes.all) { route in
+                        NavigationLink(value: CommunityRoute.guideRoute(route.id)) {
+                            RouteCard(route: route, score: progress.score(route, finished),
+                                      next: progress.next(in: route, finished)?.book)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 basics
 
-                ForEach(StartGuide.sections) { section in
-                    SectionTitle(section.title)
-                    Text(section.intro)
-                        .font(.caption)
-                        .foregroundStyle(Theme.ink2)
-                        .padding(.top, -6)
-                        .padding(.bottom, 10)
+                SectionTitle("Si no sabés qué te gusta")
+                ForEach(StartGuide.picks) { group in
+                    Text(group.title).font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
+                        .padding(.bottom, 8)
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: 12) {
-                            ForEach(section.picks) { pick in
-                                NavigationLink(value: CommunityRoute.guidePick(pick.id)) {
-                                    GuidePickCard(pick: pick)
+                            ForEach(group.picks) { pick in
+                                NavigationLink(value: CommunityRoute.guideSeries(pick.query, pick.year, pick.title)) {
+                                    PickCard(pick: pick)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -264,14 +339,13 @@ struct StartGuideView: View {
                         .padding(.horizontal, 18)
                     }
                     .padding(.horizontal, -18)
+                    .padding(.bottom, 18)
                 }
 
-                tips
-
-                Text("Datos y portadas: Comic Vine. Las portadas pertenecen a sus editoriales. Las recomendaciones y los textos son de Cómic Unlimited.")
+                Text("Datos y portadas: Comic Vine. Las portadas pertenecen a sus editoriales. Las rutas, recomendaciones y textos son de Cómic Unlimited.")
                     .font(.caption2)
                     .foregroundStyle(Theme.ink2)
-                    .padding(.top, 24)
+                    .padding(.top, 12)
             }
             .padding(.horizontal, 18)
             .padding(.bottom, 30)
@@ -282,49 +356,131 @@ struct StartGuideView: View {
         .toolbar(.visible, for: .navigationBar)
     }
 
-    /// Las palabras que más se usan, explicadas.
     private var basics: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Lo básico").font(.headline).foregroundStyle(Theme.ink)
-            term("Número (#)", "Cada revista que sale, por ejemplo Batman #1. Suelen tener unas 20 a 30 páginas.")
-            term("Serie", "Todos los números de un mismo título. Cuando una serie vuelve a empezar desde el #1, se dice que es un \"volumen\" nuevo (por eso ves años al lado del nombre).")
-            term("Arco", "Una historia que ocupa varios números seguidos. Empezar al principio de un arco es una buena forma de entrar.")
-            term("Tomo o TPB", "Un libro que junta varios números, casi siempre un arco completo. El \"Vol. 1\" es un gran lugar para empezar.")
-            term("Evento", "Una historia grande que cruza muchas series a la vez. Mejor leerla con un orden de lectura.")
+            term("Número (#)", "Cada revista que sale, por ejemplo Batman #1 (unas 20 a 30 páginas).")
+            term("Serie", "Todos los números de un título. Cuando vuelve a empezar desde el #1 es un \"volumen\" nuevo: por eso ves el año al lado del nombre.")
+            term("Tomo", "Un libro que junta varios números, casi siempre una historia completa. En la guía cada tomo dice qué números trae.")
+            term("Evento", "Una historia grande que cruza muchas series. Para el orden exacto, buscalo en Biblioteca → Listas → Subir lista .cbl → Buscar en la colección.")
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
-        .padding(.top, 18)
+        .padding(.top, 24)
     }
 
     private func term(_ name: String, _ text: String) -> some View {
         (Text(name + ": ").bold().foregroundColor(Theme.ink) + Text(text).foregroundColor(Theme.ink2))
             .font(.subheadline)
     }
+}
 
-    private var tips: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Consejos")
-            tip("star", "Tocá un cómic, mirá \"De qué se trata\" y marcalo como \"Quiero leer\": así \"Para vos\" (en Inicio) te sugiere otros parecidos.")
-            tip("list.number", "Para los eventos, en Biblioteca → Listas → Subir lista .cbl → Buscar en la colección, encontrás su orden de lectura.")
-            tip("sparkles", "En Inicio, las filas por género te muestran más series de lo que te gusta, de todas las épocas.")
-            tip("person.2", "Si algo te gustó, dejá tu comentario: tus amigos lo ven en esta pestaña.")
+/// Tu nivel, tus puntos y tus medallas.
+struct LevelCard: View {
+    let score: GuideProgress.Score
+
+    var body: some View {
+        let level = GuideProgress.level(for: score.points)
+        let fraction: Double = level.next.map { Double(score.points - level.from) / Double(max($0 - level.from, 1)) } ?? 1
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("NIVEL \(level.index + 1)")
+                        .font(.caption.weight(.heavy))
+                        .tracking(1.2)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(level.name)
+                        .font(.system(size: 22, weight: .black).width(.expanded))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("\(score.points)")
+                        .font(.system(size: 30, weight: .black).monospacedDigit())
+                        .foregroundStyle(Theme.yellow)
+                    Text("puntos").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.25))
+                    Capsule().fill(Theme.yellow).frame(width: max(8, geo.size.width * min(max(fraction, 0), 1)))
+                }
+            }
+            .frame(height: 10)
+            Text(level.next.map { "Te faltan \($0 - score.points) puntos para \(GuideProgress.levels[level.index + 1].name)" }
+                 ?? "¡Llegaste al nivel más alto!")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+            HStack(spacing: 14) {
+                stat("\(score.issues)", "números leídos", "book.fill")
+                stat("\(score.stagesDone)", "medallas", "medal.fill")
+                stat("\(score.routesDone)", "rutas completas", "trophy.fill")
+            }
+            .padding(.top, 2)
         }
+        .padding(16)
+        .background(
+            LinearGradient(colors: [Color(hex: 0xD1006C), Color(hex: 0x6B2FD6)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.ink, lineWidth: 2))
+        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.cyan).offset(x: 4, y: 4))
     }
 
-    private func tip(_ icon: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon).foregroundStyle(Theme.magenta).frame(width: 22)
-            Text(text).font(.subheadline).foregroundStyle(Theme.ink)
+    private func stat(_ value: String, _ label: String, _ icon: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon).foregroundStyle(Theme.yellow)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(value).font(.subheadline.weight(.black).monospacedDigit()).foregroundStyle(.white)
+                Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
+            }
         }
     }
 }
 
-private struct GuidePickCard: View {
+private struct RouteCard: View {
+    let route: GuideRoute
+    let score: GuideProgress.Score
+    let next: GuideBook?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: route.icon)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 54, height: 54)
+                .background(route.color, in: RoundedRectangle(cornerRadius: 14))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(route.title).font(.system(size: 17, weight: .heavy)).foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text("\(score.points) pts").font(.caption.weight(.heavy).monospacedDigit()).foregroundStyle(Theme.magenta)
+                }
+                Text(route.subtitle).font(.caption).foregroundStyle(Theme.ink2).lineLimit(1)
+                ProgressBar(value: Double(score.stagesDone) / Double(max(score.stages, 1)))
+                Text(score.issues == 0
+                     ? "Empezá: \(next?.title ?? route.stages.first?.title ?? "")"
+                     : next.map { "Seguí por: \($0.title)" } ?? "¡Ruta completa!")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+            }
+            Image(systemName: "chevron.right").font(.footnote.weight(.bold)).foregroundStyle(Theme.ink2)
+        }
+        .padding(14)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.line))
+    }
+}
+
+private struct PickCard: View {
     let pick: GuidePick
-    @State private var found: StartGuide.Found?
+    @State private var found: GuideLookup.Found?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -335,30 +491,289 @@ private struct GuidePickCard: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .padding(.top, 5)
-            Text("\(String(pick.year)) · \(pick.publisher)")
-                .font(.caption)
-                .foregroundStyle(Theme.ink2)
-                .lineLimit(1)
-            Text(pick.why)
-                .font(.caption)
-                .foregroundStyle(Theme.ink)
-                .lineLimit(4)
-                .multilineTextAlignment(.leading)
+            Text("\(String(pick.year)) · \(pick.publisher)").font(.caption).foregroundStyle(Theme.ink2).lineLimit(1)
+            Text(pick.why).font(.caption).foregroundStyle(Theme.ink).lineLimit(4).multilineTextAlignment(.leading)
             if pick.adults {
-                Text("Para adultos")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Theme.magenta)
+                Text("Para adultos").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.magenta)
             }
         }
-        .frame(width: 140)
-        .task(id: pick.id) { found = await GuideResolver.shared.resolve(pick) }
+        .frame(width: 130)
+        .task(id: pick.id) { found = await GuideResolver.shared.resolve(pick.query, pick.year) }
     }
 }
 
-/// Al tocar una recomendación: busca su serie en Comic Vine y muestra la ficha.
-struct GuidePickView: View {
-    let pickID: String
-    @State private var found: StartGuide.Found?
+// MARK: - Una ruta
+
+struct GuideRouteView: View {
+    let routeID: String
+    private var progress: GuideProgress { GuideProgress.shared }
+    @State private var banner: String?
+    @State private var celebrate = 0
+
+    var body: some View {
+        if let route = GuideRoutes.route(routeID) {
+            content(route)
+        } else {
+            Text("Esta ruta ya no existe.").foregroundStyle(Theme.ink2)
+        }
+    }
+
+    private func content(_ route: GuideRoute) -> some View {
+        let finished = progress.finished()
+        let score = progress.score(route, finished)
+        let next = progress.next(in: route, finished)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 14) {
+                    Image(systemName: route.icon)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 62, height: 62)
+                        .background(route.color, in: RoundedRectangle(cornerRadius: 16))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(route.title).font(.system(size: 26, weight: .black).width(.expanded)).foregroundStyle(Theme.ink)
+                        Text("\(score.points) puntos · \(score.stagesDone) de \(score.stages) etapas")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.magenta)
+                    }
+                }
+                .padding(.top, 8)
+                ProgressBar(value: Double(score.stagesDone) / Double(max(score.stages, 1)))
+                    .padding(.top, 12)
+
+                if let next {
+                    NextUpCard(stage: next.stage, book: next.book, started: score.issues > 0,
+                               read: progress.read(next.book, finished), color: route.color) {
+                        mark(next.book, in: route)
+                    }
+                    .padding(.top, 16)
+                } else {
+                    Label("¡Completaste toda la ruta! +\(GuideProgress.pointsPerRoute) puntos", systemImage: "trophy.fill")
+                        .font(.headline)
+                        .foregroundStyle(Theme.magenta)
+                        .padding(.top, 16)
+                }
+
+                SectionTitle("Etapas")
+                ForEach(route.stages.indices, id: \.self) { index in
+                    StageRow(stage: route.stages[index], number: index + 1,
+                             isLast: index == route.stages.count - 1,
+                             finished: finished, color: route.color,
+                             isNext: next?.stage.id == route.stages[index].id) { book in
+                        mark(book, in: route)
+                    }
+                }
+
+                Text("Cada número que terminás en el lector suma \(GuideProgress.pointsPerIssue) puntos solo (si su ficha de Comic Vine es de la serie de la ruta). Si lo leíste en otro lado, marcá el tomo como leído. Cada etapa completa da una medalla (+\(GuideProgress.pointsPerStage)).")
+                    .font(.caption)
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.top, 16)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 30)
+        }
+        .background(Theme.paper)
+        .navigationTitle(route.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .overlay(alignment: .top) {
+            if let banner {
+                Text(banner)
+                    .font(.headline.weight(.heavy))
+                    .foregroundStyle(Theme.ink)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(Theme.yellow, in: Capsule())
+                    .overlay(Capsule().stroke(Theme.ink, lineWidth: 2))
+                    .padding(.top, 10)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .sensoryFeedback(.success, trigger: celebrate)
+    }
+
+    /// Marca o desmarca un tomo y festeja lo que ganaste.
+    private func mark(_ book: GuideBook, in route: GuideRoute) {
+        let before = progress.score(route, progress.finished())
+        let levelBefore = GuideProgress.level(for: progress.total(progress.finished()).points).index
+        progress.toggle(book)
+        let finished = progress.finished()
+        let after = progress.score(route, finished)
+        let gained = after.points - before.points
+        guard gained > 0 else { return }
+        var text = "+\(gained) puntos"
+        if after.stagesDone > before.stagesDone { text = "¡Etapa completada! 🏅 " + text }
+        if after.routesDone > before.routesDone { text = "¡Ruta completa! 🏆 " + text }
+        let levelAfter = GuideProgress.level(for: progress.total(finished).points)
+        if levelAfter.index > levelBefore { text += "\nSubiste a: \(levelAfter.name)" }
+        celebrate += 1
+        withAnimation(.spring(duration: 0.35)) { banner = text }
+        Task {
+            try? await Task.sleep(for: .seconds(2.6))
+            withAnimation(.easeOut(duration: 0.3)) { if banner == text { banner = nil } }
+        }
+    }
+}
+
+/// "Seguí por acá": el próximo tomo de la ruta.
+private struct NextUpCard: View {
+    let stage: GuideStage
+    let book: GuideBook
+    let started: Bool
+    let read: Int
+    let color: Color
+    let onMark: () -> Void
+    @State private var found: GuideLookup.Found?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            NavigationLink(value: CommunityRoute.guideSeries(book.series, book.year, book.title)) {
+                RemoteCover(url: found?.cover.flatMap { URL(string: $0) }).frame(width: 72)
+            }
+            .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(started ? "SEGUÍ POR ACÁ" : "EMPEZÁ POR ACÁ")
+                    .font(.caption.weight(.heavy)).tracking(1).foregroundStyle(color)
+                Text(book.title).font(.headline.weight(.heavy)).foregroundStyle(Theme.ink)
+                Text("\(book.series) (\(String(book.year))) \(book.numbersText) · \(stage.title)")
+                    .font(.caption).foregroundStyle(Theme.ink2)
+                if let count = book.issueCount {
+                    Text("Leíste \(read) de \(count) · vale \(count * GuideProgress.pointsPerIssue) puntos")
+                        .font(.caption.weight(.semibold)).foregroundStyle(Theme.ink)
+                }
+                HStack(spacing: 10) {
+                    NavigationLink(value: CommunityRoute.guideSeries(book.series, book.year, book.title)) {
+                        Text("Ver la serie").font(.subheadline.weight(.bold)).foregroundStyle(Theme.magenta)
+                    }
+                    if book.issueCount != nil {
+                        Button(action: onMark) {
+                            Text("Ya lo leí").font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Theme.chip, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(color, lineWidth: 2))
+        .task(id: book.id) { found = await GuideResolver.shared.resolve(book.series, book.year) }
+    }
+}
+
+/// Una etapa de la ruta, como en una línea de tiempo.
+private struct StageRow: View {
+    let stage: GuideStage
+    let number: Int
+    let isLast: Bool
+    let finished: GuideProgress.Finished
+    let color: Color
+    let isNext: Bool
+    let onMark: (GuideBook) -> Void
+    private var progress: GuideProgress { GuideProgress.shared }
+
+    var body: some View {
+        let done = progress.stageDone(stage, finished)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Circle().fill(done ? color : Theme.card)
+                    Circle().stroke(done || isNext ? color : Theme.line, lineWidth: 3)
+                    if done {
+                        Image(systemName: "medal.fill").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                    } else {
+                        Text("\(number)").font(.caption.weight(.heavy)).foregroundStyle(isNext ? color : Theme.ink2)
+                    }
+                }
+                .frame(width: 32, height: 32)
+                if !isLast {
+                    Rectangle().fill(done ? color : Theme.line).frame(width: 3).frame(maxHeight: .infinity)
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(stage.title).font(.system(size: 16, weight: .heavy)).foregroundStyle(Theme.ink)
+                    if stage.start {
+                        Text("Empezá por acá")
+                            .font(.system(size: 10, weight: .heavy))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .foregroundStyle(.white)
+                            .background(Theme.magenta, in: Capsule())
+                    }
+                }
+                Text(stage.years).font(.caption.weight(.semibold)).foregroundStyle(Theme.ink2)
+                Text(stage.text).font(.subheadline).foregroundStyle(Theme.ink)
+                ForEach(stage.books) { book in
+                    BookRow(book: book, read: progress.read(book, finished), marked: progress.isMarked(book),
+                            color: color) { onMark(book) }
+                }
+            }
+            .padding(.bottom, 22)
+        }
+    }
+}
+
+private struct BookRow: View {
+    let book: GuideBook
+    let read: Int
+    let marked: Bool
+    let color: Color
+    let onMark: () -> Void
+
+    var body: some View {
+        let done = book.issueCount.map { read >= $0 } ?? false
+        HStack(spacing: 10) {
+            NavigationLink(value: CommunityRoute.guideSeries(book.series, book.year, book.title)) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(book.title).font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
+                    Text("\(book.series) (\(String(book.year))) \(book.numbersText)")
+                        .font(.caption).foregroundStyle(Theme.ink2)
+                    if let note = book.note {
+                        Text(note).font(.caption2).foregroundStyle(Theme.ink2)
+                    }
+                    if let count = book.issueCount {
+                        Text(done ? "Leído ✓ · +\(count * GuideProgress.pointsPerIssue)"
+                             : read > 0 ? "Leíste \(read) de \(count)" : "\(count) \(count == 1 ? "número" : "números") · +\(count * GuideProgress.pointsPerIssue)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(done ? color : Theme.ink2)
+                    } else {
+                        Text(read > 0 ? "En curso · leíste \(read) · +\(read * GuideProgress.pointsPerIssue)"
+                             : "Serie en curso · suma \(GuideProgress.pointsPerIssue) por número")
+                            .font(.caption.weight(.semibold)).foregroundStyle(Theme.ink2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            if book.issueCount != nil {
+                Button(action: onMark) {
+                    Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 26))
+                        .foregroundStyle(done ? color : Theme.ink2)
+                }
+                .buttonStyle(.plain)
+                .disabled(done && !marked)   // leído solo con tus archivos: no se desmarca
+                .accessibilityLabel(done ? "Leído" : "Marcar como leído")
+            }
+        }
+        .padding(10)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(done ? color.opacity(0.6) : Theme.line))
+    }
+}
+
+// MARK: - Ficha de una serie de la guía
+
+/// Busca la serie en Comic Vine (una vez) y muestra su ficha.
+struct GuideSeriesView: View {
+    let query: String
+    let year: Int
+    let title: String
+    @State private var found: GuideLookup.Found?
     @State private var loading = true
     @State private var errorText: String?
 
@@ -370,15 +785,10 @@ struct GuidePickView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
-                    if let pick = StartGuide.pick(pickID) {
-                        Text(pick.title).font(.title2.weight(.black)).foregroundStyle(Theme.ink)
-                        Text("\(String(pick.year)) · \(pick.creators) · \(pick.publisher)")
-                            .font(.subheadline).foregroundStyle(Theme.ink2)
-                        Text(pick.why).font(.body).foregroundStyle(Theme.ink)
-                    }
+                    Text(title).font(.title2.weight(.black)).foregroundStyle(Theme.ink)
+                    Text("\(query) (\(String(year)))").font(.subheadline).foregroundStyle(Theme.ink2)
                     Text(errorText ?? "No encontré su ficha en Comic Vine. Probá buscarla con el buscador de Inicio.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.ink2)
+                        .font(.subheadline).foregroundStyle(Theme.ink2)
                     Spacer()
                 }
                 .padding(18)
@@ -387,11 +797,10 @@ struct GuidePickView: View {
             }
         }
         .task {
-            guard let pick = StartGuide.pick(pickID) else { loading = false; return }
-            if ComicVineKey.current.isEmpty && StartGuide.found(pick) == nil {
+            if ComicVineKey.current.isEmpty && GuideLookup.found(query, year) == nil {
                 errorText = "Para ver la ficha, cargá tu clave de Comic Vine en Perfil → Configuración → Cuentas de Metron y Comic Vine."
             } else {
-                do { found = try await StartGuide.resolve(pick) } catch {
+                do { found = try await GuideLookup.resolve(query, year) } catch {
                     errorText = CVText.message(for: error)
                 }
             }

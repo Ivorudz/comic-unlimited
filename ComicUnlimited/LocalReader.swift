@@ -523,6 +523,17 @@ struct LocalReaderView: View {
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 4)
+            // Si es de una ruta de la guía "Por dónde empezar", suma puntos.
+            let routes = GuideProgress.shared.routes(for: live)
+            if !routes.isEmpty {
+                Label("+\(GuideProgress.pointsPerIssue) puntos · Ruta \(routes.map(\.title).joined(separator: " y "))",
+                      systemImage: "star.circle.fill")
+                    .font(.subheadline.weight(.heavy))
+                    .foregroundStyle(Color(hex: 0x121419))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color(hex: 0xFFD400), in: Capsule())
+            }
             RateCard(comic: live)
             if let next = LocalLibrary.shared.next(after: live), onOpenNext != nil {
                 nextButton(next)

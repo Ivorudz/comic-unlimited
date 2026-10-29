@@ -42,7 +42,8 @@ struct AppDestinations: ViewModifier {
                 case .profile(let id): FriendProfileView(userID: id)
                 case .editProfile: EditProfileView()
                 case .startGuide: StartGuideView()
-                case .guidePick(let id): GuidePickView(pickID: id)
+                case .guideRoute(let id): GuideRouteView(routeID: id)
+                case .guideSeries(let query, let year, let title): GuideSeriesView(query: query, year: year, title: title)
                 }
             }
     }
