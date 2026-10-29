@@ -362,6 +362,8 @@ enum CommunityRoute: Hashable {
     case startGuide
     case guideRoute(String)
     case guideSeries(String, Int, String)
+    /// Una parada de una ruta: ruta, posición del primer número y camino.
+    case guideBlock(String, Int, String)
 }
 
 // MARK: - Configurar (primera vez)

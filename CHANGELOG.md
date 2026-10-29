@@ -4,9 +4,12 @@ Cada versión se compila sola en GitHub y aparece en [Releases](https://github.c
 
 ## 0.36 · Por dónde empezar
 - Botón grande **"¿No sabés por dónde empezar a leer?"** abajo de todo en Comunidad.
-- **Rutas de lectura** en orden: Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia. Cada etapa dice qué tomos leer (serie y números), marca dónde empezar y te muestra **qué sigue**.
-- **Puntos, niveles y medallas:** cada número de una ruta que terminás suma 10 puntos (o marcás el tomo como leído); cada etapa completa da una medalla, y cada ruta, un trofeo.
-- Abajo, recomendaciones sueltas por si no sabés qué te gusta.
+- **Rutas de lectura** de Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia, con el orden de **Comic Book Reading Orders (CBRO)** número por número, dividido en eras.
+- **Tres caminos:** Esencial (las series del equipo o personaje y el centro de cada evento), + Extras (los cruces aparecen como opcionales) y Con todo.
+- **Dos formas de verlo:** Camino (paradas con tapas en zigzag, como un juego) o Bloques (lista ordenada por eras).
+- **Punto de partida a elección:** desde el principio, desde una era, desde un "★ Empezá por acá" o desde cualquier parada. "Seguí por acá" te dice qué leer después.
+- **Puntos, niveles y medallas:** 10 puntos por número (20 los extras), una medalla por era completa y +300 por ruta. Los cómics que terminás en el lector suman solos; también podés marcar "Ya lo leí".
+- "Guardar este camino en Mis listas" y recomendaciones sueltas por si no sabés qué te gusta.
 
 ## 0.35.1 · Arcos en tus listas
 - Cada arco tiene los botones **Quiero leer / Leyendo / Leído** y tu puntaje: aparece en tus listas de Perfil con la etiqueta "Arco" y tocándolo se abre.

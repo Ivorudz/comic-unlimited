@@ -524,9 +524,8 @@ struct LocalReaderView: View {
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 4)
             // Si es de una ruta de la guía "Por dónde empezar", suma puntos.
-            let routes = GuideProgress.shared.routes(for: live)
-            if !routes.isEmpty {
-                Label("+\(GuideProgress.pointsPerIssue) puntos · Ruta \(routes.map(\.title).joined(separator: " y "))",
+            if let reward = GuideProgress.shared.reward(for: live) {
+                Label("+\(reward.points) puntos · Ruta \(reward.routes.joined(separator: " y "))",
                       systemImage: "star.circle.fill")
                     .font(.subheadline.weight(.heavy))
                     .foregroundStyle(Color(hex: 0x121419))

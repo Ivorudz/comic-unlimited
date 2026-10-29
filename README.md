@@ -56,6 +56,7 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 - **Historial de lectura:** cuándo leíste cada cómic, qué páginas y cuánto tiempo.
 - **Metron:** opción para marcar como leído en tu colección, con tus estrellas, y ver el promedio de su comunidad.
 - **Comunidad privada con amigos** en una base de datos propia y gratuita ([Supabase](https://supabase.com)): perfiles, amigos que se agregan los dos, y comentarios y puntajes en cada ficha.
+- **¿No sabés por dónde empezar a leer?** Rutas de Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia con el orden de [Comic Book Reading Orders](https://www.comicbookreadingorders.com): camino esencial, con extras o con todo; elegís desde dónde empezar y cada número leído suma puntos, niveles y medallas.
 
 ### 🔗 Fuentes
 - **Catálogos** que agregás con el link de un archivo JSON (formato en [FUENTES.md](FUENTES.md)), con descarga directa a la Biblioteca.

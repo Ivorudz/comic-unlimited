@@ -44,6 +44,7 @@ struct AppDestinations: ViewModifier {
                 case .startGuide: StartGuideView()
                 case .guideRoute(let id): GuideRouteView(routeID: id)
                 case .guideSeries(let query, let year, let title): GuideSeriesView(query: query, year: year, title: title)
+                case .guideBlock(let route, let start, let path): GuideBlockView(routeID: route, blockID: start, pathRaw: path)
                 }
             }
     }
