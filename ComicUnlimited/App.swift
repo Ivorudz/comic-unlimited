@@ -28,7 +28,7 @@ struct LocalSession: Identifiable {
     var id: String { comic.id }
 }
 
-// Las cinco pestañas de abajo. Comunidad todavía dice "Próximamente".
+// Las cinco pestañas de abajo: Inicio, Biblioteca, Rutas (guía de lectura), Comunidad (con Próximos) y Perfil.
 struct RootView: View {
     @Environment(ReadingStore.self) private var store
     @State private var session: ReaderSession?
@@ -44,12 +44,11 @@ struct RootView: View {
             LibraryView()
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
             NavigationStack {
-                UpcomingView()
+                StartGuideView(asTab: true)
                     .appDestinations()
-                    .toolbar(.hidden, for: .navigationBar)
                     .onAppear { BrowsingContext.current = nil }
             }
-            .tabItem { Label("Próximos", systemImage: "calendar") }
+            .tabItem { Label("Rutas", systemImage: "map") }
             CommunityView()
                 .tabItem { Label("Comunidad", systemImage: "bubble.left") }
             ProfileView()

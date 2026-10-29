@@ -32,7 +32,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 
 - `project.yml`: receta de XcodeGen. El `.xcodeproj` **no** se guarda en el repo; se genera al compilar.
 - `ComicUnlimited/`: el código de la app (iOS 17 o superior).
-  - `App.swift`: arranque y las cinco pestañas.
+  - `App.swift`: arranque y las cinco pestañas (Inicio, Biblioteca, Rutas, Comunidad, Perfil).
   - `HomeView.swift`: pestaña Inicio (Seguir leyendo con tus archivos, y Descubrir).
   - `Discover.swift`: fila "Recién salidos" de Inicio (cómics de la última semana), categorías de abajo de "Para vos" y lo guardado de Inicio (`HomeCache`).
   - `Genres.swift`: filas por género en Descubrir con series de cualquier época (géneros de Metron, clasificadas de a poco y guardadas en el iPhone).
@@ -55,7 +55,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ComicArchive.swift`: abre .cbz/.zip/.cbr-que-es-zip (lector de zip hecho a mano con Compression de Apple) y PDF (PDFKit).
   - `DetailView.swift`: ficha de un cómic.
   - `ReaderView.swift`: lector a pantalla completa.
-  - `UpcomingView.swift`: pestaña Próximos (lanzamientos por semana).
+  - `UpcomingView.swift`: Próximos (lanzamientos por semana), dentro de Comunidad.
   - `ComicVine.swift`: conexión con Comic Vine y carga de portadas.
   - `ComicVineBrowse.swift`: buscador de cómics reales, ficha de serie y ficha de número.
   - `ComicVineExtras.swift`: personajes y arcos con imagen; traducción automática de textos de Comic Vine (traductor de Apple, iOS 18+).
@@ -78,7 +78,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `ReadingHistory.swift`: historial de lectura (cuándo, qué páginas y cuánto tiempo) y su pantalla en Perfil.
   - `WebShare.swift`: "Ver en la compu": servidor HTTP chiquito en el Wi-Fi (Network de Apple, código de 6 números, solo lectura), silencio en segundo plano para seguir con el teléfono bloqueado y su pantalla.
   - `WebShareSite.swift`: la página que ve la compu (biblioteca y lector en el navegador, todo adentro, sin internet).
-  - `StartGuide.swift`: "¿No sabés por dónde empezar a leer?" (Comunidad): tu nivel, las rutas y recomendaciones sueltas.
+  - `StartGuide.swift`: pestaña Rutas ("¿No sabés por dónde empezar a leer?"): tu nivel, las rutas y recomendaciones sueltas.
   - `GuideData.swift`: datos de las rutas (caminos, paradas, eras), puntos, niveles, medallas, punto de partida y tapas de la guía.
   - `GuideRouteViews.swift`: pantalla de cada ruta (Camino en zigzag o Bloques, elegir punto de partida, "Seguí por acá") y de cada parada.
   - `Guides/ruta-*.json`: el orden de cada ruta (de CBRO, vía CBL-ReadingLists), guardado dentro de la app.
@@ -123,6 +123,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
 - 0.35: **Mis listas** (Biblioteca → botón "Listas", `CustomLists.swift`): crear, cambiar nombre y borrar listas; "Agregar a una lista" desde el menú de cada cómic de la Biblioteca, desde la ficha de cualquier número de Comic Vine (aunque no lo tengas) y desde la ficha de un archivo sin ficha; un cómic puede estar en varias listas. Dentro de la lista: Editar para ordenar arrastrando o sacar números; los que tenés (sueltos, en un TPB o archivos sin ficha) a color y los que faltan en gris con "Te falta · Descargar" (abre su ficha, o busca en tus fuentes si no tiene código de Comic Vine); "Tenés X de Y"; "Leer en orden" abre el primero que no terminaste y "Siguiente número" sigue la lista (`ReadContext.Kind.list`). Subir una lista .cbl: archivo (selector con copia, para LiveContainer), link, o buscar en la colección CBL-ReadingLists (mismo índice semanal que los órdenes de lectura); los números con código de Comic Vine completan nombre y link de portada de a 100 por consulta. Se guarda en `mis-listas.json` (Application Support), solo datos y links.
 - 0.35.1: los arcos también van a tus listas de Perfil: la pantalla de cada arco tiene Quiero leer / Leyendo / Leído y puntaje (`RealLibrary.Kind.arc`, clave "arc-ID"); en Perfil se ven con la etiqueta "Arco" y abren el arco; en la comunidad se suben con kind "arc" (no cuentan como "leídos" del perfil). Abrir un cómic desde un arco (contexto de lectura de arco) pasa el arco solo a "Leyendo" si no estaba en Leyendo ni Leído (`RealLibrary.startedArc`); al abrir la pantalla del arco se le completa la portada.
 - 0.36: botón grande gris "¿No sabés por dónde empezar a leer?" abajo de todo en Comunidad → guía (`StartGuide.swift`, `GuideData.swift`, `GuideRouteViews.swift`). **Rutas de lectura** (Avengers, X-Men, Spider-Man, Batman, Liga de la Justicia) con el orden de CBRO (listas "with events" y "no events" de CBL-ReadingLists, cada número con su código de Comic Vine), guardadas en `Guides/ruta-*.json` y generadas con `tools/rutas/` (ver su README). Tipos: 1 = serie principal (nombre exacto de la lista `PRINCIPAL` de `armar_rutas.py`, cualquier volumen, con sus Annual y Giant-Size), 2 = centro de un evento (serie y volumen iguales al título de una lista de Events), 0 = extra (las demás series propias de CBRO y los cruces). **Tres caminos**: Esencial (1 y 2, unos 900 números por ruta), + Extras (los 0 como opcionales, no frenan "Seguí por acá") y Con todo. **Eras** con nombres de Marvel Guides / DC (empiezan donde lo dice el año de las series principales). **Dos vistas**: Camino (zigzag con tapas, una parada por tramo de la misma serie) y Bloques (lista por era). **Punto de partida** (desde el principio, una era, "★ Empezá por acá" = #1 de una serie principal, un evento o cualquier parada). **Puntos**: 10 por número, 20 por extra, +50 medalla por era (lo esencial completo), +300 por ruta; 8 niveles. Leídos = archivos terminados con ficha de Comic Vine (y números de TPB terminados) + marcados a mano (`guia-progreso.json`). Tapas: links de Comic Vine de a 100 (`guia-tapas.json`, en caché). "Guardar este camino en Mis listas". Abajo, "Si no sabés qué te gusta": recomendaciones sueltas (UserDefaults `startGuide.found`).
+- 0.37: la guía pasa a ser la pestaña principal **Rutas** (`StartGuideView(asTab: true)`, ícono de mapa), en el lugar de Próximos. **Próximos** queda como tarjeta arriba de todo en Comunidad (`CommunityRoute.upcoming`); se saca el botón gris de la guía de Comunidad. Los avisos "Cargá tu clave de Comic Vine en Próximos" ahora dicen Perfil → Configuración.
 - Más adelante: "Crear lista con este arco" (desde la carpeta de un arco, en su orden de lectura) y "Descargar todos los que faltan" de una lista.
 - .cbr: los que por dentro son .zip se abren directo. Los que son RAR se convierten a .cbz al importarlos, con libarchive (viene dentro de iOS; Apple no la permite en el App Store, pero esta app es personal).
 - LiveContainer: el selector de archivos pide una COPIA (asCopy) porque leer el original puede fallar adentro de LiveContainer.

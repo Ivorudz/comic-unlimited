@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import Observation
 
-// Pestaña Próximos: qué cómics salen en las próximas semanas, día por día.
+// Próximos (en Comunidad): qué cómics salen en las próximas semanas, día por día.
 // Semanas que vienen: Metron primero. Semanas pasadas ("Recién salidos"): Comic Vine primero.
 
 /// De dónde salieron los datos que se muestran.

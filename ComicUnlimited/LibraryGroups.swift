@@ -475,7 +475,7 @@ private struct SeriesIssuesGrid: View {
         VStack(alignment: .leading, spacing: 0) {
             SectionTitle("Números")
             if ComicVineKey.current.isEmpty {
-                Text("Cargá tu clave de Comic Vine en Próximos para ver también los números que te faltan.")
+                Text("Cargá tu clave de Comic Vine en Perfil → Configuración para ver también los números que te faltan.")
                     .font(.subheadline).foregroundStyle(Theme.ink2).padding(.bottom, 12)
             } else if let errorText {
                 Text(errorText).font(.subheadline).foregroundStyle(Theme.ink2).padding(.bottom, 12)

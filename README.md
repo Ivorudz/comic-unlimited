@@ -44,7 +44,10 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 - Cada arco con todos sus números, los tuyos a color y los que faltan en gris.
 - **Orden de lectura automático:** busca el arco en la colección pública de listas [CBL-ReadingLists](https://github.com/DieselTech/CBL-ReadingLists) (órdenes de Comic Book Reading Orders, Complete Marvel Reading Orders, League of Comic Geeks y otros) o en Metron.
 
-### 🗓️ Próximos
+### 🧭 Rutas
+- **¿No sabés por dónde empezar a leer?** La pestaña Rutas tiene las rutas de Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia con el orden de [Comic Book Reading Orders](https://www.comicbookreadingorders.com): camino esencial, con extras o con todo; elegís desde dónde empezar y cada número leído suma puntos, niveles y medallas.
+
+### 🗓️ Próximos (en Comunidad)
 - Lo que sale **cada semana o cada mes**, desde Metron (o Comic Vine si Metron no responde), sin manga ni ediciones de otros países.
 - Tocar un cómic abre su ficha, aunque Comic Vine todavía no lo tenga.
 - "Revisar conexión" para ver qué responde cada servicio.
@@ -56,7 +59,6 @@ Es una app **personal y sin fines comerciales**, escrita en SwiftUI y **sin prog
 - **Historial de lectura:** cuándo leíste cada cómic, qué páginas y cuánto tiempo.
 - **Metron:** opción para marcar como leído en tu colección, con tus estrellas, y ver el promedio de su comunidad.
 - **Comunidad privada con amigos** en una base de datos propia y gratuita ([Supabase](https://supabase.com)): perfiles, amigos que se agregan los dos, y comentarios y puntajes en cada ficha.
-- **¿No sabés por dónde empezar a leer?** Rutas de Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia con el orden de [Comic Book Reading Orders](https://www.comicbookreadingorders.com): camino esencial, con extras o con todo; elegís desde dónde empezar y cada número leído suma puntos, niveles y medallas.
 
 ### 🔗 Fuentes
 - **Catálogos** que agregás con el link de un archivo JSON (formato en [FUENTES.md](FUENTES.md)), con descarga directa a la Biblioteca.

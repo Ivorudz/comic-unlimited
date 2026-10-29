@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.37 · Pestaña Rutas
+- Las **rutas de lectura** pasan a ser una pestaña principal, **Rutas**, en el lugar donde estaba Próximos.
+- **Próximos** ahora está arriba de todo en **Comunidad**.
+
 ## 0.36 · Por dónde empezar
 - Botón grande **"¿No sabés por dónde empezar a leer?"** abajo de todo en Comunidad.
 - **Rutas de lectura** de Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia, con el orden de **Comic Book Reading Orders (CBRO)** número por número, dividido en eras.

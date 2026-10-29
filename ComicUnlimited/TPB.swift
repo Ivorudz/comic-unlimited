@@ -302,7 +302,7 @@ struct TPBContentsEditor: View {
         }, select: true)
 
         guard !ComicVineKey.current.isEmpty else {
-            status = "Cargá tu clave de Comic Vine (en Próximos) para que la app te proponga los números."
+            status = "Cargá tu clave de Comic Vine (en Perfil → Configuración) para que la app te proponga los números."
             return
         }
         guard let tpbID = comic.cvIssueID else {
@@ -371,7 +371,7 @@ struct TPBContentsEditor: View {
         let group = TPBParser.Group(series: manualSeries.trimmingCharacters(in: .whitespaces), year: nil,
                                     numbers: TPBParser.parseNumbers(manualNumbers))
         guard !ComicVineKey.current.isEmpty else {
-            status = "Cargá tu clave de Comic Vine (en Próximos) para buscar los números."
+            status = "Cargá tu clave de Comic Vine (en Perfil → Configuración) para buscar los números."
             return
         }
         adding = true

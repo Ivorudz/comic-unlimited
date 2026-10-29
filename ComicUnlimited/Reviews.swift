@@ -226,6 +226,36 @@ struct CommunityView: View {
                         .foregroundStyle(Theme.ink)
                         .padding(.top, 8)
 
+                    // Próximos: qué cómics salen (antes era una pestaña).
+                    NavigationLink(value: CommunityRoute.upcoming) {
+                        HStack(spacing: 14) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 48, height: 48)
+                                .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 12))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Próximos")
+                                    .font(.system(size: 18, weight: .heavy))
+                                    .foregroundStyle(Theme.ink)
+                                Text("Qué cómics salen esta semana y las que vienen")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Theme.ink2)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.body.weight(.bold))
+                                .foregroundStyle(Theme.ink2)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.line))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 14)
+
                     if !community.isConfigured {
                         CommunitySetupCard()
                     } else if !community.isLoggedIn {
@@ -263,34 +293,6 @@ struct CommunityView: View {
                         EntryLink(entry: entry) { ReviewRow(entry: entry) }
                     }
 
-                    // Botón grande gris: guía para empezar a leer.
-                    NavigationLink(value: CommunityRoute.startGuide) {
-                        HStack(spacing: 14) {
-                            Image(systemName: "books.vertical.fill")
-                                .font(.system(size: 26, weight: .semibold))
-                                .foregroundStyle(Theme.magenta)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("¿No sabés por dónde empezar a leer?")
-                                    .font(.system(size: 18, weight: .heavy))
-                                    .foregroundStyle(Theme.ink)
-                                    .multilineTextAlignment(.leading)
-                                Text("Rutas de lectura en orden, con puntos y medallas")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Theme.ink2)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
-                                .font(.body.weight(.bold))
-                                .foregroundStyle(Theme.ink2)
-                        }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 20)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.chip, in: RoundedRectangle(cornerRadius: 18))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 32)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 30)
@@ -360,6 +362,8 @@ enum CommunityRoute: Hashable {
     case profile(String)
     /// "¿No sabés por dónde empezar a leer?", cada ruta y la ficha de una serie de la guía (StartGuide.swift).
     case startGuide
+    /// Próximos (lanzamientos por semana), dentro de Comunidad.
+    case upcoming
     case guideRoute(String)
     case guideSeries(String, Int, String)
     /// Una parada de una ruta: ruta, posición del primer número y camino.

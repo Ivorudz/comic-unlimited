@@ -11,6 +11,8 @@ import SwiftUI
 // MARK: - Pantalla principal de la guía
 
 struct StartGuideView: View {
+    /// true = es la pestaña "Rutas" (título grande, sin barra de arriba).
+    var asTab = false
     private var progress: GuideProgress { GuideProgress.shared }
 
     var body: some View {
@@ -19,11 +21,17 @@ struct StartGuideView: View {
         let total = routes.map { progress.score($0.route, read) }.reduce(GuideProgress.Score(), +)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Por dónde empezar")
-                    .font(.system(size: 28, weight: .black).width(.expanded))
+                Text(asTab ? "Rutas" : "Por dónde empezar")
+                    .font(.system(size: asTab ? 32 : 28, weight: .black).width(.expanded))
                     .foregroundStyle(Theme.ink)
                     .misprint(0.6)
-                    .padding(.top, 8)
+                    .padding(.top, asTab ? 20 : 8)
+                if asTab {
+                    Text("¿No sabés por dónde empezar a leer?")
+                        .font(.headline)
+                        .foregroundStyle(Theme.ink)
+                        .padding(.top, 4)
+                }
                 Text("Elegí una ruta, un camino (esencial, con extras o con todo) y un punto de partida. Cada número que leas suma puntos.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.ink2)
@@ -74,9 +82,9 @@ struct StartGuideView: View {
             .padding(.bottom, 30)
         }
         .background(Theme.paper)
-        .navigationTitle("Empezar a leer")
+        .navigationTitle(asTab ? "Rutas" : "Empezar a leer")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
+        .toolbar(asTab ? .hidden : .visible, for: .navigationBar)
     }
 
     /// Cuánto de lo esencial de la ruta leíste (para la barrita).

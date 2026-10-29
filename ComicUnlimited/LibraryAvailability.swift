@@ -42,6 +42,10 @@ struct AppDestinations: ViewModifier {
                 case .profile(let id): FriendProfileView(userID: id)
                 case .editProfile: EditProfileView()
                 case .startGuide: StartGuideView()
+                case .upcoming:
+                    UpcomingView()
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar(.visible, for: .navigationBar)
                 case .guideRoute(let id): GuideRouteView(routeID: id)
                 case .guideSeries(let query, let year, let title): GuideSeriesView(query: query, year: year, title: title)
                 case .guideBlock(let route, let start, let path): GuideBlockView(routeID: route, blockID: start, pathRaw: path)

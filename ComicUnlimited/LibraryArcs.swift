@@ -350,7 +350,7 @@ struct ArcFolderView: View {
 
     private func load() async {
         guard !ComicVineKey.current.isEmpty else {
-            errorText = "Cargá tu clave de Comic Vine en Próximos para ver todos los números del arco."
+            errorText = "Cargá tu clave de Comic Vine en Perfil → Configuración para ver todos los números del arco."
             return
         }
         loading = true
