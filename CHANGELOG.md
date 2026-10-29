@@ -5,7 +5,7 @@ Cada versión se compila sola en GitHub y aparece en [Releases](https://github.c
 ## 0.36 · Por dónde empezar
 - Botón grande **"¿No sabés por dónde empezar a leer?"** abajo de todo en Comunidad.
 - **Rutas de lectura** de Avengers, X-Men, Spider-Man, Batman y Liga de la Justicia, con el orden de **Comic Book Reading Orders (CBRO)** número por número, dividido en eras.
-- **Tres caminos:** Esencial (las series del equipo o personaje y el centro de cada evento), + Extras (los cruces aparecen como opcionales) y Con todo.
+- **Tres caminos:** Esencial (solo las series principales, sus anuales y el centro de cada evento: unos 900 números por ruta), + Extras (las demás series y los cruces aparecen como opcionales) y Con todo.
 - **Dos formas de verlo:** Camino (paradas con tapas en zigzag, como un juego) o Bloques (lista ordenada por eras).
 - **Punto de partida a elección:** desde el principio, desde una era, desde un "★ Empezá por acá" o desde cualquier parada. "Seguí por acá" te dice qué leer después.
 - **Puntos, niveles y medallas:** 10 puntos por número (20 los extras), una medalla por era completa y +300 por ruta. Los cómics que terminás en el lector suman solos; también podés marcar "Ya lo leí".

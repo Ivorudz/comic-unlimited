@@ -37,6 +37,7 @@ struct StartGuideView: View {
                     ForEach(routes) { pair in
                         NavigationLink(value: CommunityRoute.guideRoute(pair.info.id)) {
                             RouteCard(info: pair.info, route: pair.route, score: progress.score(pair.route, read),
+                                      fraction: essentialFraction(pair.route, read),
                                       next: progress.next(pair.route, path: progress.path(pair.info.id), read: read))
                         }
                         .buttonStyle(.plain)
@@ -76,6 +77,13 @@ struct StartGuideView: View {
         .navigationTitle("Empezar a leer")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+    }
+
+    /// Cuánto de lo esencial de la ruta leíste (para la barrita).
+    private func essentialFraction(_ route: RouteData, _ read: Set<Int>) -> Double {
+        let essential = route.items.filter { !$0.isExtra }
+        guard !essential.isEmpty else { return 0 }
+        return Double(essential.filter { read.contains($0.cvID) }.count) / Double(essential.count)
     }
 
     private var basics: some View {
@@ -175,6 +183,7 @@ private struct RouteCard: View {
     let info: RouteInfo
     let route: RouteData
     let score: GuideProgress.Score
+    let fraction: Double
     let next: RouteBlock?
 
     var body: some View {
@@ -190,8 +199,8 @@ private struct RouteCard: View {
                     Spacer()
                     Text("\(score.points) pts").font(.caption.weight(.heavy).monospacedDigit()).foregroundStyle(Theme.magenta)
                 }
-                Text("\(info.subtitle) · \(route.items.count) números").font(.caption).foregroundStyle(Theme.ink2).lineLimit(1)
-                ProgressBar(value: Double(score.medals) / Double(max(score.eras, 1)))
+                Text("\(info.subtitle) · \(route.items.filter { !$0.isExtra }.count) esenciales").font(.caption).foregroundStyle(Theme.ink2).lineLimit(1)
+                ProgressBar(value: fraction)
                 Text(score.issues == 0
                      ? "Elegí por dónde empezar"
                      : next.map { "Seguí por: \($0.series.label) \($0.numbersText)" } ?? "¡Ruta completa!")

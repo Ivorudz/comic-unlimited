@@ -10,6 +10,21 @@ MARVEL=[(1961,"Edad de Plata"),(1970,"Edad de Bronce"),(1984,"Empieza la Era Mod
 DC=[(1938,"Edad de Oro"),(1956,"Edad de Plata"),(1970,"Edad de Bronce"),(1986,"Después de Crisis"),(2011,"Los Nuevos 52"),
     (2016,"Renacimiento"),(2021,"Infinite Frontier"),(2023,"Dawn of DC"),(2024,"DC All In")]
 KEYWORDS={"avengers":["avengers"],"xmen":["xmen","xfactor","newmutants"],"spiderman":["spiderman"],"batman":["batman","detectivecomics"],"justiceleague":["justiceleague","jla"]}
+# Camino "Esencial": solo las series principales de cada ruta (nombre exacto, cualquier volumen), sus anuales y
+# Giant-Size, más el centro de cada evento. El resto de las series propias de CBRO pasa a ser extra.
+PRINCIPAL={
+ "avengers":["avengers","newavengers","mightyavengers","uncannyavengers","darkavengers","secretavengers",
+             "westcoastavengers","avengerswestcoast","avengersforever"],
+ "xmen":["xmen","uncannyxmen","allnewxmen","astonishingxmen","newxmen","xmenblue","xmengold","xmenred",
+         "wolverineandthexmen","extraordinaryxmen","immortalxmen"],
+ "spiderman":["amazingspiderman","spectacularspiderman","peterparkerspectacularspiderman","superiorspiderman",
+              "webofspiderman","spiderman","sensationalspiderman","peterparkerspiderman","friendlyneighborhoodspiderman"],
+ "batman":["batman","detectivecomics","batmanandrobin","batmanincorporated"],
+ "justiceleague":["justiceleague","justiceleagueofamerica","jla","justiceleagueinternational","justiceleagueamerica"],
+}
+def principal(rid,name):
+    n=norm(name)
+    return any(n in (p,p+"annual","giantsize"+p) for p in PRINCIPAL[rid])
 ROUTES=[
  ("avengers","Avengers",MARVEL,"Marvel/Teams/Avengers/[Marvel] Avengers with events (WEB-CBRO).cbl","Marvel/Teams/Avengers/[Marvel] Avengers no events (WEB-CBRO).cbl",["avengers","newavengers","mightyavengers","uncannyavengers"]),
  ("xmen","X-Men",MARVEL,"Marvel/Teams/X-Men/WEB-CBRO/[Marvel] X-Men with events (WEB-CBRO).cbl","Marvel/Teams/X-Men/WEB-CBRO/[Marvel] X-Men no events (WEB-CBRO).cbl",["xmen","uncannyxmen","allnewxmen","astonishingxmen","newxmen","xmenblue","xmengold","xmenred"]),
@@ -71,6 +86,9 @@ for rid,rtitle,eras,wf,nf,flag in ROUTES:
         if key in seen: continue
         if it[3]==2: seen.add(key); marks.append({"i":i,"t":f"{series[key][0]} ({series[key][1]})","k":"e"})
         elif isflag(it) and num1(it[2]): seen.add(key); marks.append({"i":i,"t":f"{series[key][0]} ({series[key][1]})","k":"s"})
+    # Las series propias que no son principales pasan a ser extras (lo esencial queda corto y claro).
+    for it in items:
+        if it[3]==1 and not principal(rid,series[it[1]][0]): it[3]=0
     data={"id":rid,"title":rtitle,"source":"Comic Book Reading Orders (CBRO), vía CBL-ReadingLists",
           "series":series,"items":[it[:4] for it in items],"stages":stages,"marks":marks}
     json.dump(data,open(os.path.join(outdir,f"ruta-{rid}.json"),"w"),separators=(",",":"),ensure_ascii=False)

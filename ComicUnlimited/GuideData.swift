@@ -5,8 +5,8 @@ import Observation
 // El orden sale de las listas de Comic Book Reading Orders (CBRO) de la colección pública CBL-ReadingLists,
 // guardadas dentro de la app en Guides/ruta-*.json (se generan con tools/rutas/armar_rutas.py).
 // Cada número trae su código de Comic Vine, así que lo leído se cuenta exacto.
-// Tipos de número: 1 = de las series propias de la ruta, 2 = núcleo de un evento (los dos son "esenciales"),
-// 0 = cruce con otra serie ("extra").
+// Tipos de número: 1 = de una serie principal de la ruta, 2 = núcleo de un evento (los dos son "esenciales"),
+// 0 = otra serie o cruce ("extra").
 
 struct RouteSeries: Decodable {
     let name: String
@@ -89,8 +89,8 @@ enum RoutePath: String, CaseIterable, Identifiable {
     }
     var explanation: String {
         switch self {
-        case .essential: return "Las series del equipo o personaje y el centro de cada evento."
-        case .withExtras: return "Lo esencial, con los cruces con otras series marcados como extras opcionales (valen el doble)."
+        case .essential: return "Solo las series principales (con sus anuales) y el centro de cada evento."
+        case .withExtras: return "Lo esencial, con las demás series y los cruces marcados como extras opcionales (valen el doble)."
         case .everything: return "Todo el orden de CBRO, con cada cruce en su lugar (los extras valen el doble)."
         }
     }
