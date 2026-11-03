@@ -577,13 +577,45 @@ enum CVText {
     }
 
     /// Comic Vine manda los textos con formato de página web (HTML). Esto les saca las etiquetas.
+    /// Cambia los códigos de HTML por su letra: "&#8211;" → "–", "&amp;" → "&", "&rsquo;" → "’"…
+    static func decodeEntities(_ text: String) -> String {
+        guard text.contains("&") else { return text }
+        var s = text
+        // Números: &#8211; y &#x2013;
+        if let regex = try? NSRegularExpression(pattern: "&#(x?)([0-9a-fA-F]+);") {
+            let ns = s as NSString
+            var out = ""
+            var last = 0
+            for match in regex.matches(in: s, range: NSRange(location: 0, length: ns.length)) {
+                out += ns.substring(with: NSRange(location: last, length: match.range.location - last))
+                let hex = match.range(at: 1).length > 0
+                let digits = ns.substring(with: match.range(at: 2))
+                if let value = UInt32(digits, radix: hex ? 16 : 10), let scalar = Unicode.Scalar(value) {
+                    out += String(Character(scalar))
+                } else {
+                    out += ns.substring(with: match.range)
+                }
+                last = match.range.location + match.range.length
+            }
+            out += ns.substring(from: last)
+            s = out
+        }
+        let named = ["&quot;": "\"", "&apos;": "'", "&lt;": "<", "&gt;": ">", "&nbsp;": " ",
+                     "&ndash;": "–", "&mdash;": "—", "&hellip;": "…", "&lsquo;": "‘", "&rsquo;": "’",
+                     "&ldquo;": "“", "&rdquo;": "”", "&laquo;": "«", "&raquo;": "»", "&iexcl;": "¡",
+                     "&iquest;": "¿", "&ntilde;": "ñ", "&aacute;": "á", "&eacute;": "é", "&iacute;": "í",
+                     "&oacute;": "ó", "&uacute;": "ú", "&times;": "×"]
+        for (code, char) in named { s = s.replacingOccurrences(of: code, with: char) }
+        // "&amp;" al final, para no armar códigos nuevos sin querer.
+        return s.replacingOccurrences(of: "&amp;", with: "&")
+    }
+
     static func plain(_ html: String?) -> String? {
         guard var s = html, !s.isEmpty else { return nil }
         s = s.replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: [.regularExpression, .caseInsensitive])
         s = s.replacingOccurrences(of: "</(p|h[1-6]|li|div|tr)>", with: "\n", options: [.regularExpression, .caseInsensitive])
         s = s.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-        let entities = ["&amp;": "&", "&quot;": "\"", "&#039;": "'", "&#39;": "'", "&lt;": "<", "&gt;": ">", "&nbsp;": " "]
-        for (code, char) in entities { s = s.replacingOccurrences(of: code, with: char) }
+        s = decodeEntities(s)
         s = s.replacingOccurrences(of: "[ \\t]+", with: " ", options: .regularExpression)
         s = s.replacingOccurrences(of: "\\n\\s*\\n\\s*\\n+", with: "\n\n", options: .regularExpression)
         s = s.trimmingCharacters(in: .whitespacesAndNewlines)

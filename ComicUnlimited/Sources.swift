@@ -118,7 +118,7 @@ struct SourceComic: Decodable, Identifiable, Hashable {
         } else {
             parts.append(title)
         }
-        if let year, !year.isEmpty { parts.append("(\(year))") }
+        if let year, !year.isEmpty, !parts.joined().contains("(\(year))") { parts.append("(\(year))") }
         let name = parts.joined(separator: " ")
             .components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined(separator: " ")
         return "\(name).\(fileExtension)"
@@ -147,6 +147,8 @@ enum SourceError: LocalizedError {
     case network(String)
     case badFormat(String)
     case server(Int)
+    /// En vez del archivo llegó una página web (con su título, si tiene).
+    case webPage(String?)
 
     var errorDescription: String? {
         switch self {
@@ -155,6 +157,9 @@ enum SourceError: LocalizedError {
         case .network(let why): return "No se pudo conectar. (\(why))"
         case .badFormat(let why): return "El JSON no tiene el formato de una fuente: \(why). Mirá FUENTES.md en el repositorio."
         case .server(let code): return "El servidor respondió con un error (código \(code))."
+        case .webPage(let title):
+            let page = title.map { " (\"\($0)\")" } ?? ""
+            return "En vez del cómic llegó una página web\(page). El link no lleva directo al archivo: puede pedir entrar o tocar un botón en el navegador. Probá \"Abrir en Safari\"."
         }
     }
 }
@@ -353,6 +358,11 @@ final class FileDownloader: NSObject, URLSessionDownloadDelegate {
         var name = fileName
         if let real = Self.detectExtension(location) {
             name = (fileName as NSString).deletingPathExtension + "." + real
+        } else if let page = Self.webPage(location, response: downloadTask.response) {
+            // No es un cómic: es una página web (por ejemplo, una página de "descargar" o de error).
+            continuation?.resume(throwing: SourceError.webPage(page.title))
+            continuation = nil
+            return
         }
         let dest = folder.appendingPathComponent(name)
         do {
@@ -378,6 +388,29 @@ final class FileDownloader: NSObject, URLSessionDownloadDelegate {
         if Array(bytes[0..<4]) == [0x25, 0x50, 0x44, 0x46] { return "pdf" }
         if bytes.count >= 262, Array(bytes[257..<262]) == Array("ustar".utf8) { return "cbt" }
         return nil
+    }
+
+    struct WebPage { let title: String? }
+
+    /// Si lo que llegó es una página web, devuelve su título (si tiene). nil = no es una página web.
+    static func webPage(_ url: URL, response: URLResponse?) -> WebPage? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let head = try? handle.read(upToCount: 64_000), !head.isEmpty else { return nil }
+        let text = String(decoding: head, as: UTF8.self)
+        let lower = text.lowercased()
+        let isHTML = (response?.mimeType?.lowercased().contains("html") ?? false)
+            || lower.contains("<!doctype html") || lower.contains("<html")
+        guard isHTML else { return nil }
+        var title: String?
+        if let start = text.range(of: "<title", options: .caseInsensitive),
+           let close = text.range(of: ">", range: start.upperBound..<text.endIndex),
+           let end = text.range(of: "</title>", options: .caseInsensitive, range: close.upperBound..<text.endIndex) {
+            let raw = String(text[close.upperBound..<end.lowerBound])
+            let clean = CVText.decodeEntities(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clean.isEmpty { title = String(clean.prefix(80)) }
+        }
+        return WebPage(title: title)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

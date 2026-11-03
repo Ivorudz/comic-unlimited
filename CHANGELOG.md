@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.37.1 · Descargas más claras
+- Los títulos de tu página WordPress se ven bien: "Star Wars – Rogue One" en vez de "Star Wars &#8211; Rogue One".
+- Si un link de descarga devuelve una página web en vez del cómic, la app lo dice (con el nombre de esa página) y muestra **Abrir en Safari** para bajarlo desde el navegador.
+- El nombre del archivo ya no repite el año ("(2026) (2026)").
+
 ## 0.37 · Pestaña Rutas
 - Las **rutas de lectura** pasan a ser una pestaña principal, **Rutas**, en el lugar donde estaba Próximos.
 - **Próximos** ahora está arriba de todo en **Comunidad**.

@@ -117,7 +117,8 @@ enum WordPressClient {
         var seen = Set<String>()
         var result: [WPLink] = []
         for match in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
-            let raw = ns.substring(with: match.range(at: 1)).replacingOccurrences(of: "&amp;", with: "&")
+            // WordPress escribe "&" como "&amp;" o "&#038;" dentro de los links.
+            let raw = CVText.decodeEntities(ns.substring(with: match.range(at: 1)))
             guard raw.lowercased().hasPrefix("https://"), seen.insert(raw).inserted,
                   let url = URL(string: raw), let host = url.host?.lowercased() else { continue }
             result.append(classify(raw, url: url, host: host))
@@ -384,7 +385,13 @@ struct WordPressPostView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(link.label).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(1)
                 if let failure = store.failures[key] {
-                    Text(failure).font(.caption2).foregroundStyle(Theme.magenta).lineLimit(3)
+                    Text(failure).font(.caption2).foregroundStyle(Theme.magenta).lineLimit(4)
+                    if let url = URL(string: link.original) {
+                        Button("Abrir en Safari") { openURL(url) }
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.ink)
+                            .buttonStyle(.plain)
+                    }
                 }
             }
             Spacer(minLength: 0)
