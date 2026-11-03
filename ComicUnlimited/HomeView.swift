@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var forYou = ForYouModel()
     @State private var genres = GenreModel()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.selectTab) private var selectTab
 
     var body: some View {
         NavigationStack {
@@ -22,12 +23,24 @@ struct HomeView: View {
                     searchBar
                     continueReading
                     discoverSection
+                    Text("Datos y portadas: Comic Vine y Metron. Las portadas pertenecen a sus editoriales.")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.top, 8)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 24)
             }
             .background(Theme.paper)
+            // Deslizar hacia abajo: actualiza Recién salidos (y Para vos si cambiaron tus listas).
+            .refreshable {
+                await discover.retry()
+                await forYou.loadIfNeeded()
+            }
             .appDestinations()
+            .navigationDestination(for: HomeRoute.self) { route in
+                HomeGridScreen(route: route, discover: discover, forYou: forYou, genres: genres)
+            }
             .navigationDestination(for: Comic.self) { comic in
                 DetailView(comic: comic, onRead: onRead)
             }
@@ -51,10 +64,11 @@ struct HomeView: View {
     // MARK: Partes de la pantalla
 
     private var header: some View {
-        Text("Cómic\nUnlimited")
-            .font(.system(size: 44, weight: .black).width(.expanded))
-            .lineSpacing(-6)
+        Text("Cómic Unlimited")
+            .font(.system(.title, weight: .black).width(.expanded))
             .foregroundStyle(Theme.ink)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
             .misprint()
             .padding(.top, 10)
     }
@@ -71,7 +85,7 @@ struct HomeView: View {
                     .background(Theme.magenta, in: Circle())
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Buscar cómics")
-                        .font(.system(size: 16, weight: .heavy))
+                        .font(.callout.weight(.heavy))
                         .foregroundStyle(Theme.ink)
                     Text("Series, números, autores o personajes")
                         .font(.caption)
@@ -105,11 +119,21 @@ struct HomeView: View {
     private var continueReading: some View {
         // Solo tus archivos de la Biblioteca (los cómics de prueba ya no se muestran en Inicio).
         let recent = LocalLibrary.shared.recentlyRead.map { RecentItem.local($0) }
-        SectionTitle("Seguir leyendo")
+        HomeSectionTitle("Seguir leyendo")
         if recent.isEmpty {
-            Text("Todavía no empezaste ningún cómic. Importá uno en la Biblioteca y abrilo: va a aparecer acá.")
-                .font(.subheadline)
-                .foregroundStyle(Theme.ink2)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Todavía no empezaste ningún cómic. Importá uno en la Biblioteca y abrilo: va a aparecer acá.")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.ink2)
+                Button { selectTab(.library) } label: {
+                    Label("Ir a la Biblioteca", systemImage: "books.vertical")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.magenta)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -163,16 +187,23 @@ struct HomeView: View {
     /// "Descubrir": recién salidos, sugerencias, de tus series, series nuevas, géneros y editoriales.
     @ViewBuilder
     private var discoverSection: some View {
-        SectionTitle("Descubrir")
+        HomeSectionTitle("Descubrir")
 
-        RowTitle(title: "Recién salidos", subtitle: "De la última semana, desde Comic Vine")
+        HomeRowHeader(title: "Recién salidos", route: discover.all.isEmpty ? nil : .issues("recientes"))
         RecentReleasesRow(model: discover)
 
-        RowTitle(title: "Para vos", subtitle: "Series según tus puntajes y tus listas")
+        HomeRowHeader(title: "Para vos", route: forYouHasItems ? .forYou : nil)
             .padding(.top, 22)
         ForYouRow(model: forYou)
 
         DiscoverMoreRows(model: discover, genres: genres)
+    }
+}
+
+extension HomeView {
+    fileprivate var forYouHasItems: Bool {
+        if case .loaded(let items) = forYou.state { return !items.isEmpty }
+        return false
     }
 }
 
@@ -213,7 +244,7 @@ private struct LocalContinueCard: View {
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
             VStack(alignment: .leading, spacing: 3) {
                 Text(comic.displayTitle)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
                 // De qué arco o serie venías (o "Biblioteca").
@@ -238,20 +269,6 @@ private struct LocalContinueCard: View {
     }
 }
 
-/// Título chico de cada fila de "Descubrir".
-private struct RowTitle: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
-            Text(subtitle).font(.caption).foregroundStyle(Theme.ink2)
-        }
-        .padding(.bottom, 10)
-    }
-}
-
 // MARK: - Piezas reutilizables
 
 /// Al apretar la barra de búsqueda, se achica un poquito (como un botón de verdad).
@@ -269,7 +286,7 @@ struct SectionTitle: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 19, weight: .heavy))
+            .font(.title3.weight(.heavy))
             .foregroundStyle(Theme.ink)
             .padding(.top, 28)
             .padding(.bottom, 12)

@@ -534,13 +534,23 @@ final class CoverLoader {
     private let session = URLSession(configuration: .ephemeral)
     private let memory = NSCache<NSURL, UIImage>()
 
+    /// Baja la portada. Si falla (por ejemplo, internet lento), vuelve a probar dos veces
+    /// (a los 2 y a los 5 segundos), mientras la portada siga en pantalla.
     func image(for url: URL) async -> UIImage? {
         if let cached = memory.object(forKey: url as NSURL) { return cached }
         var request = URLRequest(url: url)
         request.setValue("ComicUnlimited/0.3 (app personal, uso no comercial)", forHTTPHeaderField: "User-Agent")
-        guard let fetched = try? await session.data(for: request),
-              let image = UIImage(data: fetched.0) else { return nil }
-        memory.setObject(image, forKey: url as NSURL)
-        return image
+        for wait in [0, 2, 5] {
+            if wait > 0 {
+                try? await Task.sleep(for: .seconds(wait))
+                if Task.isCancelled { return nil }
+            }
+            if let fetched = try? await session.data(for: request), let image = UIImage(data: fetched.0) {
+                memory.setObject(image, forKey: url as NSURL)
+                return image
+            }
+            if Task.isCancelled { return nil }
+        }
+        return nil
     }
 }

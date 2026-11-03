@@ -27,7 +27,10 @@ final class GenreModel {
         let id: String
         let title: String
         let subtitle: String
+        /// Las que se ven en la fila.
         let series: [SeriesItem]
+        /// Todas (para "Ver todo").
+        let all: [SeriesItem]
     }
 
     struct SeriesItem: Identifiable {
@@ -300,10 +303,10 @@ final class GenreModel {
         for pair in Self.genreNames where !names.contains(pair.spanish) { names.append(pair.spanish) }
         return names.compactMap { name in
             guard let list = byGenre[name], list.count >= 3 else { return nil }
-            let picked = list.sorted { $0.order < $1.order }.prefix(20).map { $0.item }
+            let ordered = list.sorted { $0.order < $1.order }.map { $0.item }
             return Row(id: "genero-\(name)", title: name,
                        subtitle: "\(list.count) series de todas las épocas · géneros de Metron",
-                       series: Array(picked))
+                       series: Array(ordered.prefix(20)), all: ordered)
         }
     }
 }
@@ -348,19 +351,20 @@ struct GenreRows: View {
         let rows = model.rows
         VStack(alignment: .leading, spacing: 0) {
             if model.phase == .noAccount {
-                hint("Para ver series por género (terror, superhéroes, ciencia ficción…), cargá tu cuenta de Metron en Perfil → Configuración → Cuentas de Metron y Comic Vine.")
+                hint("Para ver series por género (terror, superhéroes, ciencia ficción…), cargá tu cuenta de Metron.")
+                AccountsLink().padding(.top, -12).padding(.bottom, 22)
             } else {
                 if rows.isEmpty && model.phase == .working {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("Ordenando series por género… las primeras filas aparecen en unos minutos.")
+                        Text("Armando las filas por género…")
                             .font(.subheadline)
                             .foregroundStyle(Theme.ink2)
                     }
                     .padding(.bottom, 22)
                 }
                 ForEach(rows) { row in
-                    DiscoverRowTitle(title: row.title, subtitle: row.subtitle)
+                    HomeRowHeader(title: row.title, route: .genre(row.id))
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: 12) {
                             ForEach(row.series) { series in
@@ -374,12 +378,6 @@ struct GenreRows: View {
                     }
                     .padding(.horizontal, -18)
                     .padding(.bottom, 22)
-                }
-                if !rows.isEmpty && model.phase == .working {
-                    Text("Sumando series a los géneros (\(model.classifiedNow) nuevas desde que abriste la app)…")
-                        .font(.caption)
-                        .foregroundStyle(Theme.ink2)
-                        .padding(.bottom, 22)
                 }
             }
         }
@@ -405,7 +403,7 @@ private struct GenreSeriesCard: View {
         VStack(alignment: .leading, spacing: 3) {
             RemoteCover(url: series.cover)
             Text(series.name)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)

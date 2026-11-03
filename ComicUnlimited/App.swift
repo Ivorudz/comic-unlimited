@@ -36,24 +36,32 @@ struct RootView: View {
     @State private var localSession: LocalSession?
     /// Menú de los cómics de tu Biblioteca (compartido por todas las pestañas).
     @State private var libraryActions = LibraryActions(onRead: { _ in })
+    /// Pestaña elegida (se puede cambiar desde adentro, por ejemplo "Ir a la Biblioteca").
+    @State private var tab: AppTab = .home
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             HomeView(onRead: openReader, onReadLocal: openLocal)
                 .tabItem { Label("Inicio", systemImage: "house") }
+                .tag(AppTab.home)
             LibraryView()
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
+                .tag(AppTab.library)
             NavigationStack {
                 StartGuideView(asTab: true)
                     .appDestinations()
                     .onAppear { BrowsingContext.current = nil }
             }
             .tabItem { Label("Rutas", systemImage: "map") }
+            .tag(AppTab.routes)
             CommunityView()
                 .tabItem { Label("Comunidad", systemImage: "bubble.left") }
+                .tag(AppTab.community)
             ProfileView()
                 .tabItem { Label("Perfil", systemImage: "person.crop.circle") }
+                .tag(AppTab.profile)
         }
+        .environment(\.selectTab, { tab = $0 })
         .tint(Theme.magenta)
         .modifier(LibraryActionsHost(actions: libraryActions))
         .onAppear { libraryActions.onRead = openLocal }

@@ -175,9 +175,22 @@ struct ForYouRow: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 120)
             case .noKey:
-                notice("Para sugerirte cómics, cargá tu clave de Comic Vine en Perfil → Configuración → Cuentas de Metron y Comic Vine.")
+                VStack(alignment: .leading, spacing: 10) {
+                    notice("Para sugerirte cómics, cargá tu clave de Comic Vine.")
+                    AccountsLink()
+                }
             case .noHistory:
-                notice("Puntuá cómics o sumalos a Leyendo o Quiero leer desde su ficha (tocá uno en Recién salidos o usá Buscar cómics), y acá te vamos a sugerir otros parecidos.")
+                VStack(alignment: .leading, spacing: 10) {
+                    notice("Puntuá cómics o sumalos a Leyendo o Quiero leer, y acá te sugerimos otros parecidos.")
+                    NavigationLink(value: CVRoute.search) {
+                        Label("Buscar cómics", systemImage: "magnifyingglass")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Theme.magenta)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             case .failed(let message):
                 VStack(alignment: .leading, spacing: 10) {
                     notice(message)
@@ -225,15 +238,11 @@ private struct SuggestionCard: View {
         VStack(alignment: .leading, spacing: 3) {
             RemoteCover(url: item.coverURL)
             Text(item.name)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .padding(.top, 5)
-            Text(item.reason)
-                .font(.caption)
-                .foregroundStyle(Theme.magenta)
-                .lineLimit(2)
         }
         .frame(width: 110)
     }

@@ -121,12 +121,16 @@ final class DiscoverModel {
         let id: String
         let title: String
         let subtitle: String
+        /// Los que se ven en la fila.
         let issues: [UpcomingIssue]
+        /// Todos (para "Ver todo").
+        let full: [UpcomingIssue]
     }
 
     private func category(_ id: String, _ title: String, _ subtitle: String, _ issues: [UpcomingIssue]) -> Category? {
-        issues.isEmpty ? nil : Category(id: id, title: title, subtitle: subtitle,
-                                        issues: Array(Self.sorted(issues).prefix(Self.limit)))
+        guard !issues.isEmpty else { return nil }
+        let sorted = Self.sorted(issues)
+        return Category(id: id, title: title, subtitle: subtitle, issues: Array(sorted.prefix(Self.limit)), full: sorted)
     }
 
     /// Filas de abajo de "Para vos" (antes de los géneros): de tus series y series nuevas (#1).
@@ -202,7 +206,10 @@ struct RecentReleasesRow: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 120)
             case .noKey:
-                notice("Para ver cómics, cargá tu clave de Comic Vine en Perfil → Configuración → Cuentas de Metron y Comic Vine.")
+                VStack(alignment: .leading, spacing: 10) {
+                    notice("Para ver los cómics que salen, cargá tu clave de Comic Vine.")
+                    AccountsLink()
+                }
             case .failed(let message):
                 VStack(alignment: .leading, spacing: 10) {
                     notice(message)
@@ -274,23 +281,9 @@ struct DiscoverMoreRows: View {
 
     @ViewBuilder
     private func row(_ category: DiscoverModel.Category) -> some View {
-        DiscoverRowTitle(title: category.title, subtitle: category.subtitle)
+        HomeRowHeader(title: category.title, route: .issues(category.id))
         IssueCardsRow(issues: category.issues)
             .padding(.bottom, 22)
-    }
-}
-
-/// Título y subtítulo de una fila de Descubrir.
-struct DiscoverRowTitle: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
-            Text(subtitle).font(.caption).foregroundStyle(Theme.ink2)
-        }
-        .padding(.bottom, 10)
     }
 }
 
@@ -309,7 +302,7 @@ private struct ReleaseCard: View {
         VStack(alignment: .leading, spacing: 3) {
             RemoteCover(url: issue.coverURL)
             Text(issue.title)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -353,5 +346,19 @@ enum ComicPublishers {
     /// (falló esa consulta), no filtra, para no dejar la lista vacía.
     static func onlyComics(_ issues: [UpcomingIssue]) -> [UpcomingIssue] {
         issues.contains { $0.publisher != nil } ? issues.filter { isComics($0.publisher) } : issues
+    }
+}
+
+/// Botón "Ir a Configuración" (cuentas de Metron y Comic Vine).
+struct AccountsLink: View {
+    var body: some View {
+        NavigationLink(value: LibraryRoute.accounts) {
+            Label("Ir a Configuración", systemImage: "gearshape")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(Theme.magenta)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

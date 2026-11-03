@@ -2,6 +2,15 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.38 · Inicio más limpio
+- Título "Cómic Unlimited" más chico, en un renglón.
+- Filas con solo su nombre (sin aclaraciones) y **Ver todo** para ver todos los cómics de la fila en grilla.
+- "Seguir leyendo" muestra primero lo que estás leyendo; los terminados van al final.
+- Los avisos tienen botón: **Ir a la Biblioteca**, **Ir a Configuración** o **Buscar cómics**.
+- Deslizá hacia abajo para actualizar Recién salidos.
+- Si una portada no carga (internet lento), la app vuelve a probar sola.
+- Los textos de Inicio respetan el tamaño de letra elegido en el iPhone.
+
 ## 0.37.1 · Rutas más simples y descargas más claras
 - Cada ruta se ve más limpia: arriba solo tu avance (esenciales leídos, medallas y puntos), "Seguí por acá" y el camino.
 - **Camino, Cómo verlo, Punto de partida** y "Guardar en Mis listas" pasan a la **ruedita (⚙︎)** de arriba a la derecha.
