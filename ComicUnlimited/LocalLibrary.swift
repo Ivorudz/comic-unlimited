@@ -350,12 +350,9 @@ final class LocalLibrary {
 
     /// Lo que empezaste a leer, lo último primero (para "Seguir leyendo").
     var recentlyRead: [LocalComic] {
-        // Primero los que estás leyendo; los terminados van al final.
-        items.filter { $0.hasStarted && $0.hiddenFromContinue != true }
-            .sorted {
-                if $0.isFinished != $1.isFinished { return !$0.isFinished }
-                return ($0.lastOpened ?? 0) > ($1.lastOpened ?? 0)
-            }
+        // Solo los que estás leyendo: los terminados salen solos de "Seguir leyendo".
+        items.filter { $0.hasStarted && !$0.isFinished && $0.hiddenFromContinue != true }
+            .sorted { ($0.lastOpened ?? 0) > ($1.lastOpened ?? 0) }
     }
 
     /// Marca o desmarca una página.
