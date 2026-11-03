@@ -255,7 +255,7 @@ struct ArcFolderView: View {
     }
 
     private func grid(_ slots: [Slot]) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: Theme.coverColumns),
                   alignment: .leading, spacing: 18) {
             ForEach(slots) { slot in
                 switch slot {

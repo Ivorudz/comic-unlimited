@@ -244,6 +244,6 @@ private struct SuggestionCard: View {
                 .multilineTextAlignment(.leading)
                 .padding(.top, 5)
         }
-        .frame(width: 110)
+        .frame(width: Theme.coverWidth)
     }
 }

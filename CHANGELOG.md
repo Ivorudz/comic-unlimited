@@ -7,6 +7,7 @@ Cada versión se compila sola en GitHub y aparece en [Releases](https://github.c
   - **Color principal**: magenta, azul, verde, naranja, violeta, rojo o amarillo (botones, pestañas y detalles de toda la app).
   - **Modo**: automático (como el iPhone), claro u oscuro.
   - **Letra de los títulos**: cómic (ancha, como siempre) o clásica.
+  - **Tamaño de las portadas**: chicas, medianas o grandes (filas de Inicio, "Ver todo" y grillas de la Biblioteca).
   - **Filas de Inicio**: prendé, apagá y ordená Seguir leyendo, Recién salidos, Para vos, De tus series, Series nuevas, Géneros y Editoriales.
   - "Volver a como venía".
 - Incluye los cambios de la 0.38.1.

@@ -65,6 +65,35 @@ final class AppearanceSettings {
         var name: String { self == .comic ? "Cómic" : "Clásica" }
     }
 
+    /// Tamaño de las portadas en Inicio y en las grillas de la Biblioteca.
+    enum CoverSize: String, CaseIterable, Identifiable {
+        case small, medium, large
+        var id: String { rawValue }
+        var name: String {
+            switch self {
+            case .small: return "Chicas"
+            case .medium: return "Medianas"
+            case .large: return "Grandes"
+            }
+        }
+        /// Ancho de cada tarjeta en las filas de Inicio.
+        var rowWidth: CGFloat {
+            switch self {
+            case .small: return 88
+            case .medium: return 110
+            case .large: return 140
+            }
+        }
+        /// Columnas de las grillas (Biblioteca y "Ver todo").
+        var columns: Int {
+            switch self {
+            case .small: return 4
+            case .medium: return 3
+            case .large: return 2
+            }
+        }
+    }
+
     /// Las partes de Inicio que se pueden prender, apagar y ordenar.
     enum HomeSection: String, CaseIterable, Identifiable {
         case continueReading, recent, forYou, mySeries, newSeries, genres, publishers
@@ -96,6 +125,7 @@ final class AppearanceSettings {
     private(set) var accent: Accent
     private(set) var scheme: Scheme
     private(set) var titleStyle: TitleStyle
+    private(set) var coverSize: CoverSize
     private(set) var homeOrder: [HomeSection]
     private(set) var homeHidden: Set<HomeSection>
 
@@ -103,6 +133,7 @@ final class AppearanceSettings {
         static let accent = "appearance.accent"
         static let scheme = "appearance.scheme"
         static let titleStyle = "appearance.titleStyle"
+        static let coverSize = "appearance.coverSize"
         static let homeOrder = "appearance.homeOrder"
         static let homeHidden = "appearance.homeHidden"
     }
@@ -112,6 +143,7 @@ final class AppearanceSettings {
         accent = d.string(forKey: Key.accent).flatMap(Accent.init(rawValue:)) ?? .magenta
         scheme = d.string(forKey: Key.scheme).flatMap(Scheme.init(rawValue:)) ?? .system
         titleStyle = d.string(forKey: Key.titleStyle).flatMap(TitleStyle.init(rawValue:)) ?? .comic
+        coverSize = d.string(forKey: Key.coverSize).flatMap(CoverSize.init(rawValue:)) ?? .medium
         var order = (d.stringArray(forKey: Key.homeOrder) ?? []).compactMap(HomeSection.init(rawValue:))
         // Si se agregan partes nuevas en otra versión, van al final.
         for section in HomeSection.allCases where !order.contains(section) { order.append(section) }
@@ -134,6 +166,11 @@ final class AppearanceSettings {
         UserDefaults.standard.set(value.rawValue, forKey: Key.titleStyle)
     }
 
+    func setCoverSize(_ value: CoverSize) {
+        coverSize = value
+        UserDefaults.standard.set(value.rawValue, forKey: Key.coverSize)
+    }
+
     func isVisible(_ section: HomeSection) -> Bool { !homeHidden.contains(section) }
 
     /// Las partes de Inicio que se ven, en orden.
@@ -154,6 +191,7 @@ final class AppearanceSettings {
         setAccent(.magenta)
         setScheme(.system)
         setTitleStyle(.comic)
+        setCoverSize(.medium)
         homeOrder = HomeSection.allCases
         homeHidden = []
         saveHome()
@@ -229,6 +267,28 @@ struct AppearanceScreen: View {
             }
 
             Section {
+                Picker("Portadas", selection: Binding(get: { settings.coverSize }, set: { settings.setCoverSize($0) })) {
+                    ForEach(AppearanceSettings.CoverSize.allCases) { Text($0.name).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                HStack(alignment: .bottom, spacing: 8) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Theme.chip)
+                            .overlay(Image(systemName: "book.closed").foregroundStyle(Theme.ink2))
+                            .frame(width: settings.coverSize.rowWidth * 0.6, height: settings.coverSize.rowWidth * 0.9)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .animation(.easeOut(duration: 0.2), value: settings.coverSize)
+            } header: {
+                Text("Tamaño de las portadas")
+            } footer: {
+                Text("En las filas de Inicio, en \"Ver todo\" y en las grillas de la Biblioteca.")
+            }
+
+            Section {
                 NavigationLink {
                     HomeSectionsScreen()
                 } label: {
@@ -248,7 +308,7 @@ struct AppearanceScreen: View {
         .navigationTitle("Personalizar")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .confirmationDialog("¿Volver los colores, el modo, la letra e Inicio a como venían?",
+        .confirmationDialog("¿Volver los colores, el modo, la letra, las portadas e Inicio a como venían?",
                             isPresented: $askReset, titleVisibility: .visible) {
             Button("Volver a como venía", role: .destructive) { settings.reset() }
             Button("Cancelar", role: .cancel) {}

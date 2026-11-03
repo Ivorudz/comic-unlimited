@@ -109,7 +109,7 @@ struct HomeGridScreen: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(18)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 12, alignment: .top)],
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: Theme.coverColumns),
                           alignment: .leading, spacing: 18) {
                     ForEach(content.cards) { card in
                         link(card)

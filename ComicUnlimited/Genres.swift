@@ -413,6 +413,6 @@ private struct GenreSeriesCard: View {
                 .foregroundStyle(Theme.ink2)
                 .lineLimit(1)
         }
-        .frame(width: 110)
+        .frame(width: Theme.coverWidth)
     }
 }

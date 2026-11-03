@@ -147,7 +147,7 @@ struct ComicGrid: View {
     let comics: [LocalComic]
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: Theme.coverColumns),
                   alignment: .leading, spacing: 18) {
             ForEach(comics) { comic in
                 LocalComicTile(comic: comic)
@@ -325,7 +325,7 @@ struct FolderGrid<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: Theme.coverColumns),
                   alignment: .leading, spacing: 20, content: content)
     }
 }
@@ -483,7 +483,7 @@ private struct SeriesIssuesGrid: View {
                 Text(errorText).font(.subheadline).foregroundStyle(Theme.ink2).padding(.bottom, 12)
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3),
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: Theme.coverColumns),
                       alignment: .leading, spacing: 18) {
                 ForEach(slots) { slot in
                     switch slot {

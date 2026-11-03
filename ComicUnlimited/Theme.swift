@@ -16,6 +16,11 @@ enum Theme {
     static let star = Color(light: 0xE8A800, dark: 0xFFD400)
     static let yellow = Color(hex: 0xFFD400)
 
+    /// Ancho de las tarjetas con portada en las filas de Inicio (Personalizar → Tamaño de las portadas).
+    static var coverWidth: CGFloat { AppearanceSettings.shared.coverSize.rowWidth }
+    /// Columnas de las grillas de portadas.
+    static var coverColumns: Int { AppearanceSettings.shared.coverSize.columns }
+
     /// Ancho de la letra de los títulos: ancha tipo cómic o clásica (Personalizar).
     static var titleWidth: Font.Width {
         AppearanceSettings.shared.titleStyle == .comic ? .expanded : .standard
