@@ -27,6 +27,7 @@ struct AppDestinations: ViewModifier {
                 case .history: ReadingHistoryView()
                 case .readingProfiles: ReadingProfilesView()
                 case .accounts: AccountsScreen()
+                case .appearance: AppearanceScreen()
                 case .webShare: WebShareView()
                 case .customList(let id): CustomListView(listID: id)
                 case .diagnostics:
@@ -201,7 +202,7 @@ struct FindInSourcesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Buscar en tus fuentes")
-                    .font(.system(size: 24, weight: .black).width(.expanded))
+                    .font(.system(size: 24, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 8)
 

@@ -160,7 +160,7 @@ struct ArcFolderView: View {
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(arc?.name ?? name)
-                            .font(.system(size: 24, weight: .black).width(.expanded))
+                            .font(.system(size: 24, weight: .black).width(Theme.titleWidth))
                             .foregroundStyle(Theme.ink)
                         Text(CVText.join(["Arco argumental", arc?.publisher?.name]))
                             .font(.subheadline)
@@ -412,7 +412,7 @@ struct PublisherFolderView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(name)
-                    .font(.system(size: 26, weight: .black).width(.expanded))
+                    .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 8)
                 Text("\(countText(comics.count)) en \(groups.count) \(groups.count == 1 ? "serie" : "series")")

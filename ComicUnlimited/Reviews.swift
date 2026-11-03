@@ -222,7 +222,7 @@ struct CommunityView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Comunidad")
-                        .font(.system(size: 32, weight: .black).width(.expanded))
+                        .font(.system(size: 32, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(Theme.ink)
                         .padding(.top, 8)
 

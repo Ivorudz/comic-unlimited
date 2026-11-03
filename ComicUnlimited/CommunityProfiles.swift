@@ -115,7 +115,7 @@ struct FriendProfileView: View {
                     AvatarView(profile: profile, size: 64)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(profile?.name ?? "")
-                            .font(.system(size: 22, weight: .black).width(.expanded))
+                            .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
                             .foregroundStyle(Theme.ink)
                         if let profile, profile.displayName?.isEmpty == false {
                             Text("@\(profile.username)").font(.subheadline).foregroundStyle(Theme.ink2)

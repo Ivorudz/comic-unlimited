@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var genres = GenreModel()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.selectTab) private var selectTab
+    private var appearance: AppearanceSettings { AppearanceSettings.shared }
 
     var body: some View {
         NavigationStack {
@@ -21,8 +22,13 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
                     searchBar
-                    continueReading
-                    discoverSection
+                    // Las partes de Inicio en el orden elegido en Personalizar (las apagadas no se ven).
+                    let sections = appearance.visibleHomeSections
+                    let firstDiscover = sections.first { $0 != .continueReading }
+                    ForEach(sections) { section in
+                        if section == firstDiscover { HomeSectionTitle("Descubrir") }
+                        homeSection(section)
+                    }
                     Text("Datos y portadas: Comic Vine y Metron. Las portadas pertenecen a sus editoriales.")
                         .font(.caption2)
                         .foregroundStyle(Theme.ink2)
@@ -48,8 +54,10 @@ struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .onAppear {
                 BrowsingContext.current = nil
-                genres.start()
+                if appearance.isVisible(.genres) { genres.start() }
             }
+            // Recién salidos alimenta también De tus series, Series nuevas y Editoriales.
+            .task { await discover.load() }
             // Al volver a la app después de un rato, se actualiza lo guardado.
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
@@ -65,7 +73,7 @@ struct HomeView: View {
 
     private var header: some View {
         Text("Cómic Unlimited")
-            .font(.system(.title, weight: .black).width(.expanded))
+            .font(.system(.title, weight: .black).width(Theme.titleWidth))
             .foregroundStyle(Theme.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.6)
@@ -172,19 +180,33 @@ struct HomeView: View {
         }
     }
 
-    /// "Descubrir": recién salidos, sugerencias, de tus series, series nuevas, géneros y editoriales.
+    /// Una parte de Inicio.
     @ViewBuilder
-    private var discoverSection: some View {
-        HomeSectionTitle("Descubrir")
-
-        HomeRowHeader(title: "Recién salidos", route: discover.all.isEmpty ? nil : .issues("recientes"))
-        RecentReleasesRow(model: discover)
-
-        HomeRowHeader(title: "Para vos", route: forYouHasItems ? .forYou : nil)
-            .padding(.top, 22)
-        ForYouRow(model: forYou)
-
-        DiscoverMoreRows(model: discover, genres: genres)
+    private func homeSection(_ section: AppearanceSettings.HomeSection) -> some View {
+        switch section {
+        case .continueReading:
+            continueReading
+        case .recent:
+            HomeRowHeader(title: "Recién salidos", route: discover.all.isEmpty ? nil : .issues("recientes"))
+            RecentReleasesRow(model: discover)
+                .padding(.bottom, 22)
+        case .forYou:
+            HomeRowHeader(title: "Para vos", route: forYouHasItems ? .forYou : nil)
+            ForYouRow(model: forYou)
+                .padding(.bottom, 22)
+        case .mySeries:
+            if let category = discover.topCategories.first(where: { $0.id == "mias" }) {
+                CategoryRow(category: category)
+            }
+        case .newSeries:
+            if let category = discover.topCategories.first(where: { $0.id == "nuevas" }) {
+                CategoryRow(category: category)
+            }
+        case .genres:
+            GenreRows(model: genres)
+        case .publishers:
+            ForEach(discover.publisherCategories) { CategoryRow(category: $0) }
+        }
     }
 }
 

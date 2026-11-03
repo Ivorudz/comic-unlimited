@@ -218,7 +218,7 @@ struct SeriesView: View {
             RemoteCover(url: d.image?.medium).frame(width: 120)
             VStack(alignment: .leading, spacing: 6) {
                 Text(d.name ?? name)
-                    .font(.system(size: 24, weight: .black).width(.expanded))
+                    .font(.system(size: 24, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                 if let publisher = d.publisher?.name {
                     Text(publisher).font(.subheadline).foregroundStyle(Theme.ink2)
@@ -338,7 +338,7 @@ struct IssueView: View {
             .frame(maxWidth: .infinity)
 
         Text(CVText.issueTitle(series: d.volume?.name ?? title, number: d.issueNumber))
-            .font(.system(size: 26, weight: .black).width(.expanded))
+            .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
             .foregroundStyle(Theme.ink)
             .misprint(0.7)
             .padding(.top, 16)

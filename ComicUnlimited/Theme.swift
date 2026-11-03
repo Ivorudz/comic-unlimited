@@ -11,9 +11,15 @@ enum Theme {
     static let line = Color(light: 0xD5DCE1, dark: 0x2B2F38)
     static let chip = Color(light: 0xE1E7EB, dark: 0x262A33)
     static let cyan = Color(light: 0x0090C4, dark: 0x3CC3F0)
-    static let magenta = Color(light: 0xD1006C, dark: 0xFF4FA3)
+    /// El color principal que elegiste en Personalizar (de fábrica, magenta).
+    static var magenta: Color { AppearanceSettings.shared.accent.color }
     static let star = Color(light: 0xE8A800, dark: 0xFFD400)
     static let yellow = Color(hex: 0xFFD400)
+
+    /// Ancho de la letra de los títulos: ancha tipo cómic o clásica (Personalizar).
+    static var titleWidth: Font.Width {
+        AppearanceSettings.shared.titleStyle == .comic ? .expanded : .standard
+    }
 }
 
 extension Color {
@@ -44,9 +50,11 @@ extension Color {
 
 extension View {
     /// El efecto de "impresión corrida" de los títulos del prototipo (sombra cian y magenta).
+    /// Con la letra "Clásica" no se usa.
     func misprint(_ strength: CGFloat = 1) -> some View {
-        self
-            .shadow(color: Theme.cyan.opacity(0.55), radius: 0, x: 3 * strength, y: 1.5 * strength)
-            .shadow(color: Theme.magenta.opacity(0.5), radius: 0, x: -2 * strength, y: -1 * strength)
+        let on = AppearanceSettings.shared.titleStyle == .comic
+        return self
+            .shadow(color: on ? Theme.cyan.opacity(0.55) : .clear, radius: 0, x: 3 * strength, y: 1.5 * strength)
+            .shadow(color: on ? Theme.magenta.opacity(0.5) : .clear, radius: 0, x: -2 * strength, y: -1 * strength)
     }
 }

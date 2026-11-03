@@ -37,7 +37,7 @@ struct LocalComicDetailView: View {
                 LocalCover(comic: comic).frame(width: 130)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(comic.displayTitle)
-                        .font(.system(size: 22, weight: .black).width(.expanded))
+                        .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(Theme.ink)
                     Text("\(comic.pageCount) \(comic.pageCount == 1 ? "página" : "páginas")")
                         .font(.subheadline)

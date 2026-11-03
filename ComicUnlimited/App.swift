@@ -63,6 +63,8 @@ struct RootView: View {
         }
         .environment(\.selectTab, { tab = $0 })
         .tint(Theme.magenta)
+        // Modo claro u oscuro elegido en Personalizar (Automático = el del iPhone).
+        .preferredColorScheme(AppearanceSettings.shared.scheme.colorScheme)
         .modifier(LibraryActionsHost(actions: libraryActions))
         .onAppear { libraryActions.onRead = openLocal }
         .fullScreenCover(item: $session) { session in
@@ -104,7 +106,7 @@ struct ComingSoonView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 32, weight: .black).width(.expanded))
+                .font(.system(size: 32, weight: .black).width(Theme.titleWidth))
                 .foregroundStyle(Theme.ink)
                 .misprint(0.7)
                 .padding(.top, 20)

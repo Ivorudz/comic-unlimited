@@ -47,7 +47,7 @@ struct ReviewLinksView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Revisar fichas")
-                    .font(.system(size: 24, weight: .black).width(.expanded))
+                    .font(.system(size: 24, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 8)
                 Text("La app eligió estas fichas de Comic Vine sola. Compará tu portada con la de Comic Vine: si alguna está mal, tocá Cambiar.")

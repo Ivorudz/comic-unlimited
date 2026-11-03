@@ -22,7 +22,7 @@ struct StartGuideView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(asTab ? "Rutas" : "Por dónde empezar")
-                    .font(.system(size: asTab ? 32 : 28, weight: .black).width(.expanded))
+                    .font(.system(size: asTab ? 32 : 28, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .misprint(0.6)
                     .padding(.top, asTab ? 20 : 8)
@@ -136,7 +136,7 @@ struct LevelCard: View {
                         .tracking(1.2)
                         .foregroundStyle(.white.opacity(0.85))
                     Text(level.name)
-                        .font(.system(size: 22, weight: .black).width(.expanded))
+                        .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)

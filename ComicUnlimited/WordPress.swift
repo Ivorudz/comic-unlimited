@@ -182,7 +182,7 @@ struct WordPressView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(WordPressClient.normalized(site)?.host ?? "Mi página")
-                    .font(.system(size: 26, weight: .black).width(.expanded))
+                    .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 8)
 
@@ -306,7 +306,7 @@ struct WordPressPostView: View {
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Text(post.titleText)
-                            .font(.system(size: 22, weight: .black).width(.expanded))
+                            .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
                             .foregroundStyle(Theme.ink)
                         if let date = post.dateText {
                             Text(date).font(.subheadline).foregroundStyle(Theme.ink2)

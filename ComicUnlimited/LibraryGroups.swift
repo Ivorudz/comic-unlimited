@@ -28,6 +28,8 @@ enum LibraryRoute: Hashable {
     case readingProfiles
     /// Perfil → Configuración: cuentas de Metron y Comic Vine, y Revisar conexión.
     case accounts
+    /// Perfil → Configuración → Personalizar (colores, modo, letra e Inicio).
+    case appearance
     case diagnostics
     /// "Ver en la compu": leer tus cómics en el navegador de la compu por Wi-Fi.
     case webShare
@@ -354,7 +356,7 @@ struct SeriesFolderView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(title)
-                    .font(.system(size: 26, weight: .black).width(.expanded))
+                    .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 8)
 
@@ -573,7 +575,7 @@ struct StatusFolderView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(state.label)
-                    .font(.system(size: 26, weight: .black).width(.expanded))
+                    .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 8)
                     .padding(.bottom, 16)

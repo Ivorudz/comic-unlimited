@@ -264,26 +264,16 @@ struct IssueCardsRow: View {
     }
 }
 
-/// Más filas de Descubrir, abajo de "Para vos": de tus series, series nuevas, géneros (terror,
-/// superhéroes…) y editoriales. Todo es parte de Descubrir (sin otro título).
-struct DiscoverMoreRows: View {
-    let model: DiscoverModel
-    let genres: GenreModel
+/// Una fila de Descubrir hecha con los cómics de la semana (de tus series, series nuevas, una editorial…).
+struct CategoryRow: View {
+    let category: DiscoverModel.Category
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(model.topCategories) { row($0) }
-            GenreRows(model: genres)
-            ForEach(model.publisherCategories) { row($0) }
+            HomeRowHeader(title: category.title, route: .issues(category.id))
+            IssueCardsRow(issues: category.issues)
         }
-        .padding(.top, 22)
-    }
-
-    @ViewBuilder
-    private func row(_ category: DiscoverModel.Category) -> some View {
-        HomeRowHeader(title: category.title, route: .issues(category.id))
-        IssueCardsRow(issues: category.issues)
-            .padding(.bottom, 22)
+        .padding(.bottom, 22)
     }
 }
 

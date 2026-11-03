@@ -87,7 +87,7 @@ struct MetronIssueView: View {
                             .foregroundStyle(Theme.magenta)
                     }
                     Text(title)
-                        .font(.system(size: 22, weight: .black).width(.expanded))
+                        .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(Theme.ink)
                     if let names = d.name?.filter({ !$0.isEmpty }), !names.isEmpty {
                         Text(names.joined(separator: " · "))

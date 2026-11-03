@@ -516,7 +516,7 @@ struct LocalReaderView: View {
                 .font(.headline)
                 .foregroundStyle(Color(hex: 0xFF4FA3))
             Text(comic.displayTitle)
-                .font(.system(size: 28, weight: .black).width(.expanded))
+                .font(.system(size: 28, weight: .black).width(Theme.titleWidth))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
             Text("Quedó guardado como leído.")

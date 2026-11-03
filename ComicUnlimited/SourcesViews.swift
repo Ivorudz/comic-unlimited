@@ -18,7 +18,7 @@ struct SourcesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Fuentes")
-                    .font(.system(size: 28, weight: .black).width(.expanded))
+                    .font(.system(size: 28, weight: .black).width(Theme.titleWidth))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 8)
                 Text("Catálogos de cómics que agregás con el link de un JSON. Lo que descargues queda en tu Biblioteca.")

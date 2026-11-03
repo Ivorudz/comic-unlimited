@@ -21,7 +21,7 @@ struct DetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         SourceBadge(source: comic.source)
                         (Text(comic.title) + Text(comic.issue.isEmpty ? "" : " \(comic.issue)").foregroundStyle(Theme.magenta))
-                            .font(.system(size: 26, weight: .black).width(.expanded))
+                            .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
                             .foregroundStyle(Theme.ink)
                             .misprint(0.7)
                         Text(comic.author)

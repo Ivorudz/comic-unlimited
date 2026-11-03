@@ -101,7 +101,7 @@ struct LibraryView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Biblioteca")
-                .font(.system(size: 32, weight: .black).width(.expanded))
+                .font(.system(size: 32, weight: .black).width(Theme.titleWidth))
                 .foregroundStyle(Theme.ink)
                 .misprint(0.7)
                 .padding(.top, 20)

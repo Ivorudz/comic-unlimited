@@ -27,7 +27,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Perfil")
-                        .font(.system(size: 32, weight: .black).width(.expanded))
+                        .font(.system(size: 32, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(Theme.ink)
                         .misprint(0.7)
                         .padding(.top, 20)
@@ -112,6 +112,11 @@ struct ProfileView: View {
 
                     SectionTitle("Configuración")
                     VStack(alignment: .leading, spacing: 6) {
+                        settingsLink(LibraryRoute.appearance, title: "Personalizar",
+                                     detail: "Color principal, modo claro u oscuro, letra de los títulos y filas de Inicio.")
+
+                        Divider().padding(.vertical, 8)
+
                         settingsLink(LibraryRoute.webShare, title: "Ver en la compu",
                                      detail: "Leé tus cómics en el navegador de la compu, por tu Wi-Fi.")
 
@@ -272,7 +277,7 @@ private struct StatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
-                .font(.system(size: 22, weight: .black).width(.expanded))
+                .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)

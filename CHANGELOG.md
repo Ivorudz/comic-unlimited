@@ -2,6 +2,15 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.39 · Personalizar
+- Nueva pantalla **Perfil → Configuración → Personalizar**:
+  - **Color principal**: magenta, azul, verde, naranja, violeta, rojo o amarillo (botones, pestañas y detalles de toda la app).
+  - **Modo**: automático (como el iPhone), claro u oscuro.
+  - **Letra de los títulos**: cómic (ancha, como siempre) o clásica.
+  - **Filas de Inicio**: prendé, apagá y ordená Seguir leyendo, Recién salidos, Para vos, De tus series, Series nuevas, Géneros y Editoriales.
+  - "Volver a como venía".
+- Incluye los cambios de la 0.38.1.
+
 ## 0.38.1 · Seguir leyendo más claro
 - Los cómics terminados salen solos de "Seguir leyendo".
 - Cada tarjeta dice cuántas páginas te quedan, y de qué arco, serie, lista o **ruta** venías (si venías de alguno).
