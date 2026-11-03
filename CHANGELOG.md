@@ -2,6 +2,9 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.39.1 · Avance a tu gusto
+- Personalizar → **Avance en Seguir leyendo**: elegí si cada tarjeta dice "Quedan 17 páginas", "Página 5 de 22" o "23 % leído".
+
 ## 0.39 · Personalizar
 - Nueva pantalla **Perfil → Configuración → Personalizar**:
   - **Color principal**: magenta, azul, verde, naranja, violeta, rojo o amarillo (botones, pestañas y detalles de toda la app).

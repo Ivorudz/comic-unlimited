@@ -94,6 +94,27 @@ final class AppearanceSettings {
         }
     }
 
+    /// Cómo se cuenta el avance en "Seguir leyendo".
+    enum ProgressText: String, CaseIterable, Identifiable {
+        case left, page, percent
+        var id: String { rawValue }
+        var name: String {
+            switch self {
+            case .left: return "Quedan"
+            case .page: return "Página"
+            case .percent: return "%"
+            }
+        }
+        /// Ejemplo para la pantalla Personalizar.
+        var example: String {
+            switch self {
+            case .left: return "Quedan 17 páginas"
+            case .page: return "Página 5 de 22"
+            case .percent: return "23 % leído"
+            }
+        }
+    }
+
     /// Las partes de Inicio que se pueden prender, apagar y ordenar.
     enum HomeSection: String, CaseIterable, Identifiable {
         case continueReading, recent, forYou, mySeries, newSeries, genres, publishers
@@ -126,6 +147,7 @@ final class AppearanceSettings {
     private(set) var scheme: Scheme
     private(set) var titleStyle: TitleStyle
     private(set) var coverSize: CoverSize
+    private(set) var progressText: ProgressText
     private(set) var homeOrder: [HomeSection]
     private(set) var homeHidden: Set<HomeSection>
 
@@ -134,6 +156,7 @@ final class AppearanceSettings {
         static let scheme = "appearance.scheme"
         static let titleStyle = "appearance.titleStyle"
         static let coverSize = "appearance.coverSize"
+        static let progressText = "appearance.progressText"
         static let homeOrder = "appearance.homeOrder"
         static let homeHidden = "appearance.homeHidden"
     }
@@ -144,6 +167,7 @@ final class AppearanceSettings {
         scheme = d.string(forKey: Key.scheme).flatMap(Scheme.init(rawValue:)) ?? .system
         titleStyle = d.string(forKey: Key.titleStyle).flatMap(TitleStyle.init(rawValue:)) ?? .comic
         coverSize = d.string(forKey: Key.coverSize).flatMap(CoverSize.init(rawValue:)) ?? .medium
+        progressText = d.string(forKey: Key.progressText).flatMap(ProgressText.init(rawValue:)) ?? .left
         var order = (d.stringArray(forKey: Key.homeOrder) ?? []).compactMap(HomeSection.init(rawValue:))
         // Si se agregan partes nuevas en otra versión, van al final.
         for section in HomeSection.allCases where !order.contains(section) { order.append(section) }
@@ -164,6 +188,11 @@ final class AppearanceSettings {
     func setTitleStyle(_ value: TitleStyle) {
         titleStyle = value
         UserDefaults.standard.set(value.rawValue, forKey: Key.titleStyle)
+    }
+
+    func setProgressText(_ value: ProgressText) {
+        progressText = value
+        UserDefaults.standard.set(value.rawValue, forKey: Key.progressText)
     }
 
     func setCoverSize(_ value: CoverSize) {
@@ -192,6 +221,7 @@ final class AppearanceSettings {
         setScheme(.system)
         setTitleStyle(.comic)
         setCoverSize(.medium)
+        setProgressText(.left)
         homeOrder = HomeSection.allCases
         homeHidden = []
         saveHome()
@@ -289,6 +319,21 @@ struct AppearanceScreen: View {
             }
 
             Section {
+                Picker("Avance", selection: Binding(get: { settings.progressText }, set: { settings.setProgressText($0) })) {
+                    ForEach(AppearanceSettings.ProgressText.allCases) { Text($0.name).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Text(settings.progressText.example)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.ink2)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } header: {
+                Text("Avance en Seguir leyendo")
+            } footer: {
+                Text("Cómo se cuenta lo que te falta de cada cómic en Inicio.")
+            }
+
+            Section {
                 NavigationLink {
                     HomeSectionsScreen()
                 } label: {
@@ -308,7 +353,7 @@ struct AppearanceScreen: View {
         .navigationTitle("Personalizar")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .confirmationDialog("¿Volver los colores, el modo, la letra, las portadas e Inicio a como venían?",
+        .confirmationDialog("¿Volver los colores, el modo, la letra, las portadas, el avance e Inicio a como venían?",
                             isPresented: $askReset, titleVisibility: .visible) {
             Button("Volver a como venía", role: .destructive) { settings.reset() }
             Button("Cancelar", role: .cancel) {}
