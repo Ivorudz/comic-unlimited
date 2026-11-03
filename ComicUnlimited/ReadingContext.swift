@@ -5,7 +5,8 @@ import Foundation
 
 /// Un arco o una serie desde donde abriste un cómic.
 struct ReadContext: Codable, Hashable {
-    enum Kind: String, Codable { case series, arc, list }
+    /// route = una ruta de la guía (id = su posición en `RouteInfo.all`).
+    enum Kind: String, Codable { case series, arc, list, route }
     let kind: Kind
     let id: Int
     let name: String
@@ -16,7 +17,15 @@ struct ReadContext: Codable, Hashable {
         case .arc: return "Arco: \(name)"
         case .series: return "Serie: \(name)"
         case .list: return "Lista: \(name)"
+        case .route: return "Ruta: \(name)"
         }
+    }
+
+    /// El contexto de una ruta de la guía.
+    @MainActor
+    static func route(_ routeID: String, title: String) -> ReadContext? {
+        guard let index = RouteInfo.all.firstIndex(where: { $0.id == routeID }) else { return nil }
+        return ReadContext(kind: .route, id: index, name: title)
     }
 }
 
@@ -40,6 +49,10 @@ extension LocalLibrary {
             return comic.contents?.contains { listed.contains($0.cvID) } == true
         case .list:
             return CustomListStore.shared.list(context.id)?.items.contains { isIn(comic, $0) } == true
+        case .route:
+            guard let route = routeData(context) else { return false }
+            let mine = Set([comic.cvIssueID].compactMap { $0 } + (comic.contents ?? []).map(\.cvID))
+            return route.items.contains { mine.contains($0.cvID) }
         }
     }
 
@@ -52,12 +65,35 @@ extension LocalLibrary {
         if let context, context.kind == .list, let found = nextInList(after: comic, listID: context.id) {
             return (found, "Siguiente en \(context.name)")
         }
+        if let context, context.kind == .route, let found = nextInRoute(after: comic, context: context) {
+            return (found, "Siguiente en la ruta \(context.name)")
+        }
         guard let series = comic.cvSeriesID else { return nil }
         let list = items.filter { $0.cvSeriesID == series && $0.id != comic.id }
             .filter { $0.numberForSorting > comic.numberForSorting }
             .sorted(by: LibraryGrouping.byNumber)
         guard let found = list.first else { return nil }
         return (found, "Siguiente en \(comic.cvSeriesName ?? "la serie")")
+    }
+
+    private func routeData(_ context: ReadContext) -> RouteData? {
+        guard context.id >= 0, context.id < RouteInfo.all.count else { return nil }
+        return GuideRoutesStore.route(RouteInfo.all[context.id].id)
+    }
+
+    /// El siguiente de la ruta que tengas, siguiendo el camino elegido (en "Esencial" y "+ Extras" se saltean los extras).
+    private func nextInRoute(after comic: LocalComic, context: ReadContext) -> LocalComic? {
+        guard let route = routeData(context) else { return nil }
+        let path = GuideProgress.shared.path(route.id)
+        let direct = Dictionary(items.compactMap { c in c.cvIssueID.map { ($0, c) } }, uniquingKeysWith: { a, _ in a })
+        let collected = collectedIssues
+        let mine = Set([comic.cvIssueID].compactMap { $0 } + (comic.contents ?? []).map(\.cvID))
+        guard let position = route.items.lastIndex(where: { mine.contains($0.cvID) }) else { return nil }
+        for item in route.items[(position + 1)...] {
+            if path != .everything && item.isExtra { continue }
+            if let next = direct[item.cvID] ?? collected[item.cvID], next.id != comic.id { return next }
+        }
+        return nil
     }
 
     /// El siguiente de la lista que tengas (suelto, en un TPB o archivo sin ficha).

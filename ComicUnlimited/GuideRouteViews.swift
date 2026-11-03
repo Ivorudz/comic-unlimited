@@ -165,6 +165,8 @@ private struct GuideRouteScreen: View {
             withAnimation { cheer = nil }
         }
         .sensoryFeedback(.success, trigger: cheers)
+        // Lo que abras desde acá recuerda que venís de esta ruta ("Siguiente número" la sigue).
+        .onAppear { BrowsingContext.current = ReadContext.route(route.id, title: route.title) }
         .sheet(isPresented: $showSettings) {
             RouteSettingsSheet(route: route) {
                 let current = progress.path(route.id)
@@ -881,6 +883,7 @@ struct GuideBlockView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .sensoryFeedback(.success, trigger: cheers)
+        .onAppear { BrowsingContext.current = ReadContext.route(route.id, title: route.title) }
     }
 
     private func issueRow(_ route: RouteData, _ index: Int, read: Set<Int>, color: Color) -> some View {

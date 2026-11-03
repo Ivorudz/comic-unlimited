@@ -83,22 +83,10 @@ struct HomeView: View {
                     .foregroundStyle(Theme.paper)
                     .frame(width: 36, height: 36)
                     .background(Theme.magenta, in: Circle())
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Buscar cómics")
-                        .font(.callout.weight(.heavy))
-                        .foregroundStyle(Theme.ink)
-                    Text("Series, números, autores o personajes")
-                        .font(.caption)
-                        .foregroundStyle(Theme.ink2)
-                        .lineLimit(1)
-                }
+                Text("Buscar cómics")
+                    .font(.callout.weight(.heavy))
+                    .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                Text("Comic Vine")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Theme.chip, in: Capsule())
             }
             .padding(.leading, 8)
             .padding(.trailing, 12)
@@ -247,12 +235,14 @@ private struct LocalContinueCard: View {
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
-                // De qué arco o serie venías (o "Biblioteca").
-                Text(comic.lastContext?.label ?? "Biblioteca")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Theme.magenta)
-                    .lineLimit(1)
-                Text(comic.isFinished ? "Terminado" : "Página \((comic.lastPage ?? 0) + 1) de \(comic.pageCount)")
+                // De qué arco, serie, lista o ruta venías (si venías de alguno).
+                if let context = comic.lastContext {
+                    Text(context.label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.magenta)
+                        .lineLimit(1)
+                }
+                Text(pagesLeft)
                     .font(.footnote)
                     .foregroundStyle(Theme.ink2)
                 ProgressBar(value: progress).padding(.top, 5)
@@ -265,6 +255,16 @@ private struct LocalContinueCard: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
         .task(id: comic.id) {
             cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)
+        }
+    }
+
+    private var pagesLeft: String {
+        if comic.isFinished { return "Terminado" }
+        let left = max(comic.pageCount - ((comic.lastPage ?? 0) + 1), 0)
+        switch left {
+        case 0: return "Última página"
+        case 1: return "Queda 1 página"
+        default: return "Quedan \(left) páginas"
         }
     }
 }

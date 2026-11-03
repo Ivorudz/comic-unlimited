@@ -2,6 +2,12 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.38.1 · Seguir leyendo más claro
+- Los cómics terminados salen solos de "Seguir leyendo".
+- Cada tarjeta dice cuántas páginas te quedan, y de qué arco, serie, lista o **ruta** venías (si venías de alguno).
+- Lo que abrís desde una ruta recuerda la ruta: al terminar, "Siguiente número" sigue la ruta con el camino que elegiste.
+- Barra de búsqueda más simple: solo "Buscar cómics".
+
 ## 0.38 · Inicio más limpio
 - Título "Cómic Unlimited" más chico, en un renglón.
 - Filas con solo su nombre (sin aclaraciones) y **Ver todo** para ver todos los cómics de la fila en grilla.
