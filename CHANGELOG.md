@@ -2,7 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
-## 0.37.1 · Descargas más claras
+## 0.37.1 · Rutas más simples y descargas más claras
+- Cada ruta se ve más limpia: arriba solo tu avance (esenciales leídos, medallas y puntos), "Seguí por acá" y el camino.
+- **Camino, Cómo verlo, Punto de partida** y "Guardar en Mis listas" pasan a la **ruedita (⚙︎)** de arriba a la derecha.
+- El cartel de cada era se lee bien también en modo oscuro.
 - Los títulos de tu página WordPress se ven bien: "Star Wars – Rogue One" en vez de "Star Wars &#8211; Rogue One".
 - Si un link de descarga devuelve una página web en vez del cómic, la app lo dice (con el nombre de esa página) y muestra **Abrir en Safari** para bajarlo desde el navegador.
 - El nombre del archivo ya no repite el año ("(2026) (2026)").
