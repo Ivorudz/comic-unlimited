@@ -53,7 +53,7 @@ struct SeriesSearchView: View {
                 } else {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
-                        TextField("Nombre de la serie, por ejemplo Batman", text: $query)
+                        TextField("Buscar cómics", text: $query)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .submitLabel(.search)
@@ -64,18 +64,13 @@ struct SeriesSearchView: View {
                     .padding(.vertical, 10)
                     .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
 
-                    Text("Escribí y tocá Buscar en el teclado.")
-                        .font(.caption)
-                        .foregroundStyle(Theme.ink2)
-                        .padding(.top, 6)
-
                     if loading {
                         LoadingRow(text: "Buscando en Comic Vine…")
                     } else if let errorText {
                         ErrorNotice(text: errorText) { Task { await search() } }
                     } else if let results {
                         if results.isEmpty {
-                            Text("No encontré series con ese nombre. Probá en inglés o con menos palabras.")
+                            Text("Sin resultados. Probá en inglés o con menos palabras.")
                                 .font(.subheadline)
                                 .foregroundStyle(Theme.ink2)
                                 .padding(.vertical, 20)
@@ -89,14 +84,19 @@ struct SeriesSearchView: View {
                         }
                     }
                 }
-                AttributionFooter(link: nil)
+                if let results, !results.isEmpty {
+                    Text("Datos y portadas: Comic Vine.")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.top, 20)
+                }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
         }
         .background(Theme.paper)
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle("Cómics reales")
+        .navigationTitle("Buscar")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .onAppear { if results == nil { focused = true } }
@@ -125,14 +125,10 @@ private struct SeriesRow: View {
             RemoteCover(url: series.image?.small).frame(width: 56)
             VStack(alignment: .leading, spacing: 4) {
                 Text(series.name ?? "Sin título")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.callout.weight(.bold))
                     .foregroundStyle(Theme.ink)
                     .multilineTextAlignment(.leading)
-                Text(CVText.join([
-                    series.publisher?.name,
-                    series.startYear,
-                    series.countOfIssues.map { "\($0) \($0 == 1 ? "número" : "números")" },
-                ]))
+                Text(CVText.join([series.startYear, series.publisher?.name]))
                 .font(.footnote)
                 .foregroundStyle(Theme.ink2)
             }
@@ -468,9 +464,7 @@ private struct NoKeyNotice: View {
             Text("Falta tu clave de Comic Vine")
                 .font(.headline)
                 .foregroundStyle(Theme.ink)
-            Text("Andá a Perfil → Configuración → Cuentas de Metron y Comic Vine, pegá tu clave y tocá Guardar. Después volvé acá.")
-                .font(.subheadline)
-                .foregroundStyle(Theme.ink2)
+            AccountsLink()
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

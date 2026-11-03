@@ -3,6 +3,7 @@
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
 ## 0.39.1 · Avance a tu gusto
+- Buscador más simple: se llama "Buscar", sin "Cómics reales" ni explicaciones; cada resultado muestra solo nombre, año y editorial.
 - Personalizar → **Avance en Seguir leyendo**: elegí si cada tarjeta dice "Quedan 17 páginas", "Página 5 de 22" o "23 % leído".
 
 ## 0.39 · Personalizar
