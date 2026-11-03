@@ -222,36 +222,37 @@ struct LocalComicCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             LocalCover(comic: comic)
+                // Barrita de avance sobre la tapa (solo si lo empezaste y no lo terminaste).
+                .overlay(alignment: .bottom) {
+                    if comic.hasStarted && !comic.isFinished {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Rectangle().fill(.black.opacity(0.45))
+                                Rectangle().fill(Theme.magenta)
+                                    .frame(width: geo.size.width * min(comic.progressFraction, 1))
+                            }
+                        }
+                        .frame(height: 4)
+                        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 4, bottomTrailingRadius: 4))
+                    }
+                }
 
             Text(comic.displayTitle)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .padding(.top, 6)
-            if let name = comic.cvIssueName {
-                Text(name)
+            if comic.isFinished || comic.hasStarted {
+                Text(comic.progressText)
                     .font(.caption)
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(Theme.ink2)
                     .lineLimit(1)
             }
-            Group {
-                if comic.isFinished {
-                    Text("Leído ✓")
-                } else if let page = comic.lastPage {
-                    Text("Página \(page + 1) de \(comic.pageCount)")
-                } else {
-                    Text("\(comic.pageCount) \(comic.pageCount == 1 ? "página" : "páginas")")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(Theme.ink2)
             if matching {
                 Text("Buscando ficha…").font(.caption2).foregroundStyle(Theme.magenta)
-            } else if comic.cvIssueID != nil {
-                Label("Comic Vine", systemImage: "checkmark.seal.fill")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.magenta)
+            } else if comic.cvIssueID == nil {
+                Text("Sin ficha").font(.caption2.weight(.semibold)).foregroundStyle(Theme.magenta)
             }
         }
     }
@@ -308,7 +309,7 @@ struct FolderCard: View {
             .padding(.trailing, 6)
 
             Text(title)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)

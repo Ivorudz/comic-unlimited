@@ -14,10 +14,10 @@ struct ReviewLinksCard: View {
             NavigationLink(value: LibraryRoute.reviewLinks) {
                 HStack(spacing: 12) {
                     Image(systemName: "checklist")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(Theme.magenta)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Revisar fichas de Comic Vine").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
+                        Text("Revisar fichas de Comic Vine").font(.callout.weight(.bold)).foregroundStyle(Theme.ink)
                         Text(count == 1 ? "1 cómic con ficha elegida por la app"
                                         : "\(count) cómics con ficha elegida por la app")
                             .font(.caption).foregroundStyle(Theme.ink2)

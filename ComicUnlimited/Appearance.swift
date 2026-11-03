@@ -233,6 +233,34 @@ final class AppearanceSettings {
     }
 }
 
+extension LocalComic {
+    /// El avance como lo elegiste en Personalizar: "Quedan 17 páginas", "Página 5 de 22" o "23 % leído".
+    @MainActor
+    var progressText: String {
+        if isFinished { return "Leído ✓" }
+        let current = (lastPage ?? 0) + 1
+        let total = max(pageCount, 1)
+        switch AppearanceSettings.shared.progressText {
+        case .left:
+            let left = max(total - current, 0)
+            switch left {
+            case 0: return "Última página"
+            case 1: return "Queda 1 página"
+            default: return "Quedan \(left) páginas"
+            }
+        case .page:
+            return "Página \(min(current, total)) de \(total)"
+        case .percent:
+            return "\(min(100, current * 100 / total)) % leído"
+        }
+    }
+
+    /// Avance de 0 a 1 (para la barrita).
+    var progressFraction: Double {
+        isFinished ? 1 : Double((lastPage ?? 0) + 1) / Double(max(pageCount, 1))
+    }
+}
+
 // MARK: - Pantalla "Personalizar"
 
 struct AppearanceScreen: View {

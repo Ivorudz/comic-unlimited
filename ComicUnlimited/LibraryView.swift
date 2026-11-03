@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 // Pestaña Biblioteca: los cómics que tenés en archivos (.cbz, .zip, .cbr, .cb7, .cbt o PDF).
 // Arriba se elige cómo verlos: Todos, por Series o por Estado de lectura (carpetas).
-// Tocar un cómic lo abre en el lector. Mantenerlo apretado muestra más opciones.
+// Tocar un cómic abre su ficha (ahí está "Leer"). Mantenerlo apretado muestra más opciones.
 
 struct LibraryView: View {
     /// Formas de ver la Biblioteca (los botones de arriba).
@@ -50,10 +50,20 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
                     if library.items.isEmpty && !library.importing {
-                        Text("Todavía no importaste cómics. Tocá el botón de arriba y elegí un archivo desde la app Archivos (por ejemplo, de iCloud Drive o Descargas).")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.ink2)
-                            .padding(.top, 18)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Todavía no tenés cómics. Importalos desde la app Archivos (iCloud Drive, Descargas…): .cbz, .cbr, .cb7, .cbt, .zip o PDF.")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.ink2)
+                            Button { showImporter = true } label: {
+                                Label("Importar cómics", systemImage: "plus")
+                                    .font(.subheadline.weight(.bold))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.magenta)
+                        }
+                        .padding(.top, 18)
                     } else {
                         modePicker
                         switch mode {
@@ -64,10 +74,6 @@ struct LibraryView: View {
                         case .status: statusView
                         case .lists: CustomListsSection()
                         }
-                        Text("Tocá un cómic para leerlo. Mantenelo apretado para ver su ficha, cambiarle el nombre, elegir otra ficha de Comic Vine o borrarlo.")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.ink2)
-                            .padding(.top, 24)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -100,77 +106,44 @@ struct LibraryView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Biblioteca")
-                .font(.system(size: 32, weight: .black).width(Theme.titleWidth))
-                .foregroundStyle(Theme.ink)
-                .misprint(0.7)
-                .padding(.top, 20)
-
-            Text("Tus cómics en archivo. Se guardan solo en este iPhone.")
-                .font(.subheadline)
-                .foregroundStyle(Theme.ink2)
-                .padding(.top, 6)
-
-            Button {
-                showImporter = true
-            } label: {
-                Label("Importar cómic (.cbz, .cbr, .cb7, .cbt, .zip o PDF)", systemImage: "square.and.arrow.down")
-                    .font(.system(size: 16, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .padding(14)
-                    .foregroundStyle(Theme.ink2)
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.line, style: StrokeStyle(lineWidth: 2, dash: [6])))
+            HStack(alignment: .center) {
+                Text("Biblioteca")
+                    .font(.system(.largeTitle, weight: .black).width(Theme.titleWidth))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .misprint(0.7)
+                Spacer(minLength: 8)
+                // Importar: botón redondo al lado del título.
+                Button { showImporter = true } label: {
+                    Image(systemName: "plus")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Theme.magenta, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(library.importing)
+                .opacity(library.importing ? 0.5 : 1)
+                .accessibilityLabel("Importar cómics")
             }
-            .buttonStyle(.plain)
-            .disabled(library.importing)
-            .padding(.top, 16)
+            .padding(.top, 20)
 
             ReviewLinksCard()
 
-            NavigationLink(value: LibraryRoute.sources) {
-                HStack(spacing: 12) {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Theme.magenta)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Fuentes").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
-                        Text("Catálogos que agregás con un link · \(SourceStore.shared.sources.count) agregadas")
-                            .font(.caption).foregroundStyle(Theme.ink2)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.footnote.weight(.bold)).foregroundStyle(Theme.ink2)
-                }
-                .padding(14)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+            // Fuentes y Ver en la compu, chiquitos y en una sola fila.
+            HStack(spacing: 10) {
+                shortcut(LibraryRoute.sources, title: "Fuentes", icon: "antenna.radiowaves.left.and.right",
+                         highlighted: false)
+                shortcut(LibraryRoute.webShare, title: WebShare.shared.isOn ? "Compartiendo" : "Ver en la compu",
+                         icon: "desktopcomputer", highlighted: WebShare.shared.isOn)
             }
-            .buttonStyle(.plain)
-            .padding(.top, 10)
-
-            NavigationLink(value: LibraryRoute.webShare) {
-                HStack(spacing: 12) {
-                    Image(systemName: "desktopcomputer")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Theme.magenta)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Ver en la compu").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.ink)
-                        Text(WebShare.shared.isOn ? "Compartiendo ahora" : "Leé tus cómics en el navegador, por tu Wi-Fi")
-                            .font(.caption).foregroundStyle(WebShare.shared.isOn ? Theme.magenta : Theme.ink2)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.footnote.weight(.bold)).foregroundStyle(Theme.ink2)
-                }
-                .padding(14)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 10)
+            .padding(.top, 12)
 
             if library.importing {
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text("Importando y buscando su ficha en Comic Vine… los archivos grandes (y los .cbr, .cb7 y .cbt, que se convierten a .cbz) pueden tardar un poco.")
+                    Text("Importando…")
                         .font(.subheadline)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -179,6 +152,20 @@ struct LibraryView: View {
                 importResult
             }
         }
+    }
+
+    private func shortcut(_ route: LibraryRoute, title: String, icon: String, highlighted: Bool) -> some View {
+        NavigationLink(value: route) {
+            Label(title, systemImage: icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(highlighted ? Theme.magenta : Theme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(highlighted ? Theme.magenta : Theme.line))
+        }
+        .buttonStyle(.plain)
     }
 
     /// Resultado del último importe: queda a la vista hasta que lo cerrás.
@@ -319,7 +306,7 @@ struct LibraryView: View {
             if library.arcsPending > 0 {
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text("Buscando arcos en Comic Vine… faltan \(library.arcsPending)")
+                    Text("Buscando arcos… faltan \(library.arcsPending)")
                         .font(.subheadline)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -339,11 +326,11 @@ struct LibraryView: View {
                     }
                 }
             }
-            Text(unlinked > 0
-                 ? "Acá aparecen solo los cómics unidos a Comic Vine que pertenecen a un arco (\(unlinked) sin ficha)."
-                 : "Acá aparecen los cómics que pertenecen a un arco según Comic Vine.")
-                .font(.caption)
-                .foregroundStyle(Theme.ink2)
+            if unlinked > 0 {
+                Text(unlinked == 1 ? "1 cómic sin ficha no aparece acá." : "\(unlinked) cómics sin ficha no aparecen acá.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.ink2)
+            }
         }
         .padding(.top, 18)
     }

@@ -280,25 +280,7 @@ private struct LocalContinueCard: View {
         }
     }
 
-    /// El avance, como lo elegiste en Personalizar: páginas que quedan, página actual o porcentaje.
-    private var pagesLeft: String {
-        if comic.isFinished { return "Terminado" }
-        let current = (comic.lastPage ?? 0) + 1
-        let total = max(comic.pageCount, 1)
-        switch AppearanceSettings.shared.progressText {
-        case .left:
-            let left = max(total - current, 0)
-            switch left {
-            case 0: return "Última página"
-            case 1: return "Queda 1 página"
-            default: return "Quedan \(left) páginas"
-            }
-        case .page:
-            return "Página \(min(current, total)) de \(total)"
-        case .percent:
-            return "\(min(100, current * 100 / total)) % leído"
-        }
-    }
+    private var pagesLeft: String { comic.progressText }
 }
 
 // MARK: - Piezas reutilizables
