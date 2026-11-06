@@ -264,16 +264,17 @@ struct LocalCover: View {
     @State private var cover: UIImage?
 
     var body: some View {
-        ZStack {
-            Theme.chip
-            if let cover {
-                Image(uiImage: cover).resizable().scaledToFill()
-            } else {
-                Image(systemName: "doc.richtext").foregroundStyle(Theme.ink2)
+        // Mismo tamaño para todas las tapas: la imagen llena el recuadro 2:3 y lo que sobra se recorta.
+        Theme.chip
+            .aspectRatio(2 / 3, contentMode: .fit)
+            .overlay {
+                if let cover {
+                    Image(uiImage: cover).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "doc.richtext").foregroundStyle(Theme.ink2)
+                }
             }
-        }
-        .aspectRatio(2 / 3, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
         .task(id: comic.id) {
             cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)

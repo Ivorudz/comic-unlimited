@@ -623,19 +623,21 @@ struct RemoteCover: View {
     @State private var image: UIImage?
 
     var body: some View {
-        ZStack {
-            Theme.chip
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "book.closed")
-                    .foregroundStyle(Theme.ink2)
+        // El tamaño lo marca el recuadro (2:3); la imagen lo llena y lo que sobra se recorta.
+        // (Si la imagen marcara el tamaño, las tapas con otra forma se verían más grandes.)
+        Theme.chip
+            .aspectRatio(2 / 3, contentMode: .fit)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "book.closed")
+                        .foregroundStyle(Theme.ink2)
+                }
             }
-        }
-        .aspectRatio(2 / 3, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
         .task(id: url) {
             guard let url else { return }

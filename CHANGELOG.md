@@ -6,6 +6,7 @@ Cada versión se compila sola en GitHub y aparece en [Releases](https://github.c
 - **Biblioteca más limpia**: botón **＋** al lado del título para importar; Fuentes y Ver en la compu en una sola fila de botoncitos; sin textos de más (y sin la instrucción vieja "Tocá un cómic para leerlo", que ya no era así).
 - Cada cómic muestra el título, una barrita de avance sobre la tapa y tu avance como lo elegiste en Personalizar; "Sin ficha" solo en los que no tienen ficha de Comic Vine.
 - Biblioteca vacía con botón **Importar cómics**; mensajes cortos al importar y en Arcos; letra que se adapta al tamaño del iPhone.
+- Todas las tapas tienen el mismo tamaño: las que tienen otra forma se recortan en vez de agrandarse (antes se veían más grandes y tapaban la editorial).
 - Buscador más simple: se llama "Buscar", sin "Cómics reales" ni explicaciones; cada resultado muestra solo nombre, año y editorial.
 - Personalizar → **Avance en Seguir leyendo**: elegí si cada tarjeta dice "Quedan 17 páginas", "Página 5 de 22" o "23 % leído".
 
