@@ -2,6 +2,12 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.41 · Rutas modernas
+- La pestaña **Rutas** pasa a ser súper simple: cada ruta es un botón grande con su propio dibujo (escudo con rayo, hélice de ADN, telaraña, ciudad de noche con luna, planeta con anillo) y el avance en un aro.
+- Efectos: fondo de colores que se mueve, entrada escalonada, dibujos que flotan, un brillo que pasa, botones que se inclinan al apretarlos y vibran. Si en el iPhone tenés "Reducir movimiento", todo queda quieto.
+- Arriba, tu nivel y puntos en chiquito y el botón **?** (Lo básico); abajo, "¿No sabés qué te gusta?".
+- **Personalizar → Rutas modernas**: apagalo para volver a la vista anterior, con más detalle.
+
 ## 0.40 · Rutas más útiles
 - **A color solo lo que tenés**: en cada ruta, las tapas de los cómics que están en tu Biblioteca (sueltos o dentro de un TPB) se ven a color; las demás, en gris. Cada tramo dice cuántos tenés.
 - **Leer o Descargar** desde "Seguí por acá": si tenés el número, lo abrís directo; si no, lo busca en tus fuentes. En cada parada, los que tenés tienen botón **Leer**.

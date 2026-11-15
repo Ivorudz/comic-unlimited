@@ -148,6 +148,8 @@ final class AppearanceSettings {
     private(set) var titleStyle: TitleStyle
     private(set) var coverSize: CoverSize
     private(set) var progressText: ProgressText
+    /// Pestaña Rutas moderna (botones grandes con dibujos y efectos) o la anterior.
+    private(set) var modernRoutes: Bool
     private(set) var homeOrder: [HomeSection]
     private(set) var homeHidden: Set<HomeSection>
 
@@ -157,6 +159,7 @@ final class AppearanceSettings {
         static let titleStyle = "appearance.titleStyle"
         static let coverSize = "appearance.coverSize"
         static let progressText = "appearance.progressText"
+        static let modernRoutes = "appearance.modernRoutes"
         static let homeOrder = "appearance.homeOrder"
         static let homeHidden = "appearance.homeHidden"
     }
@@ -168,6 +171,7 @@ final class AppearanceSettings {
         titleStyle = d.string(forKey: Key.titleStyle).flatMap(TitleStyle.init(rawValue:)) ?? .comic
         coverSize = d.string(forKey: Key.coverSize).flatMap(CoverSize.init(rawValue:)) ?? .medium
         progressText = d.string(forKey: Key.progressText).flatMap(ProgressText.init(rawValue:)) ?? .left
+        modernRoutes = d.object(forKey: Key.modernRoutes) as? Bool ?? true
         var order = (d.stringArray(forKey: Key.homeOrder) ?? []).compactMap(HomeSection.init(rawValue:))
         // Si se agregan partes nuevas en otra versión, van al final.
         for section in HomeSection.allCases where !order.contains(section) { order.append(section) }
@@ -188,6 +192,11 @@ final class AppearanceSettings {
     func setTitleStyle(_ value: TitleStyle) {
         titleStyle = value
         UserDefaults.standard.set(value.rawValue, forKey: Key.titleStyle)
+    }
+
+    func setModernRoutes(_ value: Bool) {
+        modernRoutes = value
+        UserDefaults.standard.set(value, forKey: Key.modernRoutes)
     }
 
     func setProgressText(_ value: ProgressText) {
@@ -222,6 +231,7 @@ final class AppearanceSettings {
         setTitleStyle(.comic)
         setCoverSize(.medium)
         setProgressText(.left)
+        setModernRoutes(true)
         homeOrder = HomeSection.allCases
         homeHidden = []
         saveHome()
@@ -344,6 +354,14 @@ struct AppearanceScreen: View {
                 Text("Tamaño de las portadas")
             } footer: {
                 Text("En las filas de Inicio, en \"Ver todo\" y en las grillas de la Biblioteca.")
+            }
+
+            Section {
+                Toggle("Rutas modernas", isOn: Binding(get: { settings.modernRoutes }, set: { settings.setModernRoutes($0) }))
+            } header: {
+                Text("Rutas")
+            } footer: {
+                Text("Cada ruta como un botón grande con su dibujo, colores y movimiento. Apagalo para volver a la vista anterior, con más detalle.")
             }
 
             Section {

@@ -17,6 +17,16 @@ struct StartGuideView: View {
     private var progress: GuideProgress { GuideProgress.shared }
 
     var body: some View {
+        // Versión moderna (botones grandes con dibujos) o la anterior, según Personalizar.
+        if asTab && AppearanceSettings.shared.modernRoutes {
+            ModernRoutesView()
+        } else {
+            classic
+        }
+    }
+
+    @ViewBuilder
+    private var classic: some View {
         let read = progress.readSet()
         let routes = RouteInfo.all.compactMap { info in GuideRoutesStore.route(info.id).map { RoutePair(info: info, route: $0) } }
         let total = routes.map { progress.score($0.route, read) }.reduce(GuideProgress.Score(), +)
@@ -265,7 +275,7 @@ private struct RouteCard: View {
     }
 }
 
-private struct PickCard: View {
+struct PickCard: View {
     let pick: GuidePick
     @State private var found: GuideLookup.Found?
 
