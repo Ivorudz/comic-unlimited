@@ -36,8 +36,7 @@ struct ReviewSection: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line))
+                .modernCard(cornerRadius: 12)
             } else {
                 Button {
                     editing = true
@@ -222,7 +221,7 @@ struct CommunityView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Comunidad")
-                        .font(.system(size: 32, weight: .black).width(Theme.titleWidth))
+                        .font(.system(.largeTitle, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(Theme.ink)
                         .padding(.top, 8)
 
@@ -234,9 +233,10 @@ struct CommunityView: View {
                                 .foregroundStyle(.white)
                                 .frame(width: 48, height: 48)
                                 .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 12))
+                                .shadow(color: Theme.magenta.opacity(AppearanceSettings.shared.modern ? 0.5 : 0), radius: 10, y: 4)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Próximos")
-                                    .font(.system(size: 18, weight: .heavy))
+                                    .font(.headline.weight(.heavy))
                                     .foregroundStyle(Theme.ink)
                                 Text("Qué cómics salen esta semana y las que vienen")
                                     .font(.subheadline)
@@ -250,10 +250,9 @@ struct CommunityView: View {
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.line))
+                        .modernCard(cornerRadius: 16)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardPressStyle())
                     .padding(.top, 14)
 
                     if !community.isConfigured {
@@ -296,8 +295,9 @@ struct CommunityView: View {
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 30)
+                .modifier(AppearIn(index: 0))
             }
-            .background(Theme.paper)
+            .background { ModernScreenBackground() }
             .refreshable { await loadFeed() }
             .appDestinations()
             .toolbar(.hidden, for: .navigationBar)

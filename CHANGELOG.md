@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.43 · Comunidad y Perfil modernos
+- Con el Estilo moderno, **Comunidad**, **Próximos**, el **perfil de cada amigo** y **Perfil** también tienen el fondo de colores que se mueve, tarjetas de vidrio y entrada animada; las filas y tarjetas se inclinan al apretarlas.
+- Incluye lo de la 0.42.1 (barra de vidrio, sombras sin cortes y carpetas apiladas).
+
 ## 0.42.1 · Barra de vidrio y carpetas apiladas
 - La **barra de pestañas de abajo es de vidrio** (se ve lo de atrás, difuminado) con el Estilo moderno.
 - "Seguir leyendo" y las filas de Inicio: las sombras de las tarjetas ya no se cortan en línea recta.

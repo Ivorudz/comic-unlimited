@@ -232,7 +232,7 @@ struct UpcomingView: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 30)
         }
-        .background(Theme.paper)
+        .background { ModernScreenBackground() }
         .scrollDismissesKeyboard(.interactively)
         .task(id: model.loadKey) {
             await model.load()
@@ -355,8 +355,7 @@ struct UpcomingView: View {
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Theme.magenta)
             .padding(6)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+            .modernCard(cornerRadius: 14)
         }
         .padding(.top, 14)
     }
@@ -452,8 +451,7 @@ struct UpcomingView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+        .modernCard(cornerRadius: 14)
         .padding(.top, 16)
     }
 
@@ -731,8 +729,7 @@ struct AccountsForm: View {
         VStack(alignment: .leading, spacing: 10, content: content)
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+            .modernCard(cornerRadius: 14)
     }
 
     private func field<F: View>(_ input: F) -> some View {

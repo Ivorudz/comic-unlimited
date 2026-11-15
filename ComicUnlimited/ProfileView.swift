@@ -27,7 +27,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Perfil")
-                        .font(.system(size: 32, weight: .black).width(Theme.titleWidth))
+                        .font(.system(.largeTitle, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(Theme.ink)
                         .misprint(0.7)
                         .padding(.top, 20)
@@ -74,7 +74,7 @@ struct ProfileView: View {
                                     }
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(CardPressStyle())
                         }
                     }
 
@@ -105,10 +105,9 @@ struct ProfileView: View {
                             Image(systemName: "chevron.right").foregroundStyle(Theme.ink2)
                         }
                         .padding(14)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+                        .modernCard(cornerRadius: 12)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardPressStyle())
 
                     SectionTitle("Configuración")
                     VStack(alignment: .leading, spacing: 6) {
@@ -213,8 +212,7 @@ struct ProfileView: View {
                             .foregroundStyle(Theme.ink2)
                     }
                     .padding(14)
-                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+                    .modernCard(cornerRadius: 14)
 
                     Text("Las listas y los puntajes quedan guardados solo en este iPhone. Datos y portadas: Comic Vine. Las portadas pertenecen a sus editoriales.")
                         .font(.footnote)
@@ -223,8 +221,9 @@ struct ProfileView: View {
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 30)
+                .modifier(AppearIn(index: 0))
             }
-            .background(Theme.paper)
+            .background { ModernScreenBackground() }
             .appDestinations()
             .navigationTitle("Perfil")
             .toolbar(.hidden, for: .navigationBar)
@@ -267,7 +266,7 @@ private func settingsLink(_ route: LibraryRoute, title: String, detail: String) 
             Image(systemName: "chevron.right").foregroundStyle(Theme.ink2)
         }
     }
-    .buttonStyle(.plain)
+    .buttonStyle(CardPressStyle())
 }
 
 private struct StatTile: View {
@@ -277,7 +276,7 @@ private struct StatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
-                .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
+                .font(.system(.title2, weight: .black).width(Theme.titleWidth))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -288,8 +287,7 @@ private struct StatTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line))
+        .modernCard(cornerRadius: 12)
     }
 }
 
@@ -303,14 +301,14 @@ private struct EntryRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 if entry.isSeries || entry.isArc {
                     Text(entry.isArc ? "Arco" : "Serie")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .foregroundStyle(.white)
                         .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 4))
                 }
                 Text(entry.title)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.callout.weight(.bold))
                     .foregroundStyle(Theme.ink)
                     .multilineTextAlignment(.leading)
                 if entry.rating != nil || entry.thumbs != nil {

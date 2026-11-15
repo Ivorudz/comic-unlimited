@@ -168,7 +168,7 @@ struct FriendProfileView: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 30)
         }
-        .background(Theme.paper)
+        .background { ModernScreenBackground() }
         .navigationTitle(profile?.name ?? "Perfil")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -323,8 +323,7 @@ struct ProfileCommunityCard: View {
                         .foregroundStyle(Theme.magenta)
                 }
                 .padding(12)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+                .modernCard(cornerRadius: 14)
             }
             .buttonStyle(.plain)
             .padding(.top, 12)
