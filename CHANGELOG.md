@@ -2,6 +2,13 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.40 · Rutas más útiles
+- **A color solo lo que tenés**: en cada ruta, las tapas de los cómics que están en tu Biblioteca (sueltos o dentro de un TPB) se ven a color; las demás, en gris. Cada tramo dice cuántos tenés.
+- **Leer o Descargar** desde "Seguí por acá": si tenés el número, lo abrís directo; si no, lo busca en tus fuentes. En cada parada, los que tenés tienen botón **Leer**.
+- **Ir a una era** (botón de lista arriba) y **Ir a donde estoy** (botón flotante abajo) para moverte rápido por el camino.
+- Pestaña Rutas más limpia: sin el párrafo de explicación; "Lo básico" pasa al botón **?**; la tarjeta de nivel usa tu color principal; cada ruta muestra la tapa del próximo número que te toca.
+- Letra que se adapta al tamaño elegido en el iPhone.
+
 ## 0.39.1 · Avance a tu gusto
 - **Biblioteca más limpia**: botón **＋** al lado del título para importar; Fuentes y Ver en la compu en una sola fila de botoncitos; sin textos de más (y sin la instrucción vieja "Tocá un cómic para leerlo", que ya no era así).
 - Cada cómic muestra el título, una barrita de avance sobre la tapa y tu avance como lo elegiste en Personalizar; "Sin ficha" solo en los que no tienen ficha de Comic Vine.

@@ -75,6 +75,15 @@ enum GuideLayout {
     }
 }
 
+extension LocalLibrary {
+    /// Tus cómics por código de Comic Vine: los sueltos y los números que vienen dentro de un TPB.
+    var comicsByIssue: [Int: LocalComic] {
+        var map = collectedIssues
+        for comic in items { if let cv = comic.cvIssueID { map[cv] = comic } }
+        return map
+    }
+}
+
 /// El cartel de "+N puntos".
 struct GuideCheer: Identifiable, Equatable {
     let id = UUID()
@@ -113,44 +122,80 @@ private struct GuideRouteScreen: View {
         let eras = GuideLayout.eraCounts(route, read)
         let next = progress.next(route, path: path, read: read)
         let showsWay = progress.showsWay(route.id)
+        // Tus cómics (sueltos o dentro de un TPB): solo esos se ven a color.
+        let owned = LocalLibrary.shared.comicsByIssue
 
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                header(read: read, eras: eras, path: path, start: start)
-                if let next {
-                    NextUpCard(route: route, info: info, block: next, path: path, read: read,
-                               onToggle: { toggle(next) })
-                        .padding(.top, 18)
-                } else if !blocks.isEmpty {
-                    doneCard.padding(.top, 18)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    header(read: read, eras: eras, path: path, start: start)
+                    if let next {
+                        NextUpCard(route: route, info: info, block: next, path: path, read: read, owned: owned,
+                                   onToggle: { toggle(next) })
+                            .padding(.top, 18)
+                    } else if !blocks.isEmpty {
+                        doneCard.padding(.top, 18)
+                    }
+
+                    if showsWay {
+                        wayContent(sections: sections, eras: eras, next: next, path: path, read: read, owned: owned)
+                    } else {
+                        blocksContent(sections: sections, eras: eras, next: next, path: path, read: read, owned: owned)
+                    }
+
+                    Text("Orden: \(route.source). Tapas: Comic Vine; pertenecen a sus editoriales.")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.top, 20)
                 }
-
-                if showsWay {
-                    wayContent(sections: sections, eras: eras, next: next, path: path, read: read)
-                } else {
-                    blocksContent(sections: sections, eras: eras, next: next, path: path, read: read)
-                }
-
-                Text("Orden: \(route.source). Tapas: Comic Vine; pertenecen a sus editoriales.")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.top, 20)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 90)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 40)
+            // "Ir a donde estoy": lleva a la parada que te toca.
+            .overlay(alignment: .bottomTrailing) {
+                if let next {
+                    Button {
+                        withAnimation { proxy.scrollTo(next.id, anchor: .center) }
+                    } label: {
+                        Label("Ir a donde estoy", systemImage: "location.fill")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(info.color, in: Capsule())
+                            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 18)
+                    .padding(.bottom, 18)
+                }
+            }
+            .toolbar {
+                // Saltar a una era.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        ForEach(sections) { section in
+                            Button("\(section.era.t) · \(section.era.y)") {
+                                withAnimation { proxy.scrollTo("era-\(section.id)", anchor: .top) }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "list.bullet")
+                    }
+                    .accessibilityLabel("Ir a una era")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings = true } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("Ajustes de la ruta")
+                }
+            }
         }
         .background(Theme.paper)
         .navigationTitle(route.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("Ajustes de la ruta")
-            }
-        }
         .overlay(alignment: .top) {
             if let cheer {
                 CheerBanner(cheer: cheer, color: info.color)
@@ -186,7 +231,7 @@ private struct GuideRouteScreen: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(essential.read)")
-                    .font(.system(size: 28, weight: .black).monospacedDigit())
+                    .font(.system(.title, weight: .black).monospacedDigit())
                     .foregroundStyle(Theme.ink)
                 Text("de \(essential.total) esenciales")
                     .font(.subheadline)
@@ -233,14 +278,16 @@ private struct GuideRouteScreen: View {
 
     @ViewBuilder
     private func blocksContent(sections: [EraSection], eras: [EraCount], next: RouteBlock?,
-                               path: RoutePath, read: Set<Int>) -> some View {
+                               path: RoutePath, read: Set<Int>, owned: [Int: LocalComic]) -> some View {
         ForEach(sections) { section in
             EraHeader(era: section.era, count: section.id < eras.count ? eras[section.id] : EraCount())
                 .padding(.top, 22)
                 .padding(.bottom, 8)
+                .id("era-\(section.id)")
             ForEach(section.blocks) { block in
                 BlockRow(route: route, info: info, block: block, path: path,
                          readCount: GuideLayout.readCount(route, block, read),
+                         ownedCount: block.indices.filter { owned[route.items[$0].cvID] != nil }.count,
                          isNext: block.id == next?.id,
                          onToggle: { toggle(block) })
                     .id(block.id)
@@ -253,15 +300,17 @@ private struct GuideRouteScreen: View {
 
     @ViewBuilder
     private func wayContent(sections: [EraSection], eras: [EraCount], next: RouteBlock?,
-                            path: RoutePath, read: Set<Int>) -> some View {
+                            path: RoutePath, read: Set<Int>, owned: [Int: LocalComic]) -> some View {
         let order = Dictionary(uniqueKeysWithValues: sections.flatMap(\.blocks).enumerated().map { ($0.element.id, $0.offset) })
         Color.clear.frame(height: 18)
         ForEach(sections) { section in
             EraFlag(era: section.era, count: section.id < eras.count ? eras[section.id] : EraCount(), color: info.color)
+                .id("era-\(section.id)")
             ForEach(section.blocks) { block in
                 WayStop(route: route, info: info, block: block, path: path,
                         left: (order[block.id] ?? 0) % 2 == 0,
                         readCount: GuideLayout.readCount(route, block, read),
+                        owned: owned,
                         isNext: block.id == next?.id,
                         onToggle: { toggle(block) })
                     .id(block.id)
@@ -345,7 +394,7 @@ private struct EraHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(era.t).font(.system(size: 19, weight: .heavy)).foregroundStyle(Theme.ink)
+                Text(era.t).font(.title3.weight(.heavy)).foregroundStyle(Theme.ink)
                 Text(era.y).font(.caption.weight(.semibold)).foregroundStyle(Theme.ink2)
             }
             Spacer()
@@ -378,7 +427,7 @@ private struct BlockBadges: View {
 
     private func badge(_ text: String, _ color: Color) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .heavy))
+            .font(.caption2.weight(.heavy))
             .foregroundStyle(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -402,7 +451,7 @@ private struct ReadCircle: View {
             }
             if readCount >= total && total > 0 {
                 Circle().fill(color)
-                Image(systemName: "checkmark").font(.system(size: 13, weight: .black)).foregroundStyle(.white)
+                Image(systemName: "checkmark").font(.footnote.weight(.black)).foregroundStyle(.white)
             }
         }
         .frame(width: 28, height: 28)
@@ -415,6 +464,7 @@ private struct BlockRow: View {
     let block: RouteBlock
     let path: RoutePath
     let readCount: Int
+    let ownedCount: Int
     let isNext: Bool
     let onToggle: () -> Void
 
@@ -429,17 +479,25 @@ private struct BlockRow: View {
             NavigationLink(value: CommunityRoute.guideBlock(route.id, block.id, path.rawValue)) {
                 HStack(spacing: 6) {
                     Text(block.series.label)
-                        .font(.system(size: block.isExtra ? 13 : 15, weight: block.isExtra ? .medium : .bold))
+                        .font(block.isExtra ? Font.footnote.weight(.medium) : Font.subheadline.weight(.bold))
                         .foregroundStyle(block.isExtra ? Theme.ink2 : Theme.ink)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     Text(block.numbersText)
-                        .font(.system(size: block.isExtra ? 12 : 14).monospacedDigit())
+                        .font((block.isExtra ? Font.caption : Font.footnote).monospacedDigit())
                         .foregroundStyle(Theme.ink2)
                     if block.isEvent {
                         Image(systemName: "bolt.fill").font(.caption).foregroundStyle(Color(hex: 0xE65C00))
                     }
                     Spacer(minLength: 4)
+                    // Cuántos de este tramo tenés en tu Biblioteca.
+                    if ownedCount > 0 {
+                        Label(ownedCount == block.count ? "Los tenés" : "\(ownedCount)/\(block.count)",
+                              systemImage: "books.vertical.fill")
+                            .font(.caption2.weight(.bold).monospacedDigit())
+                            .foregroundStyle(Theme.magenta)
+                            .labelStyle(.titleAndIcon)
+                    }
                     Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Theme.ink2.opacity(0.6))
                 }
                 .contentShape(Rectangle())
@@ -467,9 +525,9 @@ private struct EraFlag: View {
                     Image(systemName: "medal.fill").foregroundStyle(Theme.yellow)
                 }
                 VStack(spacing: 0) {
-                    Text(era.t).font(.system(size: 14, weight: .heavy)).foregroundStyle(.white)
+                    Text(era.t).font(.subheadline.weight(.heavy)).foregroundStyle(.white)
                     Text(count.total > 0 ? "\(era.y) · \(count.read)/\(count.total)" : era.y)
-                        .font(.system(size: 10, weight: .bold).monospacedDigit())
+                        .font(.caption2.weight(.bold).monospacedDigit())
                         .foregroundStyle(.white.opacity(0.85))
                 }
             }
@@ -513,6 +571,7 @@ private struct WayStop: View {
     let path: RoutePath
     let left: Bool
     let readCount: Int
+    let owned: [Int: LocalComic]
     let isNext: Bool
     let onToggle: () -> Void
     private var covers: GuideCovers { GuideCovers.shared }
@@ -530,7 +589,7 @@ private struct WayStop: View {
                     .stroke(readCount > 0 ? info.color : Theme.line,
                             style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [2, 9]))
                 NavigationLink(value: CommunityRoute.guideBlock(route.id, block.id, path.rawValue)) {
-                    cover(firstID: firstID, done: done)
+                    cover(firstID: firstID, done: done, mine: owned[firstID] != nil)
                         .frame(width: coverWidth)
                 }
                 .buttonStyle(.plain)
@@ -545,21 +604,22 @@ private struct WayStop: View {
         .onAppear { covers.want(firstID) }
     }
 
-    private func cover(firstID: Int, done: Bool) -> some View {
+    /// A color solo si lo tenés en tu Biblioteca; si no, en gris (aunque ya lo hayas leído).
+    private func cover(firstID: Int, done: Bool, mine: Bool) -> some View {
         RemoteCover(url: covers.url(firstID))
-            .grayscale(done || isNext || readCount > 0 ? 0 : 0.9)
-            .opacity(done || isNext || readCount > 0 ? 1 : 0.8)
+            .grayscale(mine ? 0 : 1)
+            .opacity(mine ? 1 : 0.7)
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(isNext ? Theme.yellow : (done ? info.color : .clear), lineWidth: 3))
             .shadow(color: isNext ? Theme.yellow.opacity(0.9) : .black.opacity(0.18), radius: isNext ? 12 : 4, y: 2)
             .overlay(alignment: .bottomTrailing) {
                 if done {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 24))
+                        .font(.title2)
                         .foregroundStyle(.white, info.color)
                         .offset(x: 8, y: 8)
                 } else if readCount > 0 {
                     Text("\(readCount)/\(block.count)")
-                        .font(.system(size: 10, weight: .heavy).monospacedDigit())
+                        .font(.caption2.weight(.heavy).monospacedDigit())
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -570,7 +630,7 @@ private struct WayStop: View {
             .overlay(alignment: .top) {
                 if isNext {
                     Text("SEGUÍ ACÁ")
-                        .font(.system(size: 10, weight: .black))
+                        .font(.caption2.weight(.black))
                         .foregroundStyle(Color(hex: 0x17191E))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
@@ -584,10 +644,16 @@ private struct WayStop: View {
     private func label(done: Bool) -> some View {
         VStack(alignment: left ? .leading : .trailing, spacing: 3) {
             Text(block.series.label)
-                .font(.system(size: block.isExtra ? 12 : 14, weight: block.isExtra ? .semibold : .heavy))
+                .font(block.isExtra ? Font.caption.weight(.semibold) : Font.subheadline.weight(.heavy))
                 .foregroundStyle(block.isExtra ? Theme.ink2 : Theme.ink)
                 .multilineTextAlignment(left ? .leading : .trailing)
                 .lineLimit(3)
+            let mine = block.indices.filter { owned[route.items[$0].cvID] != nil }.count
+            if mine > 0 {
+                Label(mine == block.count ? "Los tenés" : "Tenés \(mine)/\(block.count)", systemImage: "books.vertical.fill")
+                    .font(.caption2.weight(.bold).monospacedDigit())
+                    .foregroundStyle(Theme.magenta)
+            }
             HStack(spacing: 4) {
                 if block.isEvent {
                     Image(systemName: "bolt.fill").foregroundStyle(Color(hex: 0xE65C00))
@@ -616,7 +682,7 @@ private struct WayEnd: View {
                 .stroke(Theme.line, style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [2, 9]))
                 .frame(height: 30)
             Image(systemName: "trophy.fill")
-                .font(.system(size: 30))
+                .font(.title)
                 .foregroundStyle(Theme.yellow)
                 .frame(width: 64, height: 64)
                 .background(color, in: Circle())
@@ -636,24 +702,30 @@ private struct NextUpCard: View {
     let block: RouteBlock
     let path: RoutePath
     let read: Set<Int>
+    let owned: [Int: LocalComic]
     let onToggle: () -> Void
+    @Environment(LibraryActions.self) private var actions
     private var covers: GuideCovers { GuideCovers.shared }
 
     var body: some View {
         let unread = block.indices.filter { !read.contains(route.items[$0].cvID) }
-        let firstID = route.items[unread.first ?? block.indices[0]].cvID
+        let firstIndex = unread.first ?? block.indices[0]
+        let firstID = route.items[firstIndex].cvID
+        let mine = owned[firstID]
         HStack(alignment: .center, spacing: 14) {
             NavigationLink(value: CommunityRoute.guideBlock(route.id, block.id, path.rawValue)) {
-                RemoteCover(url: covers.url(firstID)).frame(width: 64)
+                RemoteCover(url: covers.url(firstID))
+                    .grayscale(mine == nil ? 1 : 0)
+                    .frame(width: 64)
             }
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 4) {
                 Text("SEGUÍ POR ACÁ")
-                    .font(.system(size: 10, weight: .black))
+                    .font(.caption2.weight(.black))
                     .tracking(1)
                     .foregroundStyle(Theme.ink2)
                 Text("\(block.series.label) \(block.numbersText)")
-                    .font(.system(size: 16, weight: .heavy))
+                    .font(.headline.weight(.heavy))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
                 if unread.count < block.count {
@@ -661,11 +733,30 @@ private struct NextUpCard: View {
                         .font(.caption)
                         .foregroundStyle(Theme.ink2)
                 }
-                Button(action: onToggle) {
-                    Text("Ya lo leí").font(.caption.weight(.heavy))
+                HStack(spacing: 8) {
+                    // Leer si lo tenés; si no, buscarlo en tus fuentes.
+                    if let mine {
+                        Button { actions.onRead(mine) } label: {
+                            Label("Leer #\(route.items[firstIndex].number)", systemImage: "book.fill")
+                                .font(.caption.weight(.heavy))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(info.color)
+                    } else {
+                        NavigationLink(value: LibraryRoute.findInSources(series: block.series.name,
+                                                                         number: route.items[firstIndex].number)) {
+                            Label("Descargar", systemImage: "arrow.down.circle")
+                                .font(.caption.weight(.heavy))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(info.color)
+                    }
+                    Button(action: onToggle) {
+                        Text("Ya lo leí").font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.ink)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(info.color)
                 .padding(.top, 2)
             }
             Spacer(minLength: 0)
@@ -814,6 +905,7 @@ struct GuideBlockView: View {
     let blockID: Int
     let pathRaw: String
     @State private var cheers = 0
+    @Environment(LibraryActions.self) private var actions
     private var progress: GuideProgress { GuideProgress.shared }
     private var covers: GuideCovers { GuideCovers.shared }
 
@@ -890,6 +982,7 @@ struct GuideBlockView: View {
         let item = route.items[index]
         let name = route.series[item.series].name
         let done = read.contains(item.cvID)
+        let mine = LocalLibrary.shared.comicsByIssue[item.cvID]
         return HStack(spacing: 12) {
             Button {
                 progress.toggle([item.cvID])
@@ -902,7 +995,9 @@ struct GuideBlockView: View {
             .buttonStyle(.plain)
             NavigationLink(value: CVRoute.issue(id: item.cvID, title: CVText.issueTitle(series: name, number: item.number))) {
                 HStack(spacing: 10) {
-                    RemoteCover(url: covers.url(item.cvID)).frame(width: 40)
+                    RemoteCover(url: covers.url(item.cvID))
+                        .grayscale(mine == nil ? 1 : 0)
+                        .frame(width: 40)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(route.series[item.series].label) #\(item.number)")
                             .font(.subheadline.weight(.semibold))
@@ -910,8 +1005,19 @@ struct GuideBlockView: View {
                         if item.isEvent {
                             Text("⚡ Evento").font(.caption2.weight(.bold)).foregroundStyle(Color(hex: 0xE65C00))
                         }
+                        Text(mine == nil ? "No lo tenés" : "En tu Biblioteca")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(mine == nil ? Theme.ink2 : Theme.magenta)
                     }
                 }
+            }
+            // Leer directo si lo tenés (si no, la ficha tiene "Descargar").
+            if let mine {
+                Button { actions.onRead(mine) } label: {
+                    Text("Leer").font(.caption.weight(.heavy))
+                }
+                .buttonStyle(.borderless)
+                .tint(color)
             }
         }
         .onAppear { covers.want(item.cvID) }

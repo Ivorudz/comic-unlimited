@@ -13,29 +13,38 @@ import SwiftUI
 struct StartGuideView: View {
     /// true = es la pestaña "Rutas" (título grande, sin barra de arriba).
     var asTab = false
+    @State private var showBasics = false
     private var progress: GuideProgress { GuideProgress.shared }
 
     var body: some View {
         let read = progress.readSet()
         let routes = RouteInfo.all.compactMap { info in GuideRoutesStore.route(info.id).map { RoutePair(info: info, route: $0) } }
         let total = routes.map { progress.score($0.route, read) }.reduce(GuideProgress.Score(), +)
+        let owned = LocalLibrary.shared.comicsByIssue
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(asTab ? "Rutas" : "Por dónde empezar")
-                    .font(.system(size: asTab ? 32 : 28, weight: .black).width(Theme.titleWidth))
-                    .foregroundStyle(Theme.ink)
-                    .misprint(0.6)
-                    .padding(.top, asTab ? 20 : 8)
-                if asTab {
-                    Text("¿No sabés por dónde empezar a leer?")
-                        .font(.headline)
+                HStack(alignment: .center) {
+                    Text(asTab ? "Rutas" : "Por dónde empezar")
+                        .font(.system(.largeTitle, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(Theme.ink)
-                        .padding(.top, 4)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .misprint(0.6)
+                    Spacer(minLength: 8)
+                    // "Lo básico" (qué es un número, una serie, un evento, una era).
+                    Button { showBasics = true } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(.title2)
+                            .foregroundStyle(Theme.ink2)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Lo básico")
                 }
-                Text("Elegí una ruta, un camino (esencial, con extras o con todo) y un punto de partida. Cada número que leas suma puntos.")
+                .padding(.top, asTab ? 20 : 8)
+                Text("¿No sabés por dónde empezar a leer?")
                     .font(.subheadline)
                     .foregroundStyle(Theme.ink2)
-                    .padding(.top, 6)
 
                 LevelCard(score: total)
                     .padding(.top, 16)
@@ -46,13 +55,12 @@ struct StartGuideView: View {
                         NavigationLink(value: CommunityRoute.guideRoute(pair.info.id)) {
                             RouteCard(info: pair.info, route: pair.route, score: progress.score(pair.route, read),
                                       fraction: essentialFraction(pair.route, read),
-                                      next: progress.next(pair.route, path: progress.path(pair.info.id), read: read))
+                                      next: progress.next(pair.route, path: progress.path(pair.info.id), read: read),
+                                      read: read, owned: owned)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-
-                basics
 
                 SectionTitle("Si no sabés qué te gusta")
                 ForEach(StartGuide.picks) { group in
@@ -73,7 +81,7 @@ struct StartGuideView: View {
                     .padding(.bottom, 18)
                 }
 
-                Text("Orden de lectura: Comic Book Reading Orders (CBRO), de la colección pública CBL-ReadingLists. Eras: Marvel Guides. Datos y tapas: Comic Vine; las tapas pertenecen a sus editoriales.")
+                Text("Orden: CBRO (CBL-ReadingLists). Tapas: Comic Vine; pertenecen a sus editoriales.")
                     .font(.caption2)
                     .foregroundStyle(Theme.ink2)
                     .padding(.top, 12)
@@ -85,6 +93,18 @@ struct StartGuideView: View {
         .navigationTitle(asTab ? "Rutas" : "Empezar a leer")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(asTab ? .hidden : .visible, for: .navigationBar)
+        .sheet(isPresented: $showBasics) {
+            NavigationStack {
+                ScrollView { basics.padding(18) }
+                    .background(Theme.paper)
+                    .navigationTitle("Lo básico")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Listo") { showBasics = false } }
+                    }
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 
     /// Cuánto de lo esencial de la ruta leíste (para la barrita).
@@ -95,18 +115,14 @@ struct StartGuideView: View {
     }
 
     private var basics: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Lo básico").font(.headline).foregroundStyle(Theme.ink)
+        VStack(alignment: .leading, spacing: 12) {
             term("Número (#)", "Cada revista que sale, por ejemplo Batman #1 (unas 20 a 30 páginas).")
             term("Serie", "Todos los números de un título. Cuando vuelve a empezar desde el #1 es un \"volumen\" nuevo: por eso ves el año al lado del nombre.")
             term("Evento", "Una historia grande que cruza muchas series. En el camino \"Esencial\" está solo su centro; los cruces con otras series son extras.")
             term("Era", "Una época de la editorial (por ejemplo Marvel Disassembled o Los Nuevos 52). Completar lo esencial de una era da una medalla.")
+            term("Puntos", "Cada número leído de una ruta suma 10 (los extras, 20). Las tapas a color son las que tenés en tu Biblioteca.")
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
-        .padding(.top, 24)
     }
 
     private func term(_ name: String, _ text: String) -> some View {
@@ -136,7 +152,7 @@ struct LevelCard: View {
                         .tracking(1.2)
                         .foregroundStyle(.white.opacity(0.85))
                     Text(level.name)
-                        .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
+                        .font(.system(.title2, weight: .black).width(Theme.titleWidth))
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
@@ -144,7 +160,7 @@ struct LevelCard: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 0) {
                     Text("\(score.points)")
-                        .font(.system(size: 30, weight: .black).monospacedDigit())
+                        .font(.system(.largeTitle, weight: .black).monospacedDigit())
                         .foregroundStyle(Theme.yellow)
                     Text("puntos").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.85))
                 }
@@ -169,7 +185,7 @@ struct LevelCard: View {
         }
         .padding(16)
         .background(
-            LinearGradient(colors: [Color(hex: 0xD1006C), Color(hex: 0x6B2FD6)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            LinearGradient(colors: [Theme.magenta, Theme.magenta.opacity(0.62)], startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 18)
         )
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.ink, lineWidth: 2))
@@ -181,7 +197,7 @@ struct LevelCard: View {
             Image(systemName: icon).foregroundStyle(Theme.yellow)
             VStack(alignment: .leading, spacing: 0) {
                 Text(value).font(.subheadline.weight(.black).monospacedDigit()).foregroundStyle(.white)
-                Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
+                Text(label).font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.8))
             }
         }
     }
@@ -193,17 +209,42 @@ private struct RouteCard: View {
     let score: GuideProgress.Score
     let fraction: Double
     let next: RouteBlock?
+    let read: Set<Int>
+    let owned: [Int: LocalComic]
+    private var covers: GuideCovers { GuideCovers.shared }
 
     var body: some View {
+        // La tapa del próximo número que te toca (a color solo si lo tenés).
+        let nextID = next.map { block in
+            route.items[block.indices.first { !read.contains(route.items[$0].cvID) } ?? block.indices[0]].cvID
+        }
         HStack(spacing: 14) {
-            Image(systemName: info.icon)
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 54, height: 54)
-                .background(info.color, in: RoundedRectangle(cornerRadius: 14))
+            Group {
+                if let nextID {
+                    RemoteCover(url: covers.url(nextID))
+                        .grayscale(owned[nextID] == nil ? 1 : 0)
+                        .onAppear { covers.want(nextID) }
+                } else {
+                    Image(systemName: info.icon)
+                        .font(.title.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 54, height: 81)
+                        .background(info.color, in: RoundedRectangle(cornerRadius: 6))
+                }
+            }
+            .frame(width: 54)
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: info.icon)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(info.color, in: Circle())
+                    .overlay(Circle().stroke(Theme.card, lineWidth: 2))
+                    .offset(x: 6, y: 6)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(route.title).font(.system(size: 17, weight: .heavy)).foregroundStyle(Theme.ink)
+                    Text(route.title).font(.headline.weight(.heavy)).foregroundStyle(Theme.ink)
                     Spacer()
                     Text("\(score.points) pts").font(.caption.weight(.heavy).monospacedDigit()).foregroundStyle(Theme.magenta)
                 }
@@ -232,7 +273,7 @@ private struct PickCard: View {
         VStack(alignment: .leading, spacing: 3) {
             RemoteCover(url: found?.cover.flatMap { URL(string: $0) })
             Text(pick.title)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -240,7 +281,7 @@ private struct PickCard: View {
             Text("\(String(pick.year)) · \(pick.publisher)").font(.caption).foregroundStyle(Theme.ink2).lineLimit(1)
             Text(pick.why).font(.caption).foregroundStyle(Theme.ink).lineLimit(4).multilineTextAlignment(.leading)
             if pick.adults {
-                Text("Para adultos").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.magenta)
+                Text("Para adultos").font(.caption2.weight(.bold)).foregroundStyle(Theme.magenta)
             }
         }
         .frame(width: 130)
