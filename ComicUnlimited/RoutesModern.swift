@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Pestaña Rutas, versión moderna (Personalizar → "Rutas modernas", prendida de entrada).
+// Pestaña Rutas, versión moderna (Personalizar → "Estilo moderno", prendido de entrada).
 // Cada ruta es solo un botón grande con un dibujo propio (hecho con código, sin logos de las editoriales):
 // Avengers = escudo con rayo, X-Men = hélice de ADN, Spider-Man = telaraña, Batman = ciudad de noche
 // con luna y murciélagos, Liga de la Justicia = planeta con anillo y constelación.

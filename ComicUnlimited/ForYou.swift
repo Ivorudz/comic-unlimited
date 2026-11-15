@@ -208,7 +208,7 @@ struct ForYouRow: View {
                                 NavigationLink(value: CVRoute.series(id: item.id, name: item.name)) {
                                     SuggestionCard(item: item)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(CardPressStyle())
                             }
                         }
                         .padding(.horizontal, 18)

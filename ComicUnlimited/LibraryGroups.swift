@@ -174,7 +174,7 @@ struct LocalComicTile: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .contextMenu {
             Button { actions.onRead(comic) } label: {
                 Label("Leer", systemImage: "book")
@@ -274,8 +274,10 @@ struct LocalCover: View {
                     Image(systemName: "doc.richtext").foregroundStyle(Theme.ink2)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: AppearanceSettings.shared.modern ? 10 : 4, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: AppearanceSettings.shared.modern ? 10 : 4, style: .continuous)
+            .stroke(Theme.line.opacity(AppearanceSettings.shared.modern ? 0.4 : 1), lineWidth: 1))
+        .shadow(color: .black.opacity(AppearanceSettings.shared.modern ? 0.22 : 0), radius: 7, y: 4)
         .task(id: comic.id) {
             cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)
         }

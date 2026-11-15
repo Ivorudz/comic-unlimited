@@ -26,8 +26,11 @@ struct HomeView: View {
                     let sections = appearance.visibleHomeSections
                     let firstDiscover = sections.first { $0 != .continueReading }
                     ForEach(sections) { section in
-                        if section == firstDiscover { HomeSectionTitle("Descubrir") }
-                        homeSection(section)
+                        VStack(alignment: .leading, spacing: 0) {
+                            if section == firstDiscover { HomeSectionTitle("Descubrir") }
+                            homeSection(section)
+                        }
+                        .modifier(AppearIn(index: sections.firstIndex(of: section) ?? 0))
                     }
                     Text("Datos y portadas: Comic Vine y Metron. Las portadas pertenecen a sus editoriales.")
                         .font(.caption2)
@@ -37,7 +40,7 @@ struct HomeView: View {
                 .padding(.horizontal, 18)
                 .padding(.bottom, 24)
             }
-            .background(Theme.paper)
+            .background { ModernScreenBackground() }
             // Deslizar hacia abajo: actualiza Recién salidos (y Para vos si cambiaron tus listas).
             .refreshable {
                 await discover.retry()
@@ -99,9 +102,24 @@ struct HomeView: View {
             .padding(.leading, 8)
             .padding(.trailing, 12)
             .padding(.vertical, 8)
-            .background(Theme.card, in: Capsule())
-            .overlay(Capsule().stroke(Theme.ink, lineWidth: 2))
-            .background(Capsule().fill(Theme.magenta).offset(x: 4, y: 4))
+            .background {
+                // Moderno: cápsula de vidrio con borde de color y resplandor. Anterior: globo de historieta.
+                if appearance.modern {
+                    Capsule().fill(.ultraThinMaterial)
+                } else {
+                    Capsule().fill(Theme.card)
+                }
+            }
+            .overlay {
+                if appearance.modern {
+                    Capsule().strokeBorder(LinearGradient(colors: [Theme.magenta, Theme.cyan],
+                                                          startPoint: .leading, endPoint: .trailing), lineWidth: 1.5)
+                } else {
+                    Capsule().stroke(Theme.ink, lineWidth: 2)
+                }
+            }
+            .background(Capsule().fill(Theme.magenta).offset(x: 4, y: 4).opacity(appearance.modern ? 0 : 1))
+            .shadow(color: Theme.magenta.opacity(appearance.modern ? 0.3 : 0), radius: 14, y: 6)
             .contentShape(Capsule())
         }
         .buttonStyle(SearchBarPressStyle())
@@ -151,7 +169,7 @@ struct HomeView: View {
                             Button { onReadLocal(comic) } label: {
                                 LocalContinueCard(comic: comic)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(CardPressStyle())
                             .contextMenu {
                                 Button { onReadLocal(comic) } label: {
                                     Label(comic.isFinished ? "Volver a leer" : "Seguir leyendo", systemImage: "book")
@@ -244,18 +262,20 @@ private struct LocalContinueCard: View {
 
     var body: some View {
         let progress = comic.isFinished ? 1 : Double((comic.lastPage ?? 0) + 1) / Double(max(comic.pageCount, 1))
+        let modern = AppearanceSettings.shared.modern
         HStack(spacing: 12) {
             ZStack {
                 Theme.chip
                 if let cover { Image(uiImage: cover).resizable().scaledToFill() }
             }
             .frame(width: 62, height: 93)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: modern ? 8 : 4, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: modern ? 8 : 4, style: .continuous).stroke(Theme.line, lineWidth: modern ? 0 : 1))
+            .shadow(color: .black.opacity(modern ? 0.35 : 0), radius: 8, y: 4)
             VStack(alignment: .leading, spacing: 3) {
                 Text(comic.displayTitle)
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Theme.ink)
+                    .foregroundStyle(modern ? Color.white : Theme.ink)
                     .lineLimit(2)
                 // De qué arco, serie, lista o ruta venías (si venías de alguno).
                 if let context = comic.lastContext {
@@ -266,15 +286,36 @@ private struct LocalContinueCard: View {
                 }
                 Text(pagesLeft)
                     .font(.footnote)
-                    .foregroundStyle(Theme.ink2)
+                    .foregroundStyle(modern ? Color.white.opacity(0.8) : Theme.ink2)
                 ProgressBar(value: progress).padding(.top, 5)
             }
             Spacer(minLength: 0)
         }
-        .padding(10)
+        .padding(modern ? 12 : 10)
         .frame(width: 290)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+        .background {
+            // Moderno: la misma tapa, grande y difuminada, de fondo (es tuya, así que va a color).
+            if modern {
+                ZStack {
+                    Color.black
+                    if let cover {
+                        Image(uiImage: cover).resizable().scaledToFill().blur(radius: 24).opacity(0.85)
+                    }
+                    LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 14).fill(Theme.card)
+            }
+        }
+        .overlay {
+            if modern {
+                RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.2), lineWidth: 1)
+            } else {
+                RoundedRectangle(cornerRadius: 14).stroke(Theme.line)
+            }
+        }
+        .shadow(color: .black.opacity(modern ? 0.25 : 0), radius: 12, y: 6)
         .task(id: comic.id) {
             cover = UIImage(contentsOfFile: LocalLibrary.shared.coverURL(comic).path)
         }

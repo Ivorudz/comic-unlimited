@@ -43,6 +43,8 @@ struct LibraryView: View {
     @State private var showImporter = false
     @State private var problems: [String] = []
     @State private var notices: [String] = []
+    /// Para que el resaltado de "Todos / Series / …" se deslice de un botón al otro.
+    @Namespace private var modeSlider
 
     var body: some View {
         NavigationStack {
@@ -79,7 +81,7 @@ struct LibraryView: View {
                 .padding(.horizontal, 18)
                 .padding(.bottom, 30)
             }
-            .background(Theme.paper)
+            .background { ModernScreenBackground() }
             .scrollDismissesKeyboard(.interactively)
             .appDestinations()
             .navigationTitle("Biblioteca")
@@ -125,6 +127,7 @@ struct LibraryView: View {
                 .buttonStyle(.plain)
                 .disabled(library.importing)
                 .opacity(library.importing ? 0.5 : 1)
+                .shadow(color: Theme.magenta.opacity(AppearanceSettings.shared.modern ? 0.5 : 0), radius: 10, y: 4)
                 .accessibilityLabel("Importar cómics")
             }
             .padding(.top, 20)
@@ -162,10 +165,15 @@ struct LibraryView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(highlighted ? Theme.magenta : Theme.line))
+                .modernCard(cornerRadius: 12)
+                .overlay {
+                    if highlighted {
+                        RoundedRectangle(cornerRadius: AppearanceSettings.shared.modern ? 16 : 12, style: .continuous)
+                            .stroke(Theme.magenta)
+                    }
+                }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
     }
 
     /// Resultado del último importe: queda a la vista hasta que lo cerrás.
@@ -195,18 +203,36 @@ struct LibraryView: View {
     }
 
     private var modePicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+        let modern = AppearanceSettings.shared.modern
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: modern ? 4 : 8) {
                 ForEach(Mode.allCases) { option in
-                    Button { mode = option } label: {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { mode = option }
+                    } label: {
                         Text(option.rawValue)
                             .font(.subheadline.weight(.semibold))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .foregroundStyle(mode == option ? Theme.paper : Theme.ink)
-                            .background(mode == option ? Theme.ink : Theme.chip, in: Capsule())
+                            .background {
+                                if mode == option {
+                                    // Moderno: el resaltado se desliza de un botón al otro.
+                                    Capsule().fill(Theme.ink)
+                                        .matchedGeometryEffect(id: "mode", in: modeSlider)
+                                } else if !modern {
+                                    Capsule().fill(Theme.chip)
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
+                }
+            }
+            .padding(modern ? 4 : 0)
+            .background {
+                if modern {
+                    Capsule().fill(.ultraThinMaterial)
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
                 }
             }
             .padding(.horizontal, 18)
@@ -293,7 +319,7 @@ struct LibraryView: View {
                     FolderCard(title: group.name, subtitle: countText(group.comics.count),
                                cover: group.comics.first, icon: "questionmark.folder")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(CardPressStyle())
             }
         }
         .padding(.top, 18)
@@ -322,7 +348,7 @@ struct LibraryView: View {
                             FolderCard(title: group.arc.name, subtitle: countText(group.comics.count),
                                        cover: group.comics.first, icon: "point.3.connected.trianglepath.dotted")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(CardPressStyle())
                     }
                 }
             }
@@ -343,7 +369,7 @@ struct LibraryView: View {
                     FolderCard(title: group.name, subtitle: countText(group.comics.count),
                                cover: group.comics.first, icon: "building.2")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(CardPressStyle())
             }
         }
         .padding(.top, 18)
@@ -357,7 +383,7 @@ struct LibraryView: View {
                     FolderCard(title: state.label, subtitle: countText(comics.count),
                                cover: comics.first, icon: state.icon)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(CardPressStyle())
             }
         }
         .padding(.top, 18)

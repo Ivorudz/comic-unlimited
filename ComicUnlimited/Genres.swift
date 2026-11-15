@@ -371,7 +371,7 @@ struct GenreRows: View {
                                 NavigationLink(value: CVRoute.series(id: series.id, name: series.name)) {
                                     GenreSeriesCard(series: series)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(CardPressStyle())
                             }
                         }
                         .padding(.horizontal, 18)

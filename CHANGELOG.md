@@ -2,6 +2,13 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.42 · Inicio y Biblioteca modernos
+- La opción de Personalizar pasa a llamarse **Estilo moderno** y ahora vale para **Rutas, Inicio y Biblioteca** (prendida de entrada; apagada, todo vuelve al estilo anterior).
+- **Inicio**: fondo de colores que se mueve despacio; barra de búsqueda de vidrio con borde de colores y resplandor; "Seguir leyendo" con la tapa difuminada de fondo; las filas entran una tras otra al abrir.
+- **Biblioteca**: mismo fondo; botón ＋ con resplandor; Fuentes y Ver en la compu de vidrio; los botones Todos / Series / Arcos… en una barra de vidrio donde el resaltado se desliza.
+- En todas: tapas con esquinas más redondas y sombra suave; las tarjetas se achican, se inclinan y vibran al apretarlas.
+- Con "Reducir movimiento" del iPhone, nada se mueve.
+
 ## 0.41.1 · Adentro de cada ruta, también moderno
 - Brillo nuevo en las tarjetas: un reflejo suave y difuso que pasa cada tanto, como una ola que baja de tarjeta en tarjeta, y un borde de luz arriba, como un vidrio.
 - Con **Rutas modernas** prendido, la pantalla de cada ruta también es moderna: encabezado grande con el dibujo flotando, aro de avance, medallas y puntos; fondo de colores de la ruta que se mueve; "Seguí por acá" de vidrio con resplandor; botones que se inclinan al apretarlos. Apagado, todo queda como antes.

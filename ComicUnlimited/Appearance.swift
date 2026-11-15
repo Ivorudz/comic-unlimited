@@ -357,11 +357,11 @@ struct AppearanceScreen: View {
             }
 
             Section {
-                Toggle("Rutas modernas", isOn: Binding(get: { settings.modernRoutes }, set: { settings.setModernRoutes($0) }))
+                Toggle("Estilo moderno", isOn: Binding(get: { settings.modernRoutes }, set: { settings.setModernRoutes($0) }))
             } header: {
-                Text("Rutas")
+                Text("Estilo")
             } footer: {
-                Text("Cada ruta como un botón grande con su dibujo, colores y movimiento. Apagalo para volver a la vista anterior, con más detalle.")
+                Text("Rutas, Inicio y Biblioteca con fondo de colores en movimiento, vidrio, sombras y animaciones. Apagalo para volver al estilo anterior.")
             }
 
             Section {

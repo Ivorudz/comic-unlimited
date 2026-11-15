@@ -255,7 +255,7 @@ struct IssueCardsRow: View {
                             NavigationLink(value: CVRoute.issue(id: issue.id, title: issue.title)) { ReleaseCard(issue: issue) }
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardPressStyle())
                 }
             }
             .padding(.horizontal, 18)
