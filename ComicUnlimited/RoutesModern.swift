@@ -147,8 +147,14 @@ private struct RouteHeroCard: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: still)) { timeline in
-            let t = still ? 0 : timeline.date.timeIntervalSinceReferenceDate
-            let phase = Double(index) * 1.3
+            let t: Double = still ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            let phase: Double = Double(index) * 1.3
+            let glowX: CGFloat = 120 + CGFloat(sin(t * 0.5 + phase)) * 10
+            let glowY: CGFloat = -30 + CGFloat(cos(t * 0.4 + phase)) * 8
+            let dotY: CGFloat = 60 + CGFloat(sin(t * 0.6 + phase)) * 6
+            let tilt: Double = sin(t * 0.8 + phase) * 3
+            let bob: CGFloat = CGFloat(sin(t * 1.2 + phase)) * 5
+            let cycle: CGFloat = CGFloat((t * 0.22 + Double(index) * 0.17).truncatingRemainder(dividingBy: 1))
             ZStack(alignment: .leading) {
                 // Fondo: color de la ruta, más oscuro abajo, con círculos de luz.
                 ZStack {
@@ -158,20 +164,20 @@ private struct RouteHeroCard: View {
                     Circle()
                         .fill(.white.opacity(0.14))
                         .frame(width: 220, height: 220)
-                        .offset(x: 120 + sin(t * 0.5 + phase) * 10, y: -30 + cos(t * 0.4 + phase) * 8)
+                        .offset(x: glowX, y: glowY)
                         .blur(radius: 2)
                     Circle()
                         .fill(.white.opacity(0.08))
                         .frame(width: 120, height: 120)
-                        .offset(x: -140, y: 60 + sin(t * 0.6 + phase) * 6)
+                        .offset(x: -140, y: dotY)
                 }
 
                 // El dibujo, flotando.
                 RouteEmblem(routeID: info.id)
                     .frame(width: 126, height: 126)
                     .shadow(color: .white.opacity(0.45), radius: 12)
-                    .rotationEffect(.degrees(sin(t * 0.8 + phase) * 3))
-                    .offset(y: sin(t * 1.2 + phase) * 5)
+                    .rotationEffect(.degrees(tilt))
+                    .offset(y: bob)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 18)
 
@@ -192,12 +198,12 @@ private struct RouteHeroCard: View {
             // Un brillo que pasa cada tanto.
             .overlay {
                 GeometryReader { geo in
-                    let cycle = (t * 0.22 + Double(index) * 0.17).truncatingRemainder(dividingBy: 1)
+                    let shineX: CGFloat = geo.size.width * (cycle * 2.2 - 0.5)
                     LinearGradient(colors: [.clear, .white.opacity(0.28), .clear],
                                    startPoint: .leading, endPoint: .trailing)
                         .frame(width: geo.size.width * 0.35)
                         .rotationEffect(.degrees(18))
-                        .offset(x: -geo.size.width * 0.5 + cycle * geo.size.width * 2.2)
+                        .offset(x: shineX)
                         .opacity(still ? 0 : 1)
                 }
                 .allowsHitTesting(false)
@@ -255,16 +261,11 @@ private struct RoutesBackdrop: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 20, paused: still)) { timeline in
-            let t = still ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            let t: Double = still ? 0 : timeline.date.timeIntervalSinceReferenceDate
             GeometryReader { geo in
                 ZStack {
                     ForEach(colors.indices, id: \.self) { i in
-                        let a = Double(i) * 1.7
-                        Circle()
-                            .fill(colors[i].opacity(0.32))
-                            .frame(width: geo.size.width * 0.8, height: geo.size.width * 0.8)
-                            .position(x: geo.size.width * (0.5 + 0.38 * sin(t * 0.07 + a)),
-                                      y: geo.size.height * (0.15 + 0.18 * Double(i) + 0.05 * cos(t * 0.09 + a)))
+                        BackdropBlob(color: colors[i], index: i, time: t, size: geo.size)
                     }
                 }
                 .blur(radius: 70)
@@ -275,6 +276,25 @@ private struct RoutesBackdrop: View {
     }
 }
 
+/// Una mancha de color del fondo, en su lugar según el tiempo.
+private struct BackdropBlob: View {
+    let color: Color
+    let index: Int
+    let time: Double
+    let size: CGSize
+
+    var body: some View {
+        let a: Double = Double(index) * 1.7
+        let fx: CGFloat = 0.5 + 0.38 * CGFloat(sin(time * 0.07 + a))
+        let fy: CGFloat = 0.15 + 0.18 * CGFloat(index) + 0.05 * CGFloat(cos(time * 0.09 + a))
+        let side: CGFloat = size.width * 0.8
+        Circle()
+            .fill(color.opacity(0.32))
+            .frame(width: side, height: side)
+            .position(x: size.width * fx, y: size.height * fy)
+    }
+}
+
 // MARK: - Dibujos de cada ruta (hechos con código)
 
 struct RouteEmblem: View {
@@ -282,128 +302,193 @@ struct RouteEmblem: View {
 
     var body: some View {
         Canvas { context, size in
-            let w = size.width, h = size.height
-            func p(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * w, y: y * h) }
-            let white = GraphicsContext.Shading.color(.white)
-            switch routeID {
-            case "avengers":
-                // Escudo con un rayo.
-                var shield = Path()
-                shield.move(to: p(0.5, 0.05))
-                shield.addLine(to: p(0.9, 0.18))
-                shield.addLine(to: p(0.88, 0.52))
-                shield.addQuadCurve(to: p(0.5, 0.96), control: p(0.84, 0.82))
-                shield.addQuadCurve(to: p(0.12, 0.52), control: p(0.16, 0.82))
-                shield.addLine(to: p(0.1, 0.18))
-                shield.closeSubpath()
-                context.fill(shield, with: .color(.white.opacity(0.16)))
-                context.stroke(shield, with: white, style: StrokeStyle(lineWidth: w * 0.055, lineJoin: .round))
-                var bolt = Path()
-                bolt.addLines([p(0.58, 0.2), p(0.35, 0.56), p(0.49, 0.56), p(0.41, 0.82), p(0.67, 0.44), p(0.53, 0.44), p(0.62, 0.2)])
-                bolt.closeSubpath()
-                context.fill(bolt, with: white)
-            case "xmen":
-                // Hélice de ADN.
-                var left = Path(), right = Path()
-                let steps = 60
-                for s in 0...steps {
-                    let y = 0.04 + 0.92 * Double(s) / Double(steps)
-                    let x = 0.28 * sin(y * .pi * 3)
-                    if s == 0 { left.move(to: p(0.5 + x, y)); right.move(to: p(0.5 - x, y)) } else {
-                        left.addLine(to: p(0.5 + x, y)); right.addLine(to: p(0.5 - x, y))
-                    }
-                }
-                var rungs = Path()
-                var y = 0.1
-                while y < 0.95 {
-                    let x = 0.28 * sin(y * .pi * 3)
-                    rungs.move(to: p(0.5 + x, y)); rungs.addLine(to: p(0.5 - x, y))
-                    y += 0.075
-                }
-                context.stroke(rungs, with: .color(.white.opacity(0.6)), style: StrokeStyle(lineWidth: w * 0.03, lineCap: .round))
-                context.stroke(left, with: white, style: StrokeStyle(lineWidth: w * 0.055, lineCap: .round))
-                context.stroke(right, with: .color(.white.opacity(0.85)), style: StrokeStyle(lineWidth: w * 0.055, lineCap: .round))
-            case "spiderman":
-                // Telaraña con una arañita colgando.
-                let c = p(0.42, 0.42)
-                let spokes = 8
-                var web = Path()
-                for i in 0..<spokes {
-                    let a = Double(i) / Double(spokes) * 2 * .pi
-                    web.move(to: c)
-                    web.addLine(to: CGPoint(x: c.x + cos(a) * w * 0.42, y: c.y + sin(a) * h * 0.42))
-                }
-                for r in [0.12, 0.21, 0.3, 0.39] {
-                    for i in 0..<spokes {
-                        let a1 = Double(i) / Double(spokes) * 2 * .pi
-                        let a2 = Double(i + 1) / Double(spokes) * 2 * .pi
-                        let m = (a1 + a2) / 2
-                        let p1 = CGPoint(x: c.x + cos(a1) * w * r, y: c.y + sin(a1) * h * r)
-                        let p2 = CGPoint(x: c.x + cos(a2) * w * r, y: c.y + sin(a2) * h * r)
-                        let ctrl = CGPoint(x: c.x + cos(m) * w * r * 0.82, y: c.y + sin(m) * h * r * 0.82)
-                        web.move(to: p1)
-                        web.addQuadCurve(to: p2, control: ctrl)
-                    }
-                }
-                context.stroke(web, with: white, style: StrokeStyle(lineWidth: w * 0.022, lineCap: .round))
-                var thread = Path()
-                thread.move(to: p(0.8, 0.0)); thread.addLine(to: p(0.8, 0.74))
-                context.stroke(thread, with: .color(.white.opacity(0.8)), lineWidth: w * 0.015)
-                var legs = Path()
-                for side in [-1.0, 1.0] {
-                    for k in 0..<4 {
-                        let yy = 0.77 + Double(k) * 0.035
-                        legs.move(to: p(0.8, yy))
-                        legs.addQuadCurve(to: p(0.8 + side * 0.1, yy + 0.04), control: p(0.8 + side * 0.08, yy - 0.04))
-                    }
-                }
-                context.stroke(legs, with: white, style: StrokeStyle(lineWidth: w * 0.018, lineCap: .round))
-                context.fill(Path(ellipseIn: CGRect(x: 0.765 * w, y: 0.74 * h, width: 0.07 * w, height: 0.07 * h)), with: white)
-                context.fill(Path(ellipseIn: CGRect(x: 0.75 * w, y: 0.79 * h, width: 0.1 * w, height: 0.12 * h)), with: white)
-            case "batman":
-                // Luna creciente, murciélagos y ciudad de noche.
-                context.drawLayer { layer in
-                    layer.fill(Path(ellipseIn: CGRect(x: 0.52 * w, y: 0.06 * h, width: 0.34 * w, height: 0.34 * h)), with: white)
-                    layer.blendMode = .destinationOut
-                    layer.fill(Path(ellipseIn: CGRect(x: 0.6 * w, y: 0.02 * h, width: 0.32 * w, height: 0.32 * h)), with: white)
-                }
-                func bat(_ cx: Double, _ cy: Double, _ s: Double) -> Path {
-                    var b = Path()
-                    let pts: [(Double, Double)] = [(-1, 0), (-0.35, -0.15), (-0.15, -0.35), (0, -0.2), (0.15, -0.35), (0.35, -0.15),
-                                                   (1, 0), (0.6, 0.15), (0.3, 0.05), (0, 0.3), (-0.3, 0.05), (-0.6, 0.15)]
-                    b.addLines(pts.map { p(cx + $0.0 * s, cy + $0.1 * s) })
-                    b.closeSubpath()
-                    return b
-                }
-                context.fill(bat(0.3, 0.22, 0.09), with: white)
-                context.fill(bat(0.16, 0.38, 0.06), with: .color(.white.opacity(0.85)))
-                context.fill(bat(0.42, 0.42, 0.05), with: .color(.white.opacity(0.75)))
-                var city = Path()
-                let buildings: [(Double, Double, Double)] = [(0.0, 0.12, 0.7), (0.12, 0.1, 0.58), (0.22, 0.14, 0.66), (0.36, 0.08, 0.52),
-                                                            (0.44, 0.16, 0.62), (0.6, 0.1, 0.55), (0.7, 0.14, 0.68), (0.84, 0.16, 0.6)]
-                for b in buildings {
-                    city.addRect(CGRect(x: b.0 * w, y: b.2 * h, width: b.1 * w, height: (1 - b.2) * h))
-                }
-                context.fill(city, with: white)
-            default:
-                // Planeta con anillo y constelación.
-                let stars: [(Double, Double)] = [(0.1, 0.18), (0.26, 0.08), (0.42, 0.16), (0.82, 0.12), (0.9, 0.3), (0.12, 0.82), (0.86, 0.86)]
-                var lines = Path()
-                lines.addLines(stars.prefix(3).map { p($0.0, $0.1) })
-                lines.move(to: p(0.82, 0.12)); lines.addLine(to: p(0.9, 0.3))
-                context.stroke(lines, with: .color(.white.opacity(0.55)), lineWidth: w * 0.012)
-                for s in stars {
-                    context.fill(Path(ellipseIn: CGRect(x: (s.0 - 0.022) * w, y: (s.1 - 0.022) * h, width: 0.044 * w, height: 0.044 * h)), with: white)
-                }
-                let ring = Path(ellipseIn: CGRect(x: 0.08 * w, y: 0.44 * h, width: 0.84 * w, height: 0.2 * h))
-                    .applying(CGAffineTransform(translationX: -0.5 * w, y: -0.54 * h)
-                        .concatenating(CGAffineTransform(rotationAngle: -0.35))
-                        .concatenating(CGAffineTransform(translationX: 0.5 * w, y: 0.54 * h)))
-                context.stroke(ring, with: .color(.white.opacity(0.9)), lineWidth: w * 0.035)
-                context.fill(Path(ellipseIn: CGRect(x: 0.3 * w, y: 0.34 * h, width: 0.4 * w, height: 0.4 * h)), with: white)
-            }
+            EmblemDrawing.draw(routeID, in: &context, size: size)
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// Cada dibujo en su propia función (con números de tipo CGFloat), para que el compilador los revise rápido.
+private enum EmblemDrawing {
+    static func draw(_ routeID: String, in context: inout GraphicsContext, size: CGSize) {
+        let pen = Pen(width: size.width, height: size.height)
+        switch routeID {
+        case "avengers": shield(&context, pen)
+        case "xmen": helix(&context, pen)
+        case "spiderman": web(&context, pen)
+        case "batman": night(&context, pen)
+        default: planet(&context, pen)
+        }
+    }
+
+    /// Pasa de coordenadas de 0 a 1 al tamaño real.
+    struct Pen {
+        let width: CGFloat
+        let height: CGFloat
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * width, y: y * height) }
+        func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> CGRect {
+            CGRect(x: x * width, y: y * height, width: w * width, height: h * height)
+        }
+        func line(_ fraction: CGFloat) -> CGFloat { fraction * width }
+    }
+
+    static let white = GraphicsContext.Shading.color(.white)
+
+    static func soft(_ opacity: Double) -> GraphicsContext.Shading {
+        .color(Color.white.opacity(opacity))
+    }
+
+    // Escudo con un rayo.
+    static func shield(_ context: inout GraphicsContext, _ pen: Pen) {
+        var outline = Path()
+        outline.move(to: pen.p(0.5, 0.05))
+        outline.addLine(to: pen.p(0.9, 0.18))
+        outline.addLine(to: pen.p(0.88, 0.52))
+        outline.addQuadCurve(to: pen.p(0.5, 0.96), control: pen.p(0.84, 0.82))
+        outline.addQuadCurve(to: pen.p(0.12, 0.52), control: pen.p(0.16, 0.82))
+        outline.addLine(to: pen.p(0.1, 0.18))
+        outline.closeSubpath()
+        context.fill(outline, with: soft(0.16))
+        context.stroke(outline, with: white, style: StrokeStyle(lineWidth: pen.line(0.055), lineJoin: .round))
+
+        var bolt = Path()
+        let points: [CGPoint] = [pen.p(0.58, 0.2), pen.p(0.35, 0.56), pen.p(0.49, 0.56), pen.p(0.41, 0.82),
+                                 pen.p(0.67, 0.44), pen.p(0.53, 0.44), pen.p(0.62, 0.2)]
+        bolt.addLines(points)
+        bolt.closeSubpath()
+        context.fill(bolt, with: white)
+    }
+
+    // Hélice de ADN.
+    static func helix(_ context: inout GraphicsContext, _ pen: Pen) {
+        var left = Path()
+        var right = Path()
+        let steps = 60
+        for step in 0...steps {
+            let y: CGFloat = 0.04 + 0.92 * CGFloat(step) / CGFloat(steps)
+            let x: CGFloat = 0.28 * sin(y * .pi * 3)
+            if step == 0 {
+                left.move(to: pen.p(0.5 + x, y))
+                right.move(to: pen.p(0.5 - x, y))
+            } else {
+                left.addLine(to: pen.p(0.5 + x, y))
+                right.addLine(to: pen.p(0.5 - x, y))
+            }
+        }
+        var rungs = Path()
+        var y: CGFloat = 0.1
+        while y < 0.95 {
+            let x: CGFloat = 0.28 * sin(y * .pi * 3)
+            rungs.move(to: pen.p(0.5 + x, y))
+            rungs.addLine(to: pen.p(0.5 - x, y))
+            y += 0.075
+        }
+        context.stroke(rungs, with: soft(0.6), style: StrokeStyle(lineWidth: pen.line(0.03), lineCap: .round))
+        context.stroke(left, with: white, style: StrokeStyle(lineWidth: pen.line(0.055), lineCap: .round))
+        context.stroke(right, with: soft(0.85), style: StrokeStyle(lineWidth: pen.line(0.055), lineCap: .round))
+    }
+
+    // Telaraña con una arañita colgando.
+    static func web(_ context: inout GraphicsContext, _ pen: Pen) {
+        let cx: CGFloat = 0.42
+        let cy: CGFloat = 0.42
+        let spokes = 8
+        var threads = Path()
+        for i in 0..<spokes {
+            let a: CGFloat = CGFloat(i) / CGFloat(spokes) * 2 * .pi
+            threads.move(to: pen.p(cx, cy))
+            threads.addLine(to: pen.p(cx + cos(a) * 0.42, cy + sin(a) * 0.42))
+        }
+        let radii: [CGFloat] = [0.12, 0.21, 0.3, 0.39]
+        for r in radii {
+            for i in 0..<spokes {
+                let a1: CGFloat = CGFloat(i) / CGFloat(spokes) * 2 * .pi
+                let a2: CGFloat = CGFloat(i + 1) / CGFloat(spokes) * 2 * .pi
+                let mid: CGFloat = (a1 + a2) / 2
+                let inner: CGFloat = r * 0.82
+                threads.move(to: pen.p(cx + cos(a1) * r, cy + sin(a1) * r))
+                threads.addQuadCurve(to: pen.p(cx + cos(a2) * r, cy + sin(a2) * r),
+                                     control: pen.p(cx + cos(mid) * inner, cy + sin(mid) * inner))
+            }
+        }
+        context.stroke(threads, with: white, style: StrokeStyle(lineWidth: pen.line(0.022), lineCap: .round))
+
+        var thread = Path()
+        thread.move(to: pen.p(0.8, 0))
+        thread.addLine(to: pen.p(0.8, 0.74))
+        context.stroke(thread, with: soft(0.8), lineWidth: pen.line(0.015))
+
+        var legs = Path()
+        let sides: [CGFloat] = [-1, 1]
+        for side in sides {
+            for k in 0..<4 {
+                let ly: CGFloat = 0.77 + CGFloat(k) * 0.035
+                legs.move(to: pen.p(0.8, ly))
+                legs.addQuadCurve(to: pen.p(0.8 + side * 0.1, ly + 0.04), control: pen.p(0.8 + side * 0.08, ly - 0.04))
+            }
+        }
+        context.stroke(legs, with: white, style: StrokeStyle(lineWidth: pen.line(0.018), lineCap: .round))
+        context.fill(Path(ellipseIn: pen.rect(0.765, 0.74, 0.07, 0.07)), with: white)
+        context.fill(Path(ellipseIn: pen.rect(0.75, 0.79, 0.1, 0.12)), with: white)
+    }
+
+    // Luna creciente, murciélagos y ciudad de noche.
+    static func night(_ context: inout GraphicsContext, _ pen: Pen) {
+        let moon = Path(ellipseIn: pen.rect(0.52, 0.06, 0.34, 0.34))
+        let bite = Path(ellipseIn: pen.rect(0.6, 0.02, 0.32, 0.32))
+        context.drawLayer { layer in
+            layer.fill(moon, with: white)
+            layer.blendMode = .destinationOut
+            layer.fill(bite, with: white)
+        }
+        context.fill(bat(pen, 0.3, 0.22, 0.09), with: white)
+        context.fill(bat(pen, 0.16, 0.38, 0.06), with: soft(0.85))
+        context.fill(bat(pen, 0.42, 0.42, 0.05), with: soft(0.75))
+
+        var city = Path()
+        let xs: [CGFloat] = [0.0, 0.12, 0.22, 0.36, 0.44, 0.6, 0.7, 0.84]
+        let widths: [CGFloat] = [0.12, 0.1, 0.14, 0.08, 0.16, 0.1, 0.14, 0.16]
+        let tops: [CGFloat] = [0.7, 0.58, 0.66, 0.52, 0.62, 0.55, 0.68, 0.6]
+        for i in xs.indices {
+            city.addRect(pen.rect(xs[i], tops[i], widths[i], 1 - tops[i]))
+        }
+        context.fill(city, with: white)
+    }
+
+    static func bat(_ pen: Pen, _ cx: CGFloat, _ cy: CGFloat, _ s: CGFloat) -> Path {
+        let xs: [CGFloat] = [-1, -0.35, -0.15, 0, 0.15, 0.35, 1, 0.6, 0.3, 0, -0.3, -0.6]
+        let ys: [CGFloat] = [0, -0.15, -0.35, -0.2, -0.35, -0.15, 0, 0.15, 0.05, 0.3, 0.05, 0.15]
+        var points: [CGPoint] = []
+        for i in xs.indices {
+            points.append(pen.p(cx + xs[i] * s, cy + ys[i] * s))
+        }
+        var path = Path()
+        path.addLines(points)
+        path.closeSubpath()
+        return path
+    }
+
+    // Planeta con anillo y una constelación.
+    static func planet(_ context: inout GraphicsContext, _ pen: Pen) {
+        let sx: [CGFloat] = [0.1, 0.26, 0.42, 0.82, 0.9, 0.12, 0.86]
+        let sy: [CGFloat] = [0.18, 0.08, 0.16, 0.12, 0.3, 0.82, 0.86]
+        var lines = Path()
+        lines.addLines([pen.p(sx[0], sy[0]), pen.p(sx[1], sy[1]), pen.p(sx[2], sy[2])])
+        lines.move(to: pen.p(sx[3], sy[3]))
+        lines.addLine(to: pen.p(sx[4], sy[4]))
+        context.stroke(lines, with: soft(0.55), lineWidth: pen.line(0.012))
+        for i in sx.indices {
+            context.fill(Path(ellipseIn: pen.rect(sx[i] - 0.022, sy[i] - 0.022, 0.044, 0.044)), with: white)
+        }
+
+        let center = pen.p(0.5, 0.54)
+        let toOrigin = CGAffineTransform(translationX: -center.x, y: -center.y)
+        let turn = CGAffineTransform(rotationAngle: -0.35)
+        let back = CGAffineTransform(translationX: center.x, y: center.y)
+        let ring = Path(ellipseIn: pen.rect(0.08, 0.44, 0.84, 0.2))
+            .applying(toOrigin.concatenating(turn).concatenating(back))
+        context.stroke(ring, with: soft(0.9), lineWidth: pen.line(0.035))
+        context.fill(Path(ellipseIn: pen.rect(0.3, 0.34, 0.4, 0.4)), with: white)
     }
 }
 
