@@ -248,7 +248,7 @@ struct LocalReaderView: View {
                 } else if let errorText {
                     VStack(spacing: 14) {
                         Text(errorText).foregroundStyle(.white).multilineTextAlignment(.center)
-                        Button("Cerrar") { dismiss() }.foregroundStyle(Color(hex: 0xFF4FA3))
+                        Button("Cerrar") { dismiss() }.foregroundStyle(Theme.magenta)
                     }
                     .padding(30)
                 } else {
@@ -513,7 +513,7 @@ struct LocalReaderView: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 40, height: 36)
-                        .background(.white.opacity(0.16), in: Capsule())
+                        .readerButtonBackground()
                 }
                 .accessibilityLabel("Cerrar lector")
                 Text(comic.displayTitle)
@@ -526,9 +526,9 @@ struct LocalReaderView: View {
                     } label: {
                         Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(isBookmarked ? Color(hex: 0xFF4FA3) : .white)
+                            .foregroundStyle(isBookmarked ? Theme.magenta : .white)
                             .frame(width: 40, height: 36)
-                            .background(.white.opacity(0.16), in: Capsule())
+                            .readerButtonBackground()
                     }
                     .accessibilityLabel(isBookmarked ? "Quitar marcador" : "Marcar esta página")
                 }
@@ -538,23 +538,23 @@ struct LocalReaderView: View {
                 } label: {
                     Image(systemName: rotationLocked ? "lock.rotation" : "lock.rotation.open")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(rotationLocked ? Color(hex: 0xFF4FA3) : .white)
+                        .foregroundStyle(rotationLocked ? Theme.magenta : .white)
                         .frame(width: 40, height: 36)
-                        .background(.white.opacity(0.16), in: Capsule())
+                        .readerButtonBackground()
                 }
                 .accessibilityLabel(rotationLocked ? "Destrabar el giro" : "Trabar el giro")
                 Button { showMarks = true } label: {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 40, height: 36)
-                        .background(.white.opacity(0.16), in: Capsule())
+                        .readerButtonBackground()
                 }
                 .accessibilityLabel(live.isCollection ? "Números y marcadores" : "Marcadores")
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 40, height: 36)
-                        .background(.white.opacity(0.16), in: Capsule())
+                        .readerButtonBackground()
                 }
                 .accessibilityLabel("Opciones de lectura")
             }
@@ -562,7 +562,7 @@ struct LocalReaderView: View {
             .padding(.horizontal, 14)
             .padding(.top, 10)
             .padding(.bottom, 24)
-            .background(LinearGradient(colors: [.black.opacity(0.85), .clear], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .top))
+            .background(LinearGradient(colors: [.black.opacity(modern ? 0.55 : 0.85), .clear], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .top))
 
             Spacer()
 
@@ -608,7 +608,7 @@ struct LocalReaderView: View {
                                 withAnimation(.easeOut(duration: 0.15)) { scrubPage = nil }
                             }
                         )
-                        .tint(Color(hex: 0xFF4FA3))
+                        .tint(Theme.magenta)
                         .environment(\.layoutDirection, direction == .rightToLeft ? .rightToLeft : .leftToRight)
                         .accessibilityLabel("Ir a la página")
                         VStack(alignment: .trailing, spacing: 1) {
@@ -624,12 +624,13 @@ struct LocalReaderView: View {
                     }
                     .padding(.horizontal, 14)
                 }
-                .padding(.top, 24)
-                .padding(.bottom, 16)
-                .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom))
+                .modifier(ReaderBottomPanel(modern: modern))
             }
         }
     }
+
+    /// Estilo moderno (Personalizar): botones y panel de vidrio.
+    private var modern: Bool { AppearanceSettings.shared.modern }
 
     /// "Quedan ~6 min" según tu velocidad de lectura.
     private var timeLeftText: String {
@@ -653,7 +654,7 @@ struct LocalReaderView: View {
             }
             .foregroundStyle(.white)
             .padding(12)
-            .background(Color(hex: 0xFF4FA3), in: RoundedRectangle(cornerRadius: 14))
+            .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
     }
@@ -664,7 +665,7 @@ struct LocalReaderView: View {
         VStack(spacing: 12) {
             Text("Terminaste")
                 .font(.headline)
-                .foregroundStyle(Color(hex: 0xFF4FA3))
+                .foregroundStyle(Theme.magenta)
             Text(comic.displayTitle)
                 .font(.system(size: 28, weight: .black).width(Theme.titleWidth))
                 .multilineTextAlignment(.center)
@@ -694,7 +695,7 @@ struct LocalReaderView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(13)
-                    .background(.white.opacity(0.16), in: Capsule())
+                    .readerButtonBackground()
             }
             Button { dismiss() } label: {
                 Text("Cerrar")
@@ -863,7 +864,7 @@ struct ReaderSettingsSheet: View {
                     Text("El brillo se cambia deslizando el dedo hacia arriba o abajo en el rincón de abajo a la izquierda, y vuelve al del iPhone al cerrar el lector. La hora y la batería se ven abajo, en chiquito, mientras leés. El modo nocturno pone una luz más cálida y tenue sobre las páginas.")
                 }
             }
-            .tint(Color(hex: 0xFF4FA3))
+            .tint(Theme.magenta)
             .navigationTitle("Opciones de lectura")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -901,7 +902,7 @@ struct ReaderMarksSheet: View {
                                         Text(issue.title).font(.subheadline.weight(.bold))
                                         Text(issue.startPage.map { "Empieza en la página \($0 + 1)" } ?? "Sin marcar")
                                             .font(.caption)
-                                            .foregroundStyle(issue.startPage == nil ? Color.secondary : Color(hex: 0xFF4FA3))
+                                            .foregroundStyle(issue.startPage == nil ? Color.secondary : Theme.magenta)
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 }
@@ -969,6 +970,7 @@ private struct ThumbnailStrip: View {
     let reversed: Bool
     var bookmarks: Set<Int> = []
     let onSelect: (Int) -> Void
+    private var modern: Bool { AppearanceSettings.shared.modern }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -978,15 +980,19 @@ private struct ThumbnailStrip: View {
                         Button { onSelect(index) } label: {
                             ThumbnailView(loader: loader, index: index)
                                 .frame(width: 44, height: 66)
-                                .overlay(RoundedRectangle(cornerRadius: 3)
-                                    .stroke(index == current ? Color(hex: 0xFF4FA3) : .white.opacity(0.2),
+                                .clipShape(RoundedRectangle(cornerRadius: modern ? 7 : 3, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: modern ? 7 : 3, style: .continuous)
+                                    .stroke(index == current ? Theme.magenta : .white.opacity(0.2),
                                             lineWidth: index == current ? 2 : 1))
+                                .shadow(color: modern && index == current ? Theme.magenta.opacity(0.7) : .clear, radius: 6)
+                                .scaleEffect(modern && index == current ? 1.08 : 1)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: current)
                                 .opacity(index == current ? 1 : 0.75)
                                 .overlay(alignment: .topTrailing) {
                                     if bookmarks.contains(index) {
                                         Image(systemName: "bookmark.fill")
                                             .font(.system(size: 10))
-                                            .foregroundStyle(Color(hex: 0xFF4FA3))
+                                            .foregroundStyle(Theme.magenta)
                                             .padding(2)
                                     }
                                 }
@@ -1635,6 +1641,53 @@ private struct BrightnessCornerGesture: UIViewRepresentable {
             default:
                 break
             }
+        }
+    }
+}
+
+// MARK: - Estilo moderno del lector
+
+private extension View {
+    /// Fondo de los botones de arriba: cápsula clara (clásico) o de vidrio (moderno).
+    func readerButtonBackground() -> some View { modifier(ReaderButtonBackground()) }
+}
+
+private struct ReaderButtonBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if AppearanceSettings.shared.modern {
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().stroke(.white.opacity(0.18), lineWidth: 0.8))
+                .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+        } else {
+            content.background(.white.opacity(0.16), in: Capsule())
+        }
+    }
+}
+
+/// Panel de abajo (miniaturas y barra): degradado oscuro (clásico) o tarjeta de vidrio flotante (moderno).
+private struct ReaderBottomPanel: ViewModifier {
+    let modern: Bool
+
+    func body(content: Content) -> some View {
+        if modern {
+            content
+                .padding(.vertical, 14)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .stroke(LinearGradient(colors: [.white.opacity(0.28), Theme.magenta.opacity(0.35)],
+                                               startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.45), radius: 18, y: 6)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
+                .background(LinearGradient(colors: [.clear, .black.opacity(0.4)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom))
+        } else {
+            content
+                .padding(.top, 24)
+                .padding(.bottom, 16)
+                .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom))
         }
     }
 }

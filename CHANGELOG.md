@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.44.1 · Lector con tu color
+- El lector usa **el color que elegiste** en Personalizar (barra, marcadores, candado, miniatura actual, opciones), en vez del rosa de siempre.
+- Con el **Estilo moderno**, el lector también se ve moderno: botones de arriba de vidrio, y abajo las miniaturas y la barra van en una tarjeta de vidrio flotante con borde de luz; la miniatura de la página actual se agranda y brilla con tu color.
+
 ## 0.44 · Lector más cómodo
 - **Deslizá hacia abajo para cerrar** el lector (la página baja con el dedo; si la soltás antes, vuelve). No funciona con zoom ni en modo vertical.
 - **Barra para saltar**: al arrastrar la barra de abajo se ve la página en grande y su número; al soltar, vas a esa página.

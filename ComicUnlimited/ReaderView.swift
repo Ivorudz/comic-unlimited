@@ -109,7 +109,7 @@ struct ReaderView: View {
                     in: 1...Double(max(comic.pageCount, 2)),
                     step: 1
                 )
-                .tint(Color(hex: 0xFF4FA3))
+                .tint(Theme.magenta)
                 .accessibilityLabel("Ir a la página")
                 Text("\(min(page, comic.pageCount - 1) + 1) / \(comic.pageCount)")
                     .font(.footnote.monospacedDigit())
@@ -129,7 +129,7 @@ struct ReaderView: View {
         VStack(spacing: 12) {
             Text("Terminaste")
                 .font(.headline)
-                .foregroundStyle(Color(hex: 0xFF4FA3))
+                .foregroundStyle(Theme.magenta)
             Text(comic.title)
                 .font(.system(size: 30, weight: .black).width(Theme.titleWidth))
                 .multilineTextAlignment(.center)
