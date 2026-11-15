@@ -3,6 +3,7 @@
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
 ## 0.43.1 · Portadas al instante
+- **Barra de abajo flotante**: con el Estilo moderno, las pestañas van en una cápsula de vidrio que flota sobre el contenido (como en las apps nuevas); el resaltado se desliza de una pestaña a otra, y se esconde cuando aparece el teclado. Si cambiás el estilo, la barra cambia al volver a abrir la app.
 - "Seguir leyendo": la tapa difuminada de fondo ya no se sale de la tarjeta.
 - **Portadas guardadas**: la app guarda una copia de cada portada en el iPhone (como Safari), así se ven al instante, también después de actualizar la app. Se borran solas a los 30 días (y si pasan de 300 MB, las más viejas). En Personalizar se ve cuánto ocupan y se pueden borrar.
 

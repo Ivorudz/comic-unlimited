@@ -1,4 +1,6 @@
 import SwiftUI
+import Combine
+import UIKit
 
 // Piezas del "Estilo moderno" (Personalizar → Estilo moderno): Rutas, Inicio y Biblioteca con
 // fondo de colores que se mueve, vidrio, sombras suaves, entradas animadas y botones que se inclinan.
@@ -7,6 +9,9 @@ import SwiftUI
 extension AppearanceSettings {
     /// Estilo moderno prendido (se guarda con la misma clave que "Rutas modernas").
     var modern: Bool { modernRoutes }
+
+    /// Barra de pestañas flotante: se decide al abrir la app (si se cambia el estilo, se nota al volver a abrirla).
+    static let floatingTabBar: Bool = AppearanceSettings.shared.modern
 }
 
 /// Botón de tarjeta: con el estilo moderno se achica, se inclina un poco y vibra al apretarlo;
@@ -75,5 +80,86 @@ extension View {
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: cornerRadius))
                 .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(Theme.line))
         }
+    }
+}
+
+// MARK: - Barra de pestañas flotante
+
+/// Barra de abajo como cápsula de vidrio que flota sobre el contenido (estilo de las apps nuevas).
+/// El resaltado de la pestaña elegida se desliza de una a otra.
+struct FloatingTabBar: View {
+    @Binding var selection: AppTab
+    @Namespace private var slider
+    /// Con el teclado abierto la barra se esconde (como en las apps de Apple).
+    @State private var keyboardOpen = false
+
+    private struct Item: Identifiable {
+        let tab: AppTab
+        let title: String
+        let icon: String
+        let selectedIcon: String
+        var id: AppTab { tab }
+    }
+
+    private static let items: [Item] = [
+        Item(tab: .home, title: "Inicio", icon: "house", selectedIcon: "house.fill"),
+        Item(tab: .library, title: "Biblioteca", icon: "books.vertical", selectedIcon: "books.vertical.fill"),
+        Item(tab: .routes, title: "Rutas", icon: "map", selectedIcon: "map.fill"),
+        Item(tab: .community, title: "Comunidad", icon: "bubble.left", selectedIcon: "bubble.left.fill"),
+        Item(tab: .profile, title: "Perfil", icon: "person.crop.circle", selectedIcon: "person.crop.circle.fill"),
+    ]
+
+    var body: some View {
+        Group {
+            if !keyboardOpen { bar }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardOpen = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardOpen = false
+        }
+    }
+
+    private var bar: some View {
+        HStack(spacing: 2) {
+            ForEach(Self.items) { item in
+                let selected = selection == item.tab
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { selection = item.tab }
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: selected ? item.selectedIcon : item.icon)
+                            .font(.system(size: 19, weight: .semibold))
+                            .frame(height: 22)
+                        Text(item.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundStyle(selected ? Theme.magenta : Theme.ink.opacity(0.75))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background {
+                        if selected {
+                            Capsule()
+                                .fill(Theme.ink.opacity(0.09))
+                                .matchedGeometryEffect(id: "tab", in: slider)
+                        }
+                    }
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(item.title)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 1))
+        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+        .padding(.horizontal, 18)
+        .padding(.bottom, 4)
+        .sensoryFeedback(.selection, trigger: selection)
     }
 }

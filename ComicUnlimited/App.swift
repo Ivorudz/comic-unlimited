@@ -10,15 +10,9 @@ struct ComicUnlimitedApp: App {
     init() {
         // Portadas guardadas: se borran las viejas (por detrás, sin frenar la app).
         Task.detached(priority: .background) { CoverLoader.trim() }
-        // Estilo moderno: la barra de pestañas de abajo es de vidrio (se ve lo de atrás, difuminado).
-        if AppearanceSettings.shared.modern {
-            let bar = UITabBarAppearance()
-            bar.configureWithTransparentBackground()
-            bar.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
-            bar.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.15)
-            bar.shadowColor = UIColor.white.withAlphaComponent(0.08)
-            UITabBar.appearance().standardAppearance = bar
-            UITabBar.appearance().scrollEdgeAppearance = bar
+        // Estilo moderno: se esconde la barra de pestañas del sistema y se usa la flotante (FloatingTabBar).
+        if AppearanceSettings.floatingTabBar {
+            UITabBar.appearance().isHidden = true
         }
     }
 
@@ -60,9 +54,11 @@ struct RootView: View {
             HomeView(onRead: openReader, onReadLocal: openLocal)
                 .tabItem { Label("Inicio", systemImage: "house") }
                 .tag(AppTab.home)
+                .toolbar(AppearanceSettings.floatingTabBar ? .hidden : .automatic, for: .tabBar)
             LibraryView()
                 .tabItem { Label("Biblioteca", systemImage: "books.vertical") }
                 .tag(AppTab.library)
+                .toolbar(AppearanceSettings.floatingTabBar ? .hidden : .automatic, for: .tabBar)
             NavigationStack {
                 StartGuideView(asTab: true)
                     .appDestinations()
@@ -70,14 +66,23 @@ struct RootView: View {
             }
             .tabItem { Label("Rutas", systemImage: "map") }
             .tag(AppTab.routes)
+            .toolbar(AppearanceSettings.floatingTabBar ? .hidden : .automatic, for: .tabBar)
             CommunityView()
                 .tabItem { Label("Comunidad", systemImage: "bubble.left") }
                 .tag(AppTab.community)
+                .toolbar(AppearanceSettings.floatingTabBar ? .hidden : .automatic, for: .tabBar)
             ProfileView()
                 .tabItem { Label("Perfil", systemImage: "person.crop.circle") }
                 .tag(AppTab.profile)
+                .toolbar(AppearanceSettings.floatingTabBar ? .hidden : .automatic, for: .tabBar)
         }
         .environment(\.selectTab, { tab = $0 })
+        // Barra flotante: las pantallas le dejan lugar abajo y el contenido pasa por detrás (se ve difuminado).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if AppearanceSettings.floatingTabBar {
+                FloatingTabBar(selection: $tab)
+            }
+        }
         .tint(Theme.magenta)
         // Modo claro u oscuro elegido en Personalizar (Automático = el del iPhone).
         .preferredColorScheme(AppearanceSettings.shared.scheme.colorScheme)
