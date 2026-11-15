@@ -83,6 +83,85 @@ extension View {
     }
 }
 
+// MARK: - Fichas
+
+/// Botones grandes de las fichas (Leer, Descargar, Ver en la Biblioteca…).
+enum DetailButtonKind { case primary, secondary, accent }
+
+extension View {
+    /// Fondo de un botón grande de ficha: con el estilo moderno, el principal va con tu color y brillo,
+    /// y el secundario de vidrio; si no, como siempre.
+    @ViewBuilder
+    func detailButtonBackground(_ kind: DetailButtonKind) -> some View {
+        if AppearanceSettings.shared.modern {
+            switch kind {
+            case .primary, .accent:
+                self
+                    .foregroundStyle(.white)
+                    .background(LinearGradient(colors: [Theme.magenta, Theme.magenta.opacity(0.72)],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.25), lineWidth: 1))
+                    .shadow(color: Theme.magenta.opacity(0.4), radius: 12, y: 5)
+            case .secondary:
+                self
+                    .foregroundStyle(Theme.ink)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.18), lineWidth: 1))
+            }
+        } else {
+            switch kind {
+            case .primary:
+                self.foregroundStyle(Theme.paper).background(Theme.ink, in: RoundedRectangle(cornerRadius: 12))
+            case .secondary:
+                self.foregroundStyle(Theme.ink).background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+            case .accent:
+                self.foregroundStyle(.white).background(Theme.magenta, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+
+    /// Tapa grande de una ficha: con el estilo moderno, con un resplandor de tu color.
+    func detailHeroGlow() -> some View {
+        shadow(color: AppearanceSettings.shared.modern ? Theme.magenta.opacity(0.35) : .clear, radius: 24, y: 10)
+    }
+
+    /// Tarjeta solo con el estilo moderno (con el clásico no cambia nada).
+    @ViewBuilder
+    func modernOnlyCard(cornerRadius: CGFloat = 14) -> some View {
+        if AppearanceSettings.shared.modern {
+            self.padding(.horizontal, 14).padding(.vertical, 6).modernCard(cornerRadius: cornerRadius)
+        } else {
+            self
+        }
+    }
+}
+
+/// Arriba de una ficha moderna: la tapa grande y difuminada, que se funde con el fondo (como Música).
+struct DetailBackdrop<Cover: View>: View {
+    @ViewBuilder var cover: () -> Cover
+
+    var body: some View {
+        if AppearanceSettings.shared.modern {
+            Color.clear
+                .frame(height: 440)
+                .overlay {
+                    cover()
+                        .frame(maxWidth: .infinity)
+                        .scaleEffect(1.4)
+                        .blur(radius: 46)
+                        .opacity(0.75)
+                }
+                .clipped()
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black.opacity(0.7), location: 0.5),
+                                             .init(color: .clear, location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
 // MARK: - Barra de pestañas flotante
 
 /// Barra de abajo como cápsula de vidrio que flota sobre el contenido (estilo de las apps nuevas).

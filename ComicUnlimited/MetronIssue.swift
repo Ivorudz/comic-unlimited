@@ -17,8 +17,13 @@ struct MetronIssueView: View {
             if let cv = detail?.cvId {
                 IssueView(id: cv, title: title)
             } else if let detail {
-                ScrollView { content(detail) }
-                    .background(Theme.paper)
+                ScrollView {
+                    content(detail)
+                        .background(alignment: .top) {
+                            DetailBackdrop { RemoteCover(url: detail.image.flatMap { URL(string: $0) }) }
+                        }
+                }
+                .background(ModernScreenBackground())
                     .navigationTitle(title)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar(.visible, for: .navigationBar)
@@ -79,7 +84,7 @@ struct MetronIssueView: View {
     private func content(_ d: MetronIssueDetail) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 16) {
-                RemoteCover(url: d.image.flatMap { URL(string: $0) }).frame(width: 130)
+                RemoteCover(url: d.image.flatMap { URL(string: $0) }).frame(width: 130).detailHeroGlow()
                 VStack(alignment: .leading, spacing: 6) {
                     if let publisher = d.publisher?.name {
                         Text(publisher.uppercased())

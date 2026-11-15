@@ -81,8 +81,7 @@ struct LibraryAvailability: View {
                             .font(.system(size: 16, weight: .heavy))
                             .frame(maxWidth: .infinity)
                             .padding(13)
-                            .foregroundStyle(Theme.paper)
-                            .background(Theme.ink, in: RoundedRectangle(cornerRadius: 12))
+                            .detailButtonBackground(.primary)
                     }
                     .buttonStyle(.plain)
                     NavigationLink(value: LibraryRoute.series(mine.cvSeriesID)) {
@@ -90,8 +89,7 @@ struct LibraryAvailability: View {
                             .font(.system(size: 15, weight: .bold))
                             .frame(maxWidth: .infinity)
                             .padding(13)
-                            .foregroundStyle(Theme.ink)
-                            .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+                            .detailButtonBackground(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -119,8 +117,7 @@ struct LibraryAvailability: View {
                             .font(.system(size: 16, weight: .heavy))
                             .frame(maxWidth: .infinity)
                             .padding(13)
-                            .foregroundStyle(Theme.paper)
-                            .background(Theme.ink, in: RoundedRectangle(cornerRadius: 12))
+                            .detailButtonBackground(.primary)
                     }
                     .buttonStyle(.plain)
                     TPBLink(tpb: tpb) {
@@ -128,8 +125,7 @@ struct LibraryAvailability: View {
                             .font(.system(size: 15, weight: .bold))
                             .frame(maxWidth: .infinity)
                             .padding(13)
-                            .foregroundStyle(Theme.ink)
-                            .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+                            .detailButtonBackground(.secondary)
                     }
                 }
                 Label("En biblioteca, dentro de: \(tpb.displayTitle)", systemImage: "checkmark.seal.fill")
@@ -143,8 +139,7 @@ struct LibraryAvailability: View {
                         .font(.system(size: 16, weight: .heavy))
                         .frame(maxWidth: .infinity)
                         .padding(13)
-                        .foregroundStyle(.white)
-                        .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 12))
+                        .detailButtonBackground(.accent)
                 }
                 .buttonStyle(.plain)
                 if detail.volume != nil && !library.items.isEmpty {

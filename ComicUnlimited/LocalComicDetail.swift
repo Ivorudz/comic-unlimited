@@ -21,7 +21,7 @@ struct LocalComicDetailView: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .background(Theme.paper)
+        .background(ModernScreenBackground())
         .navigationTitle(library.item(comicID)?.displayTitle ?? "Cómic")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -34,7 +34,7 @@ struct LocalComicDetailView: View {
     @ViewBuilder private func content(_ comic: LocalComic) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 16) {
-                LocalCover(comic: comic).frame(width: 130)
+                LocalCover(comic: comic).frame(width: 130).detailHeroGlow()
                 VStack(alignment: .leading, spacing: 6) {
                     Text(comic.displayTitle)
                         .font(.system(size: 22, weight: .black).width(Theme.titleWidth))
@@ -64,8 +64,7 @@ struct LocalComicDetailView: View {
                     .font(.system(size: 16, weight: .heavy))
                     .frame(maxWidth: .infinity)
                     .padding(13)
-                    .foregroundStyle(Theme.paper)
-                    .background(Theme.ink, in: RoundedRectangle(cornerRadius: 12))
+                    .detailButtonBackground(.primary)
             }
             .buttonStyle(.plain)
             .padding(.top, 18)
@@ -85,6 +84,7 @@ struct LocalComicDetailView: View {
                 actionRow("Cambiar nombre", icon: "pencil") { actions?.renaming = comic }
                 actionRow("Borrar de la Biblioteca", icon: "trash", destructive: true) { actions?.toDelete = comic }
             }
+            .modernOnlyCard()
             .padding(.top, 14)
 
             Text("Archivo: \(comic.title)")
@@ -98,6 +98,9 @@ struct LocalComicDetailView: View {
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 30)
+        .background(alignment: .top) {
+            DetailBackdrop { LocalCover(comic: comic) }
+        }
     }
 
     private func actionRow(_ title: String, icon: String, destructive: Bool = false,

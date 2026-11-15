@@ -2,9 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
-## 0.44.1 · Lector con tu color
+## 0.44.1 · Lector y fichas modernos
 - El lector usa **el color que elegiste** en Personalizar (barra, marcadores, candado, miniatura actual, opciones), en vez del rosa de siempre.
 - Con el **Estilo moderno**, el lector también se ve moderno: botones de arriba de vidrio, y abajo las miniaturas y la barra van en una tarjeta de vidrio flotante con borde de luz; la miniatura de la página actual se agranda y brilla con tu color.
+- **Al terminar un cómic** (Estilo moderno): sello de "terminado" con tu color, de fondo la tapa del cómic difuminada, "¿Qué te pareció?" en una tarjeta de vidrio y "Siguiente número" con la tapa del que sigue, degradado de tu color y brillo. También en el final del modo vertical.
+- **Fichas modernas** (de un número, de una serie, de Metron y de un archivo sin ficha): arriba, la tapa grande difuminada que se funde con el fondo (como en Música); la tapa con un resplandor de tu color; en la ficha de un número, título y datos centrados y "Ver toda la serie" como botón de vidrio; Leer y Descargar con tu color y brillo, los otros botones de vidrio; autores y acciones en tarjetas de vidrio.
 
 ## 0.44 · Lector más cómodo
 - **Deslizá hacia abajo para cerrar** el lector (la página baja con el dedo; si la soltás antes, vuelve). No funciona con zoom ni en modo vertical.

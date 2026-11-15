@@ -185,7 +185,7 @@ struct SeriesView: View {
                                 .font(.subheadline.weight(.bold))
                                 .frame(maxWidth: .infinity)
                                 .padding(12)
-                                .background(Theme.chip, in: RoundedRectangle(cornerRadius: 12))
+                                .detailButtonBackground(.secondary)
                         }
                         .buttonStyle(.plain)
                         .disabled(loadingMore)
@@ -200,8 +200,11 @@ struct SeriesView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
+            .background(alignment: .top) {
+                DetailBackdrop { RemoteCover(url: detail?.image?.medium) }
+            }
         }
-        .background(Theme.paper)
+        .background(ModernScreenBackground())
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -211,7 +214,7 @@ struct SeriesView: View {
 
     private func header(_ d: CVVolumeDetail) -> some View {
         HStack(alignment: .bottom, spacing: 16) {
-            RemoteCover(url: d.image?.medium).frame(width: 120)
+            RemoteCover(url: d.image?.medium).frame(width: 120).detailHeroGlow()
             VStack(alignment: .leading, spacing: 6) {
                 Text(d.name ?? name)
                     .font(.system(size: 24, weight: .black).width(Theme.titleWidth))
@@ -319,8 +322,11 @@ struct IssueView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
+            .background(alignment: .top) {
+                DetailBackdrop { RemoteCover(url: detail?.image?.medium) }
+            }
         }
-        .background(Theme.paper)
+        .background(ModernScreenBackground())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -329,39 +335,56 @@ struct IssueView: View {
 
     @ViewBuilder
     private func content(_ d: CVIssueDetail) -> some View {
+        let modern = AppearanceSettings.shared.modern
         RemoteCover(url: d.image?.medium)
-            .frame(width: 200)
+            .frame(width: modern ? 210 : 200)
+            .detailHeroGlow()
             .frame(maxWidth: .infinity)
+            .padding(.top, modern ? 12 : 0)
 
-        Text(CVText.issueTitle(series: d.volume?.name ?? title, number: d.issueNumber))
-            .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
-            .foregroundStyle(Theme.ink)
-            .misprint(0.7)
-            .padding(.top, 16)
-        if let name = d.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
-            Text(name).font(.headline).foregroundStyle(Theme.ink).padding(.top, 4)
-        }
+        // Con el estilo moderno, el título y los datos van centrados debajo de la tapa.
+        VStack(alignment: modern ? .center : .leading, spacing: 0) {
+            Text(CVText.issueTitle(series: d.volume?.name ?? title, number: d.issueNumber))
+                .font(.system(size: 26, weight: .black).width(Theme.titleWidth))
+                .foregroundStyle(Theme.ink)
+                .multilineTextAlignment(modern ? .center : .leading)
+                .misprint(0.7)
+                .padding(.top, 16)
+            if let name = d.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
+                Text(name).font(.headline).foregroundStyle(Theme.ink).padding(.top, 4)
+                    .multilineTextAlignment(modern ? .center : .leading)
+            }
 
-        VStack(alignment: .leading, spacing: 4) {
-            if let store = CVText.fullDate(d.storeDate) {
-                Text("Salida en comiquerías: \(store)")
+            VStack(alignment: modern ? .center : .leading, spacing: 4) {
+                if let store = CVText.fullDate(d.storeDate) {
+                    Text("Salida en comiquerías: \(store)")
+                }
+                if let cover = CVText.monthYear(d.coverDate) {
+                    Text("Fecha de tapa: \(cover)")
+                }
             }
-            if let cover = CVText.monthYear(d.coverDate) {
-                Text("Fecha de tapa: \(cover)")
-            }
-        }
-        .font(.subheadline)
-        .foregroundStyle(Theme.ink2)
-        .padding(.top, 8)
+            .font(.subheadline)
+            .foregroundStyle(Theme.ink2)
+            .padding(.top, 8)
 
-        if let volume = d.volume {
-            NavigationLink(value: CVRoute.series(id: volume.id, name: volume.name ?? "Serie")) {
-                Label("Ver toda la serie", systemImage: "books.vertical")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Theme.magenta)
+            if let volume = d.volume {
+                NavigationLink(value: CVRoute.series(id: volume.id, name: volume.name ?? "Serie")) {
+                    Label("Ver toda la serie", systemImage: "books.vertical")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.magenta)
+                        .padding(.horizontal, modern ? 14 : 0)
+                        .padding(.vertical, modern ? 8 : 0)
+                        .background {
+                            if modern {
+                                Capsule().fill(.ultraThinMaterial)
+                                    .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                            }
+                        }
+                }
+                .padding(.top, 10)
             }
-            .padding(.top, 10)
         }
+        .frame(maxWidth: .infinity, alignment: modern ? .center : .leading)
 
         LibraryAvailability(detail: d)
 
@@ -384,15 +407,22 @@ struct IssueView: View {
         let credits = CVText.groupCredits(d.personCredits ?? [])
         if !credits.isEmpty {
             SectionTitle("Autores")
-            ForEach(credits) { credit in
-                HStack(alignment: .firstTextBaseline) {
-                    Text(credit.name).font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
-                    Spacer()
-                    Text(credit.roles).font(.footnote).foregroundStyle(Theme.ink2).multilineTextAlignment(.trailing)
+            VStack(spacing: 0) {
+                ForEach(credits) { credit in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(credit.name).font(.subheadline.weight(.bold)).foregroundStyle(Theme.ink)
+                        Spacer()
+                        Text(credit.roles).font(.footnote).foregroundStyle(Theme.ink2).multilineTextAlignment(.trailing)
+                    }
+                    .padding(.vertical, 6)
+                    .overlay(alignment: .bottom) {
+                        if credit.id != credits.last?.id || !AppearanceSettings.shared.modern {
+                            Rectangle().fill(Theme.line).frame(height: 1)
+                        }
+                    }
                 }
-                .padding(.vertical, 6)
-                .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
             }
+            .modernOnlyCard()
         }
 
         let characters = d.characterCredits ?? []

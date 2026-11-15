@@ -140,7 +140,22 @@ struct RateCard: View {
         }
         .padding(14)
         .frame(maxWidth: 420, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        .modifier(RateCardBackground())
+    }
+}
+
+/// Fondo de "¿Qué te pareció?": vidrio con el estilo moderno, tarjeta de siempre si no.
+private struct RateCardBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if AppearanceSettings.shared.modern {
+            content
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
+        } else {
+            content.background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        }
     }
 }
 

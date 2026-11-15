@@ -644,9 +644,13 @@ struct LocalReaderView: View {
         Button {
             onOpenNext?(next.comic)
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
+                if modern {
+                    // La tapa del que sigue.
+                    LocalCover(comic: next.comic).frame(width: 40)
+                }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(next.label).font(.caption).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                    Text(next.label).font(.caption).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                     Text(next.comic.displayTitle).font(.system(size: 15, weight: .heavy)).lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -654,15 +658,25 @@ struct LocalReaderView: View {
             }
             .foregroundStyle(.white)
             .padding(12)
-            .background(Theme.magenta, in: RoundedRectangle(cornerRadius: 14))
+            .modifier(NextButtonBackground(modern: modern))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
     }
 
     private var endCard: some View {
         // Se puede deslizar hacia arriba (con "¿Qué te pareció?" no entra en pantallas chicas).
         ScrollView {
         VStack(spacing: 12) {
+            if modern {
+                // Sello de "terminado" con tu color.
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 46))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, Theme.magenta)
+                    .shadow(color: Theme.magenta.opacity(0.7), radius: 18)
+                    .padding(.bottom, 2)
+                    .accessibilityHidden(true)
+            }
             Text("Terminaste")
                 .font(.headline)
                 .foregroundStyle(Theme.magenta)
@@ -713,6 +727,20 @@ struct LocalReaderView: View {
         .padding(.bottom, 150)
         }
         .scrollIndicators(.hidden)
+        .background {
+            // Con el estilo moderno, de fondo la tapa del cómic que terminaste, difuminada.
+            if modern {
+                Color.black
+                    .overlay {
+                        LocalCover(comic: live)
+                            .scaleEffect(1.5)
+                            .blur(radius: 50)
+                            .opacity(0.55)
+                    }
+                    .clipped()
+                    .ignoresSafeArea()
+            }
+        }
     }
 }
 
@@ -1688,6 +1716,24 @@ private struct ReaderBottomPanel: ViewModifier {
                 .padding(.top, 24)
                 .padding(.bottom, 16)
                 .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom))
+        }
+    }
+}
+
+/// Botón "Siguiente número": con el estilo moderno, degradado de tu color con brillo.
+private struct NextButtonBackground: ViewModifier {
+    let modern: Bool
+
+    func body(content: Content) -> some View {
+        if modern {
+            content
+                .background(LinearGradient(colors: [Theme.magenta, Theme.magenta.opacity(0.7)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.25), lineWidth: 1))
+                .shadow(color: Theme.magenta.opacity(0.5), radius: 16, y: 6)
+        } else {
+            content.background(Theme.magenta, in: RoundedRectangle(cornerRadius: 14))
         }
     }
 }
