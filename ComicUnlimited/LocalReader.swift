@@ -200,6 +200,10 @@ struct LocalReaderView: View {
     @State private var scrubPage: Double?
     /// Segundos por página según tu historial (para "quedan ~N min").
     @State private var secondsPerPage: Double = 25
+    /// Brillo: se está deslizando en el rincón de abajo a la izquierda (se ve la barrita).
+    @State private var adjustingBrightness = false
+    @State private var brightnessStart: Double = 0
+    @State private var hideBrightness: Task<Void, Never>?
     /// Candado de giro.
     @State private var rotationLocked = false
     @State private var readerID = UUID()
@@ -253,6 +257,16 @@ struct LocalReaderView: View {
 
                 if night { nightFilter }
 
+                if adjustingBrightness {
+                    BrightnessIndicator(value: brightness)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                        .padding(.leading, 18)
+                        .padding(.bottom, showControls ? 150 : 24)
+                        .allowsHitTesting(false)
+                        .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .bottomLeading)))
+                        .zIndex(2)
+                }
+
                 if (showControls || page == pageCount) && pullDown == 0 {
                     controls.transition(.opacity)
                 } else if showClock && pullDown == 0 && page < pageCount {
@@ -263,6 +277,27 @@ struct LocalReaderView: View {
                 }
             }
         }
+        // Brillo como en Netflix: deslizar hacia arriba o abajo en el rincón de abajo a la izquierda.
+        .background(
+            BrightnessCornerGesture(
+                onBegan: {
+                    brightnessStart = brightnessOn ? brightness : Double(UIScreen.main.brightness)
+                    hideBrightness?.cancel()
+                    withAnimation(.easeOut(duration: 0.15)) { adjustingBrightness = true }
+                },
+                onChanged: { moved in
+                    brightness = min(max(brightnessStart + Double(-moved / 260), 0.02), 1)
+                    brightnessOn = true
+                },
+                onEnded: {
+                    hideBrightness = Task {
+                        try? await Task.sleep(for: .milliseconds(900))
+                        if Task.isCancelled { return }
+                        withAnimation(.easeOut(duration: 0.3)) { adjustingBrightness = false }
+                    }
+                }
+            )
+        )
         .statusBarHidden(!showControls)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
@@ -545,17 +580,6 @@ struct LocalReaderView: View {
                 .padding(.bottom, 8)
             }
 
-            // Brillo como en Netflix: deslizar la barrita de abajo a la izquierda, hacia arriba o abajo.
-            if page < pageCount && scrubPage == nil {
-                HStack {
-                    BrightnessBar(value: $brightness, active: $brightnessOn)
-                    Spacer()
-                }
-                .padding(.leading, 16)
-                .padding(.bottom, 12)
-                .transition(.opacity)
-            }
-
             if pageCount > 1 {
                 VStack(spacing: 10) {
                     // Mientras arrastrás la barra: la página en grande, para saber adónde vas.
@@ -836,7 +860,7 @@ struct ReaderSettingsSheet: View {
                 } header: {
                     Text("Pantalla")
                 } footer: {
-                    Text("El brillo se cambia con la barrita de abajo a la izquierda (deslizá hacia arriba o abajo) y vuelve al del iPhone al cerrar el lector. La hora y la batería se ven abajo, en chiquito, mientras leés. El modo nocturno pone una luz más cálida y tenue sobre las páginas.")
+                    Text("El brillo se cambia deslizando el dedo hacia arriba o abajo en el rincón de abajo a la izquierda, y vuelve al del iPhone al cerrar el lector. La hora y la batería se ven abajo, en chiquito, mientras leés. El modo nocturno pone una luz más cálida y tenue sobre las páginas.")
                 }
             }
             .tint(Color(hex: 0xFF4FA3))
@@ -1484,56 +1508,133 @@ private struct ReaderClock: View {
     }
 }
 
-/// Barrita de brillo (abajo a la izquierda): se desliza hacia arriba o abajo y el brillo cambia en el momento.
-private struct BrightnessBar: View {
-    @Binding var value: Double
-    @Binding var active: Bool
-    @State private var dragging = false
-    @State private var startValue: Double = 0
-
-    private let height: CGFloat = 150
-    private let width: CGFloat = 40
-
-    /// Lo que muestra: el brillo del lector si está activo; si no, el del iPhone.
-    private var shown: Double { active ? value : Double(UIScreen.main.brightness) }
+/// La barrita de brillo que se ve mientras deslizás en el rincón de abajo a la izquierda.
+private struct BrightnessIndicator: View {
+    let value: Double
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Capsule().fill(.white.opacity(0.16))
+            Capsule().fill(.ultraThinMaterial)
             Capsule()
-                .fill(.white.opacity(0.9))
-                .frame(height: max(width, height * CGFloat(shown)))
-            Image(systemName: shown < 0.5 ? "sun.min.fill" : "sun.max.fill")
-                .font(.system(size: 15, weight: .bold))
+                .fill(.white.opacity(0.92))
+                .frame(height: max(36, 150 * CGFloat(value)))
+            Image(systemName: value < 0.5 ? "sun.min.fill" : "sun.max.fill")
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.black.opacity(0.75))
-                .padding(.bottom, 11)
+                .padding(.bottom, 10)
         }
-        .frame(width: width, height: height)
+        .frame(width: 36, height: 150)
         .clipShape(Capsule())
-        .scaleEffect(dragging ? 1.08 : 1, anchor: .bottom)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: dragging)
-        .contentShape(Capsule())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { drag in
-                    if !dragging {
-                        dragging = true
-                        startValue = shown
-                    }
-                    let moved = Double(-drag.translation.height / height)
-                    value = min(max(startValue + moved, 0.02), 1)
-                    active = true
-                }
-                .onEnded { _ in dragging = false }
-        )
-        .sensoryFeedback(.selection, trigger: dragging)
-        .accessibilityElement()
-        .accessibilityLabel("Brillo")
-        .accessibilityValue("\(Int((shown * 100).rounded())) %")
-        .accessibilityAdjustableAction { direction in
-            let step = direction == .increment ? 0.1 : -0.1
-            value = min(max(shown + step, 0.02), 1)
-            active = true
+        .shadow(color: .black.opacity(0.4), radius: 8, y: 3)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Rincón invisible de abajo a la izquierda: deslizar hacia arriba o abajo cambia el brillo.
+/// Un toque suelto ahí sigue pasando de página, y deslizar de costado sigue pasando de página.
+private struct BrightnessCornerGesture: UIViewRepresentable {
+    var onBegan: () -> Void
+    var onChanged: (CGFloat) -> Void
+    var onEnded: () -> Void
+
+    /// Tamaño del rincón (más o menos un pulgar).
+    static let cornerWidth: CGFloat = 110
+    static let cornerHeight: CGFloat = 200
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> CornerView {
+        let view = CornerView()
+        view.isUserInteractionEnabled = false
+        view.coordinator = context.coordinator
+        context.coordinator.parent = self
+        return view
+    }
+
+    func updateUIView(_ view: CornerView, context: Context) {
+        context.coordinator.parent = self
+    }
+
+    static func dismantleUIView(_ view: CornerView, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    /// Vista vacía que pone el gesto en la ventana mientras el lector está abierto.
+    final class CornerView: UIView {
+        weak var coordinator: Coordinator?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let window { coordinator?.attach(to: window, area: self) } else { coordinator?.detach() }
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: BrightnessCornerGesture?
+        private weak var area: UIView?
+        private var pan: UIPanGestureRecognizer?
+
+        func attach(to window: UIWindow, area: UIView) {
+            self.area = area
+            guard pan == nil else { return }
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
+            pan.delegate = self
+            pan.maximumNumberOfTouches = 1
+            window.addGestureRecognizer(pan)
+            self.pan = pan
+        }
+
+        func detach() {
+            if let pan { pan.view?.removeGestureRecognizer(pan) }
+            pan = nil
+        }
+
+        /// La pantalla del lector (para no reaccionar si hay una hoja abierta encima).
+        private var readerRoot: UIView? {
+            var responder: UIResponder? = area
+            while let current = responder {
+                if let controller = current as? UIViewController { return controller.view }
+                responder = current.next
+            }
+            return nil
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer, let area, let window = area.window else { return false }
+            // Hacia arriba o abajo, no de costado.
+            let speed = pan.velocity(in: area)
+            guard abs(speed.y) > abs(speed.x) * 1.3 else { return false }
+            // Dónde apoyaste el dedo.
+            let now = pan.location(in: area)
+            let moved = pan.translation(in: area)
+            let start = CGPoint(x: now.x - moved.x, y: now.y - moved.y)
+            guard start.x >= 0, start.x < BrightnessCornerGesture.cornerWidth,
+                  start.y > area.bounds.height - BrightnessCornerGesture.cornerHeight else { return false }
+            // Que el dedo esté sobre el lector y no sobre una hoja (opciones, marcadores).
+            let point = area.convert(start, to: window)
+            guard let hit = window.hitTest(point, with: nil), let root = readerRoot else { return false }
+            return hit.isDescendant(of: root)
+        }
+
+        /// Mientras se decide si es para el brillo, los otros deslizamientos (páginas, cerrar, desplazar) esperan.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            other is UIPanGestureRecognizer
+        }
+
+        @objc func panned(_ pan: UIPanGestureRecognizer) {
+            switch pan.state {
+            case .began:
+                UISelectionFeedbackGenerator().selectionChanged()
+                parent?.onBegan()
+                parent?.onChanged(pan.translation(in: pan.view).y)
+            case .changed:
+                parent?.onChanged(pan.translation(in: pan.view).y)
+            case .ended, .cancelled, .failed:
+                parent?.onEnded()
+            default:
+                break
+            }
         }
     }
 }

@@ -5,7 +5,7 @@ Cada versión se compila sola en GitHub y aparece en [Releases](https://github.c
 ## 0.44 · Lector más cómodo
 - **Deslizá hacia abajo para cerrar** el lector (la página baja con el dedo; si la soltás antes, vuelve). No funciona con zoom ni en modo vertical.
 - **Barra para saltar**: al arrastrar la barra de abajo se ve la página en grande y su número; al soltar, vas a esa página.
-- **Brillo como en Netflix**: con los botones a la vista, deslizá hacia arriba o abajo la barrita de abajo a la izquierda (con un sol) y el brillo cambia en el momento. Al cerrar el lector vuelve el del iPhone (y en ⚙︎ → Pantalla está "Volver al brillo del iPhone").
+- **Brillo como en Netflix**: apoyá el dedo en el rincón de abajo a la izquierda y deslizá hacia arriba o abajo; el brillo cambia en el momento y aparece una barrita con un sol mientras movés el dedo. No hace falta tocar el centro. Un toque suelto ahí sigue pasando de página. Al cerrar el lector vuelve el del iPhone (y en ⚙︎ → Pantalla está "Volver al brillo del iPhone").
 - **Cuánto falta**: abajo, al lado del número de página, "~6 min", según lo rápido que leés (historial).
 - **Candado de giro** (arriba): traba el lector derecho o de costado, como esté en ese momento.
 - **Hora y batería** en chiquito abajo mientras leés (se apaga en ⚙︎ → Pantalla).
