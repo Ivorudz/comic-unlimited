@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import CryptoKit
 
 // Conexión con Comic Vine (comicvine.gamespot.com), la base de datos de cómics
 // que usamos para saber qué sale y cuándo. Uso personal y no comercial, como piden sus condiciones.
@@ -534,10 +535,42 @@ final class CoverLoader {
     private let session = URLSession(configuration: .ephemeral)
     private let memory = NSCache<NSURL, UIImage>()
 
-    /// Baja la portada. Si falla (por ejemplo, internet lento), vuelve a probar dos veces
-    /// (a los 2 y a los 5 segundos), mientras la portada siga en pantalla.
+    // Caché temporal en el iPhone (como hace Safari con las imágenes): una copia de cada portada en la
+    // carpeta de caché, que iOS puede limpiar si falta espacio. Se borran solas a los 30 días y, si pasan
+    // de 300 MB, se borran las más viejas. Nunca van al repositorio.
+    private static let maxAge: TimeInterval = 30 * 24 * 60 * 60
+    private static let maxBytes: Int64 = 300_000_000
+    static let folder: URL = {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let folder = base.appendingPathComponent("portadas", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }()
+
+    private static func file(for url: URL) -> URL {
+        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let name = digest.map { String(format: "%02x", $0) }.joined()
+        return folder.appendingPathComponent(name + ".img")
+    }
+
+    /// La portada guardada, si tiene menos de 30 días.
+    private static func saved(_ url: URL) -> UIImage? {
+        let file = file(for: url)
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+              let date = attributes[.modificationDate] as? Date,
+              Date().timeIntervalSince(date) < maxAge,
+              let data = try? Data(contentsOf: file) else { return nil }
+        return UIImage(data: data)
+    }
+
+    /// Baja la portada (o la toma de las guardadas). Si falla (por ejemplo, internet lento), vuelve a
+    /// probar dos veces (a los 2 y a los 5 segundos), mientras la portada siga en pantalla.
     func image(for url: URL) async -> UIImage? {
         if let cached = memory.object(forKey: url as NSURL) { return cached }
+        if let saved = Self.saved(url) {
+            memory.setObject(saved, forKey: url as NSURL)
+            return saved
+        }
         var request = URLRequest(url: url)
         request.setValue("ComicUnlimited/0.3 (app personal, uso no comercial)", forHTTPHeaderField: "User-Agent")
         for wait in [0, 2, 5] {
@@ -547,10 +580,48 @@ final class CoverLoader {
             }
             if let fetched = try? await session.data(for: request), let image = UIImage(data: fetched.0) {
                 memory.setObject(image, forKey: url as NSURL)
+                try? fetched.0.write(to: Self.file(for: url), options: .atomic)
                 return image
             }
             if Task.isCancelled { return nil }
         }
         return nil
+    }
+
+    /// Cuánto ocupan las portadas guardadas.
+    static func savedBytes() -> Int64 {
+        savedFiles().reduce(0) { $0 + $1.size }
+    }
+
+    /// Borra todas las portadas guardadas.
+    static func clearSaved() {
+        for item in savedFiles() { try? FileManager.default.removeItem(at: item.url) }
+    }
+
+    /// Al abrir la app: borra las de más de 30 días y, si pasan de 300 MB, las más viejas.
+    static func trim() {
+        var files = savedFiles().sorted { $0.date < $1.date }
+        let now = Date()
+        var total = files.reduce(0) { $0 + $1.size }
+        while let oldest = files.first, now.timeIntervalSince(oldest.date) > maxAge || total > maxBytes {
+            try? FileManager.default.removeItem(at: oldest.url)
+            total -= oldest.size
+            files.removeFirst()
+        }
+    }
+
+    private struct SavedFile {
+        let url: URL
+        let size: Int64
+        let date: Date
+    }
+
+    private static func savedFiles() -> [SavedFile] {
+        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
+        guard let urls = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys) else { return [] }
+        return urls.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
+            return SavedFile(url: url, size: Int64(values.fileSize ?? 0), date: values.contentModificationDate ?? .distantPast)
+        }
     }
 }

@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.43.1 · Portadas al instante
+- "Seguir leyendo": la tapa difuminada de fondo ya no se sale de la tarjeta.
+- **Portadas guardadas**: la app guarda una copia de cada portada en el iPhone (como Safari), así se ven al instante, también después de actualizar la app. Se borran solas a los 30 días (y si pasan de 300 MB, las más viejas). En Personalizar se ve cuánto ocupan y se pueden borrar.
+
 ## 0.43 · Comunidad y Perfil modernos
 - Con el Estilo moderno, **Comunidad**, **Próximos**, el **perfil de cada amigo** y **Perfil** también tienen el fondo de colores que se mueve, tarjetas de vidrio y entrada animada; las filas y tarjetas se inclinan al apretarlas.
 - Incluye lo de la 0.42.1 (barra de vidrio, sombras sin cortes y carpetas apiladas).

@@ -276,6 +276,7 @@ extension LocalComic {
 struct AppearanceScreen: View {
     private var settings: AppearanceSettings { AppearanceSettings.shared }
     @State private var askReset = false
+    @State private var savedCoversText = "…"
 
     var body: some View {
         List {
@@ -380,6 +381,18 @@ struct AppearanceScreen: View {
             }
 
             Section {
+                LabeledContent("Ocupan", value: savedCoversText)
+                Button("Borrar portadas guardadas", role: .destructive) {
+                    CoverLoader.clearSaved()
+                    savedCoversText = "0 MB"
+                }
+            } header: {
+                Text("Portadas guardadas")
+            } footer: {
+                Text("La app guarda una copia de las portadas en el iPhone para que se vean al instante (también después de actualizar). Se borran solas a los 30 días.")
+            }
+
+            Section {
                 NavigationLink {
                     HomeSectionsScreen()
                 } label: {
@@ -399,6 +412,10 @@ struct AppearanceScreen: View {
         .navigationTitle("Personalizar")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .task {
+            let bytes = await Task.detached(priority: .utility) { CoverLoader.savedBytes() }.value
+            savedCoversText = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        }
         .confirmationDialog("¿Volver los colores, el modo, la letra, las portadas, el avance e Inicio a como venían?",
                             isPresented: $askReset, titleVisibility: .visible) {
             Button("Volver a como venía", role: .destructive) { settings.reset() }

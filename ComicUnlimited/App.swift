@@ -8,6 +8,8 @@ struct ComicUnlimitedApp: App {
     @State private var store = ReadingStore()
 
     init() {
+        // Portadas guardadas: se borran las viejas (por detrás, sin frenar la app).
+        Task.detached(priority: .background) { CoverLoader.trim() }
         // Estilo moderno: la barra de pestañas de abajo es de vidrio (se ve lo de atrás, difuminado).
         if AppearanceSettings.shared.modern {
             let bar = UITabBarAppearance()
