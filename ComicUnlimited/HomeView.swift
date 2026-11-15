@@ -298,14 +298,18 @@ private struct LocalContinueCard: View {
         .background {
             // Moderno: la misma tapa, grande y difuminada, de fondo (es tuya, así que va a color).
             if modern {
-                ZStack {
-                    Color.black
-                    if let cover {
-                        Image(uiImage: cover).resizable().scaledToFill().blur(radius: 24).opacity(0.85)
+                // El tamaño lo marca el color de fondo (igual a la tarjeta); la tapa va encima y se recorta.
+                // (Si la tapa marcara el tamaño, se saldría de la tarjeta.)
+                Color.black
+                    .overlay {
+                        if let cover {
+                            Image(uiImage: cover).resizable().scaledToFill().blur(radius: 24).opacity(0.85)
+                        }
                     }
-                    LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .overlay {
+                        LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             } else {
                 RoundedRectangle(cornerRadius: 14).fill(Theme.card)
             }
