@@ -1,10 +1,24 @@
 import SwiftUI
+import UIKit
 
 // Punto de partida de la app.
 @main
 struct ComicUnlimitedApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store = ReadingStore()
+
+    init() {
+        // Estilo moderno: la barra de pestañas de abajo es de vidrio (se ve lo de atrás, difuminado).
+        if AppearanceSettings.shared.modern {
+            let bar = UITabBarAppearance()
+            bar.configureWithTransparentBackground()
+            bar.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+            bar.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.15)
+            bar.shadowColor = UIColor.white.withAlphaComponent(0.08)
+            UITabBar.appearance().standardAppearance = bar
+            UITabBar.appearance().scrollEdgeAppearance = bar
+        }
+    }
 
     var body: some Scene {
         WindowGroup {

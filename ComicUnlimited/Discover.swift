@@ -259,8 +259,10 @@ struct IssueCardsRow: View {
                 }
             }
             .padding(.horizontal, 18)
+            .padding(.vertical, 14)
         }
         .padding(.horizontal, -18)
+        .padding(.vertical, -14)
     }
 }
 

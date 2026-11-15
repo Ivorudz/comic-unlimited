@@ -252,7 +252,7 @@ struct CustomListsSection: View {
                         NavigationLink(value: LibraryRoute.customList(list.id)) {
                             FolderCard(title: list.name,
                                        subtitle: list.items.isEmpty ? "Vacía" : "Tenés \(owned) de \(list.items.count)",
-                                       cover: list.items.lazy.compactMap { library.owned($0) }.first,
+                                       covers: Array(list.items.lazy.compactMap { library.owned($0) }.prefix(3)),
                                        icon: "list.number")
                         }
                         .buttonStyle(.plain)

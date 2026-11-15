@@ -424,7 +424,7 @@ struct PublisherFolderView: View {
                     ForEach(groups) { group in
                         NavigationLink(value: LibraryRoute.series(group.seriesID)) {
                             FolderCard(title: group.name, subtitle: countText(group.comics.count),
-                                       cover: group.comics.first, icon: "questionmark.folder")
+                                       covers: Array(group.comics.prefix(3)), icon: "questionmark.folder")
                         }
                         .buttonStyle(.plain)
                     }

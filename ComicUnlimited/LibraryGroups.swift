@@ -240,7 +240,7 @@ struct LocalComicCard: View {
             Text(comic.displayTitle)
                 .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
-                .lineLimit(2)
+                .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.leading)
                 .padding(.top, 6)
             if comic.isFinished || comic.hasStarted {
@@ -288,38 +288,53 @@ struct LocalCover: View {
 struct FolderCard: View {
     let title: String
     let subtitle: String
-    let cover: LocalComic?
+    /// Hasta 3 tapas del grupo: se ven apiladas, como varios cómics uno arriba del otro.
+    let covers: [LocalComic]
     var icon: String = "folder"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ZStack {
-                RoundedRectangle(cornerRadius: 4).fill(Theme.line).offset(x: 6, y: -6)
-                RoundedRectangle(cornerRadius: 4).fill(Theme.chip).offset(x: 3, y: -3)
-                if let cover {
-                    LocalCover(comic: cover)
+                if covers.count > 2 {
+                    LocalCover(comic: covers[2])
+                        .scaleEffect(0.86)
+                        .rotationEffect(.degrees(-7))
+                        .offset(x: -8, y: -12)
+                        .brightness(-0.18)
+                }
+                if covers.count > 1 {
+                    LocalCover(comic: covers[1])
+                        .scaleEffect(0.93)
+                        .rotationEffect(.degrees(6))
+                        .offset(x: 8, y: -7)
+                        .brightness(-0.08)
+                }
+                if let front = covers.first {
+                    LocalCover(comic: front)
                 } else {
                     ZStack {
                         Theme.card
                         Image(systemName: icon).font(.system(size: 30)).foregroundStyle(Theme.magenta)
                     }
                     .aspectRatio(2 / 3, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.line, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.line, lineWidth: 1))
                 }
             }
-            .padding(.top, 6)
-            .padding(.trailing, 6)
+            // Mismo lugar arriba para todas (con o sin pila), así quedan a la misma altura.
+            .padding(.top, 14)
+            .padding(.horizontal, 6)
 
             Text(title)
                 .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.ink)
-                .lineLimit(2)
+                .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.leading)
-                .padding(.top, 6)
+                .padding(.top, 8)
             Text(subtitle)
                 .font(.caption)
                 .foregroundStyle(Theme.ink2)
+                .lineLimit(1)
         }
     }
 }

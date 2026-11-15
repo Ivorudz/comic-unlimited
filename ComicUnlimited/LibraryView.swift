@@ -317,7 +317,7 @@ struct LibraryView: View {
             ForEach(groups) { group in
                 NavigationLink(value: LibraryRoute.series(group.seriesID)) {
                     FolderCard(title: group.name, subtitle: countText(group.comics.count),
-                               cover: group.comics.first, icon: "questionmark.folder")
+                               covers: Array(group.comics.prefix(3)), icon: "questionmark.folder")
                 }
                 .buttonStyle(CardPressStyle())
             }
@@ -346,7 +346,7 @@ struct LibraryView: View {
                     ForEach(groups) { group in
                         NavigationLink(value: LibraryRoute.arc(id: group.arc.id, name: group.arc.name)) {
                             FolderCard(title: group.arc.name, subtitle: countText(group.comics.count),
-                                       cover: group.comics.first, icon: "point.3.connected.trianglepath.dotted")
+                                       covers: Array(group.comics.prefix(3)), icon: "point.3.connected.trianglepath.dotted")
                         }
                         .buttonStyle(CardPressStyle())
                     }
@@ -367,7 +367,7 @@ struct LibraryView: View {
             ForEach(groups, id: \.name) { group in
                 NavigationLink(value: LibraryRoute.publisher(group.name)) {
                     FolderCard(title: group.name, subtitle: countText(group.comics.count),
-                               cover: group.comics.first, icon: "building.2")
+                               covers: Array(group.comics.prefix(3)), icon: "building.2")
                 }
                 .buttonStyle(CardPressStyle())
             }
@@ -381,7 +381,7 @@ struct LibraryView: View {
                 let comics = LibraryGrouping.comics(in: state, library.items)
                 NavigationLink(value: LibraryRoute.status(state)) {
                     FolderCard(title: state.label, subtitle: countText(comics.count),
-                               cover: comics.first, icon: state.icon)
+                               covers: Array(comics.prefix(3)), icon: state.icon)
                 }
                 .buttonStyle(CardPressStyle())
             }

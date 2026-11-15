@@ -2,6 +2,12 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.42.1 · Barra de vidrio y carpetas apiladas
+- La **barra de pestañas de abajo es de vidrio** (se ve lo de atrás, difuminado) con el Estilo moderno.
+- "Seguir leyendo" y las filas de Inicio: las sombras de las tarjetas ya no se cortan en línea recta.
+- Biblioteca: cada **grupo** (serie, arco, editorial, estado, lista) muestra **hasta 3 tapas apiladas**, como varios cómics uno arriba del otro.
+- Biblioteca: todas las tarjetas quedan **a la misma altura**, aunque el título ocupe un renglón o dos.
+
 ## 0.42 · Inicio y Biblioteca modernos
 - La opción de Personalizar pasa a llamarse **Estilo moderno** y ahora vale para **Rutas, Inicio y Biblioteca** (prendida de entrada; apagada, todo vuelve al estilo anterior).
 - **Inicio**: fondo de colores que se mueve despacio; barra de búsqueda de vidrio con borde de colores y resplandor; "Seguir leyendo" con la tapa difuminada de fondo; las filas entran una tras otra al abrir.

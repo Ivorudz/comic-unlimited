@@ -375,8 +375,10 @@ struct GenreRows: View {
                             }
                         }
                         .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
                     }
                     .padding(.horizontal, -18)
+                    .padding(.vertical, -14)
                     .padding(.bottom, 22)
                 }
             }
