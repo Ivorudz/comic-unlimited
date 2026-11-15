@@ -545,6 +545,17 @@ struct LocalReaderView: View {
                 .padding(.bottom, 8)
             }
 
+            // Brillo como en Netflix: deslizar la barrita de abajo a la izquierda, hacia arriba o abajo.
+            if page < pageCount && scrubPage == nil {
+                HStack {
+                    BrightnessBar(value: $brightness, active: $brightnessOn)
+                    Spacer()
+                }
+                .padding(.leading, 16)
+                .padding(.bottom, 12)
+                .transition(.opacity)
+            }
+
             if pageCount > 1 {
                 VStack(spacing: 10) {
                     // Mientras arrastrás la barra: la página en grande, para saber adónde vas.
@@ -806,15 +817,8 @@ struct ReaderSettingsSheet: View {
                 }
 
                 Section {
-                    Toggle("Brillo propio del lector", isOn: $brightnessOn)
                     if brightnessOn {
-                        HStack(spacing: 10) {
-                            Image(systemName: "sun.min")
-                            Slider(value: $brightness, in: 0.02...1)
-                                .accessibilityLabel("Brillo")
-                            Image(systemName: "sun.max")
-                        }
-                        .foregroundStyle(.secondary)
+                        Button("Volver al brillo del iPhone") { brightnessOn = false }
                     }
                     Toggle("Mostrar hora y batería", isOn: $showClock)
                     Toggle("Pantalla siempre encendida", isOn: $keepAwake)
@@ -832,7 +836,7 @@ struct ReaderSettingsSheet: View {
                 } header: {
                     Text("Pantalla")
                 } footer: {
-                    Text("El brillo propio vuelve al del iPhone al cerrar el lector. La hora y la batería se ven abajo, en chiquito, mientras leés. El modo nocturno pone una luz más cálida y tenue sobre las páginas.")
+                    Text("El brillo se cambia con la barrita de abajo a la izquierda (deslizá hacia arriba o abajo) y vuelve al del iPhone al cerrar el lector. La hora y la batería se ven abajo, en chiquito, mientras leés. El modo nocturno pone una luz más cálida y tenue sobre las páginas.")
                 }
             }
             .tint(Color(hex: 0xFF4FA3))
@@ -1476,6 +1480,60 @@ private struct ReaderClock: View {
         case ..<0.63: return "battery.50"
         case ..<0.88: return "battery.75"
         default: return "battery.100"
+        }
+    }
+}
+
+/// Barrita de brillo (abajo a la izquierda): se desliza hacia arriba o abajo y el brillo cambia en el momento.
+private struct BrightnessBar: View {
+    @Binding var value: Double
+    @Binding var active: Bool
+    @State private var dragging = false
+    @State private var startValue: Double = 0
+
+    private let height: CGFloat = 150
+    private let width: CGFloat = 40
+
+    /// Lo que muestra: el brillo del lector si está activo; si no, el del iPhone.
+    private var shown: Double { active ? value : Double(UIScreen.main.brightness) }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Capsule().fill(.white.opacity(0.16))
+            Capsule()
+                .fill(.white.opacity(0.9))
+                .frame(height: max(width, height * CGFloat(shown)))
+            Image(systemName: shown < 0.5 ? "sun.min.fill" : "sun.max.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.black.opacity(0.75))
+                .padding(.bottom, 11)
+        }
+        .frame(width: width, height: height)
+        .clipShape(Capsule())
+        .scaleEffect(dragging ? 1.08 : 1, anchor: .bottom)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: dragging)
+        .contentShape(Capsule())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { drag in
+                    if !dragging {
+                        dragging = true
+                        startValue = shown
+                    }
+                    let moved = Double(-drag.translation.height / height)
+                    value = min(max(startValue + moved, 0.02), 1)
+                    active = true
+                }
+                .onEnded { _ in dragging = false }
+        )
+        .sensoryFeedback(.selection, trigger: dragging)
+        .accessibilityElement()
+        .accessibilityLabel("Brillo")
+        .accessibilityValue("\(Int((shown * 100).rounded())) %")
+        .accessibilityAdjustableAction { direction in
+            let step = direction == .increment ? 0.1 : -0.1
+            value = min(max(shown + step, 0.02), 1)
+            active = true
         }
     }
 }
