@@ -137,6 +137,36 @@ enum ReaderSettings {
     static let dim = "reader.dim"
     static let doublePage = "reader.doublePage"
     static let cropMargins = "reader.cropMargins"
+    static let brightnessOn = "reader.brightnessOn"
+    static let brightness = "reader.brightness"
+    static let clock = "reader.clock"
+}
+
+/// Deslizar hacia abajo para cerrar: la página (UIKit) avisa cuánto la arrastraste y el lector se mueve.
+/// Solo vale el lector abierto (por si por un momento hay dos: al pasar al siguiente número).
+enum ReaderPull {
+    static var handler: ((CGFloat, Bool, CGFloat) -> Void)?
+    static var owner: UUID?
+    static var enabled = true
+}
+
+/// Brillo propio del lector: guarda el del iPhone al abrir y lo devuelve al cerrar.
+enum ReaderBrightness {
+    private static var saved: CGFloat?
+
+    static func apply(_ on: Bool, _ value: Double) {
+        if on {
+            if saved == nil { saved = UIScreen.main.brightness }
+            UIScreen.main.brightness = CGFloat(value)
+        } else {
+            restore()
+        }
+    }
+
+    static func restore() {
+        if let saved { UIScreen.main.brightness = saved }
+        saved = nil
+    }
 }
 
 // MARK: - Lector
@@ -159,6 +189,20 @@ struct LocalReaderView: View {
     @AppStorage(ReaderSettings.dim) private var dim = 0.25
     @AppStorage(ReaderSettings.doublePage) private var doublePage = true
     @AppStorage(ReaderSettings.cropMargins) private var cropMargins = false
+    @AppStorage(ReaderSettings.brightnessOn) private var brightnessOn = false
+    @AppStorage(ReaderSettings.brightness) private var brightness = 0.6
+    @AppStorage(ReaderSettings.clock) private var showClock = true
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Cuánto arrastraste la página hacia abajo (para cerrar).
+    @State private var pullDown: CGFloat = 0
+    /// Página elegida en la barra mientras la arrastrás (se va a esa página al soltar).
+    @State private var scrubPage: Double?
+    /// Segundos por página según tu historial (para "quedan ~N min").
+    @State private var secondsPerPage: Double = 25
+    /// Candado de giro.
+    @State private var rotationLocked = false
+    @State private var readerID = UUID()
 
     @State private var page: Int
     @State private var showControls = true
@@ -195,6 +239,8 @@ struct LocalReaderView: View {
 
                 if let loader {
                     pages(loader, size: geo.size)
+                        .offset(y: pullDown)
+                        .scaleEffect(1 - min(pullDown, 400) / 2000)
                 } else if let errorText {
                     VStack(spacing: 14) {
                         Text(errorText).foregroundStyle(.white).multilineTextAlignment(.center)
@@ -207,8 +253,13 @@ struct LocalReaderView: View {
 
                 if night { nightFilter }
 
-                if showControls || page == pageCount {
+                if (showControls || page == pageCount) && pullDown == 0 {
                     controls.transition(.opacity)
+                } else if showClock && pullDown == 0 && page < pageCount {
+                    ReaderClock()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 2)
+                        .allowsHitTesting(false)
                 }
             }
         }
@@ -230,8 +281,30 @@ struct LocalReaderView: View {
             AppOrientation.readerOpened(keepAwake: keepAwake)
             openedAt = Date()
             seenPages = [page]
+            secondsPerPage = ReadingHistory.shared.secondsPerPage
+            ReaderBrightness.apply(brightnessOn, brightness)
+            // Deslizar hacia abajo para cerrar (no en el modo vertical, que ya se desliza hacia arriba y abajo).
+            ReaderPull.owner = readerID
+            ReaderPull.enabled = direction != .vertical
+            ReaderPull.handler = { distance, ended, speed in
+                if ended {
+                    if distance > 120 || speed > 900 {
+                        dismiss()
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { pullDown = 0 }
+                    }
+                } else {
+                    pullDown = distance
+                }
+            }
         }
         .onDisappear {
+            // Si ya se abrió otro lector (Siguiente número), ese sigue con su brillo y su gesto.
+            if ReaderPull.owner == readerID || ReaderPull.owner == nil {
+                ReaderPull.handler = nil
+                ReaderPull.owner = nil
+                ReaderBrightness.restore()
+            }
             AppOrientation.readerClosed()
             recordHistory()
             if finishedHere, let cv = live.cvIssueID {
@@ -239,6 +312,13 @@ struct LocalReaderView: View {
             }
         }
         .onChange(of: keepAwake) { _, on in UIApplication.shared.isIdleTimerDisabled = on }
+        .onChange(of: direction) { _, value in ReaderPull.enabled = value != .vertical }
+        .onChange(of: brightnessOn) { _, on in ReaderBrightness.apply(on, brightness) }
+        .onChange(of: brightness) { _, value in ReaderBrightness.apply(brightnessOn, value) }
+        .onChange(of: scenePhase) { _, phase in
+            // Al salir de la app, el iPhone vuelve a su brillo; al volver, el del lector.
+            if phase == .active { ReaderBrightness.apply(brightnessOn, brightness) } else { ReaderBrightness.restore() }
+        }
         .task {
             let url = LocalLibrary.shared.fileURL(comic)
             let result: Result<ComicFile, Error> = await Task.detached(priority: .userInitiated) {
@@ -417,6 +497,17 @@ struct LocalReaderView: View {
                     }
                     .accessibilityLabel(isBookmarked ? "Quitar marcador" : "Marcar esta página")
                 }
+                Button {
+                    rotationLocked.toggle()
+                    AppOrientation.lockRotation(rotationLocked)
+                } label: {
+                    Image(systemName: rotationLocked ? "lock.rotation" : "lock.rotation.open")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(rotationLocked ? Color(hex: 0xFF4FA3) : .white)
+                        .frame(width: 40, height: 36)
+                        .background(.white.opacity(0.16), in: Capsule())
+                }
+                .accessibilityLabel(rotationLocked ? "Destrabar el giro" : "Trabar el giro")
                 Button { showMarks = true } label: {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 16, weight: .bold))
@@ -456,7 +547,11 @@ struct LocalReaderView: View {
 
             if pageCount > 1 {
                 VStack(spacing: 10) {
-                    if thumbnails, let loader {
+                    // Mientras arrastrás la barra: la página en grande, para saber adónde vas.
+                    if let scrubPage, let loader {
+                        ScrubPreview(loader: loader, index: min(max(Int(scrubPage.rounded()) - 1, 0), pageCount - 1))
+                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    } else if thumbnails, let loader {
                         ThumbnailStrip(loader: loader, current: min(page, pageCount - 1),
                                        reversed: direction == .rightToLeft,
                                        bookmarks: Set(live.bookmarks ?? [])) { index in
@@ -466,19 +561,31 @@ struct LocalReaderView: View {
                     HStack(spacing: 12) {
                         Slider(
                             value: Binding(
-                                get: { Double(min(page, pageCount - 1) + 1) },
-                                set: { page = Int($0.rounded()) - 1 }
+                                get: { scrubPage ?? Double(min(page, pageCount - 1) + 1) },
+                                set: { value in withAnimation(.easeOut(duration: 0.15)) { scrubPage = value } }
                             ),
                             in: 1...Double(pageCount),
-                            step: 1
+                            step: 1,
+                            onEditingChanged: { editing in
+                                // Al soltar, recién ahí se va a esa página.
+                                guard !editing, let target = scrubPage else { return }
+                                page = Int(target.rounded()) - 1
+                                withAnimation(.easeOut(duration: 0.15)) { scrubPage = nil }
+                            }
                         )
                         .tint(Color(hex: 0xFF4FA3))
                         .environment(\.layoutDirection, direction == .rightToLeft ? .rightToLeft : .leftToRight)
                         .accessibilityLabel("Ir a la página")
-                        Text("\(min(page, pageCount - 1) + 1) / \(pageCount)")
-                            .font(.footnote.monospacedDigit())
-                            .foregroundStyle(.white)
-                            .frame(minWidth: 64, alignment: .trailing)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("\(scrubPage.map { Int($0.rounded()) } ?? (min(page, pageCount - 1) + 1)) / \(pageCount)")
+                                .font(.footnote.monospacedDigit())
+                                .foregroundStyle(.white)
+                            // Cuánto falta, según lo rápido que leés (historial).
+                            Text(timeLeftText)
+                                .font(.caption2)
+                                .foregroundStyle(.white.opacity(0.65))
+                        }
+                        .frame(minWidth: 64, alignment: .trailing)
                     }
                     .padding(.horizontal, 14)
                 }
@@ -487,6 +594,14 @@ struct LocalReaderView: View {
                 .background(LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom))
             }
         }
+    }
+
+    /// "Quedan ~6 min" según tu velocidad de lectura.
+    private var timeLeftText: String {
+        let left = max(pageCount - (min(page, pageCount - 1) + 1), 0)
+        guard left > 0 else { return "Última página" }
+        let minutes = Int((Double(left) * secondsPerPage / 60).rounded())
+        return minutes < 1 ? "Menos de 1 min" : "~\(minutes) min"
     }
 
     private func nextButton(_ next: (comic: LocalComic, label: String)) -> some View {
@@ -582,6 +697,9 @@ struct ReaderSettingsSheet: View {
     @AppStorage(ReaderSettings.dim) private var dim = 0.25
     @AppStorage(ReaderSettings.doublePage) private var doublePage = true
     @AppStorage(ReaderSettings.cropMargins) private var cropMargins = false
+    @AppStorage(ReaderSettings.brightnessOn) private var brightnessOn = false
+    @AppStorage(ReaderSettings.brightness) private var brightness = 0.6
+    @AppStorage(ReaderSettings.clock) private var showClock = true
 
     private var profiles: ReadingProfiles { ReadingProfiles.shared }
     private var profile: ReadingProfiles.Profile? { comic.flatMap { profiles.profile(for: $0) } }
@@ -688,6 +806,17 @@ struct ReaderSettingsSheet: View {
                 }
 
                 Section {
+                    Toggle("Brillo propio del lector", isOn: $brightnessOn)
+                    if brightnessOn {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sun.min")
+                            Slider(value: $brightness, in: 0.02...1)
+                                .accessibilityLabel("Brillo")
+                            Image(systemName: "sun.max")
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    Toggle("Mostrar hora y batería", isOn: $showClock)
                     Toggle("Pantalla siempre encendida", isOn: $keepAwake)
                     Toggle("Modo nocturno", isOn: $night)
                     if night {
@@ -703,7 +832,7 @@ struct ReaderSettingsSheet: View {
                 } header: {
                     Text("Pantalla")
                 } footer: {
-                    Text("El modo nocturno pone una luz más cálida y tenue sobre las páginas, solo en el lector.")
+                    Text("El brillo propio vuelve al del iPhone al cerrar el lector. La hora y la batería se ven abajo, en chiquito, mientras leés. El modo nocturno pone una luz más cálida y tenue sobre las páginas.")
                 }
             }
             .tint(Color(hex: 0xFF4FA3))
@@ -1147,6 +1276,11 @@ private struct ZoomableImage: UIViewRepresentable {
         let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.singleTapped(_:)))
         singleTap.require(toFail: doubleTap)
         scroll.addGestureRecognizer(singleTap)
+
+        // Deslizar hacia abajo (sin zoom y arriba de todo) cierra el lector.
+        let pull = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pulled(_:)))
+        pull.delegate = context.coordinator
+        scroll.addGestureRecognizer(pull)
         return scroll
     }
 
@@ -1162,10 +1296,33 @@ private struct ZoomableImage: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(onSingleTap: onSingleTap) }
 
-    final class Coordinator: NSObject, UIScrollViewDelegate {
+    final class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
         var onSingleTap: (CGFloat) -> Void
 
         init(onSingleTap: @escaping (CGFloat) -> Void) { self.onSingleTap = onSingleTap }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer, pan.delegate === self,
+                  let scroll = pan.view as? UIScrollView else { return true }
+            let speed = pan.velocity(in: scroll)
+            return ReaderPull.enabled && scroll.zoomScale <= 1.01 && scroll.contentOffset.y <= 1
+                && speed.y > 0 && speed.y > abs(speed.x) * 1.4
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+        @objc func pulled(_ pan: UIPanGestureRecognizer) {
+            let distance = max(0, pan.translation(in: pan.view).y)
+            switch pan.state {
+            case .changed:
+                ReaderPull.handler?(distance, false, 0)
+            case .ended, .cancelled, .failed:
+                ReaderPull.handler?(distance, true, pan.velocity(in: pan.view).y)
+            default:
+                break
+            }
+        }
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? { (scrollView as? PageScrollView)?.imageView }
 
@@ -1245,5 +1402,80 @@ final class PageScrollView: UIScrollView {
         let x = max(0, (bounds.width - contentSize.width) / 2)
         let y = max(0, (bounds.height - contentSize.height) / 2)
         contentInset = UIEdgeInsets(top: y, left: x, bottom: y, right: x)
+    }
+}
+
+// MARK: - Barra para saltar y hora
+
+/// La página en grande mientras arrastrás la barra de abajo.
+private struct ScrubPreview: View {
+    let loader: PageLoader
+    let index: Int
+    @State private var image: UIImage?
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Color.white.opacity(0.08)
+                .aspectRatio(2 / 3, contentMode: .fit)
+                .overlay {
+                    if let image { Image(uiImage: image).resizable().scaledToFill() }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(.white.opacity(0.3), lineWidth: 1))
+                .shadow(color: .black.opacity(0.5), radius: 12, y: 6)
+                .frame(width: 130)
+            Text("Página \(index + 1)")
+                .font(.footnote.weight(.bold).monospacedDigit())
+                .foregroundStyle(.white)
+        }
+        .environment(\.layoutDirection, .leftToRight)
+        .task(id: index) {
+            // Primero la miniatura (al instante) y después, si te quedás, una más nítida.
+            image = await loader.thumbnail(index)
+            try? await Task.sleep(for: .milliseconds(120))
+            if Task.isCancelled { return }
+            if let sharp = await loader.image(index, maxWidth: 420) { image = sharp }
+        }
+    }
+}
+
+/// Hora y batería en chiquito, abajo, mientras leés (el lector esconde las del iPhone).
+private struct ReaderClock: View {
+    private static let format: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            let level = UIDevice.current.batteryLevel
+            let charging = UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full
+            HStack(spacing: 6) {
+                Text(Self.format.string(from: context.date))
+                if level >= 0 {
+                    Image(systemName: batteryIcon(level, charging: charging))
+                    Text("\(Int((level * 100).rounded())) %")
+                }
+            }
+            .font(.caption2.weight(.semibold).monospacedDigit())
+            .foregroundStyle(.white.opacity(0.75))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.black.opacity(0.35), in: Capsule())
+        }
+        .onAppear { UIDevice.current.isBatteryMonitoringEnabled = true }
+        .accessibilityHidden(true)
+    }
+
+    private func batteryIcon(_ level: Float, charging: Bool) -> String {
+        if charging { return "battery.100.bolt" }
+        switch level {
+        case ..<0.13: return "battery.0"
+        case ..<0.38: return "battery.25"
+        case ..<0.63: return "battery.50"
+        case ..<0.88: return "battery.75"
+        default: return "battery.100"
+        }
     }
 }

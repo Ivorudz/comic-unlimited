@@ -8,6 +8,23 @@ enum AppOrientation {
     static var allowLandscape = false
     /// Lectores abiertos (al pasar al siguiente número, por un momento puede haber dos).
     private static var openReaders = 0
+    /// Candado de giro del lector: la orientación en que quedó trabado (nil = gira libre).
+    static var lockedMask: UIInterfaceOrientationMask?
+
+    /// Traba (o destraba) el giro en la orientación de ahora.
+    static func lockRotation(_ lock: Bool) {
+        if lock {
+            let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            switch scene?.interfaceOrientation {
+            case .landscapeLeft: lockedMask = .landscapeLeft
+            case .landscapeRight: lockedMask = .landscapeRight
+            default: lockedMask = .portrait
+            }
+        } else {
+            lockedMask = nil
+        }
+        set(allowLandscape: allowLandscape)
+    }
 
     /// El lector se abrió: deja girar y, si querés, mantiene la pantalla encendida.
     static func readerOpened(keepAwake: Bool) {
@@ -20,6 +37,7 @@ enum AppOrientation {
     static func readerClosed() {
         openReaders = max(0, openReaders - 1)
         guard openReaders == 0 else { return }
+        lockedMask = nil
         UIApplication.shared.isIdleTimerDisabled = false
         set(allowLandscape: false)
     }
@@ -43,6 +61,7 @@ enum AppOrientation {
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        AppOrientation.allowLandscape ? .allButUpsideDown : .portrait
+        guard AppOrientation.allowLandscape else { return .portrait }
+        return AppOrientation.lockedMask ?? .allButUpsideDown
     }
 }

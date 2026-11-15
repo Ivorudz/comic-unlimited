@@ -76,6 +76,20 @@ final class ReadingHistory {
         save()
     }
 
+    /// Cuántos segundos tardás por página, según tus lecturas (para "quedan ~N min").
+    /// Usa las de 3 páginas o más; sin datos, 25 segundos.
+    var secondsPerPage: Double {
+        var total = 0.0
+        var pages = 0
+        for session in sessions.prefix(200) where session.pages >= 3 {
+            // Si dejaste el lector abierto mucho rato, no cuenta de más.
+            total += min(session.seconds, Double(session.pages) * 120)
+            pages += session.pages
+        }
+        guard pages >= 10 else { return 25 }
+        return min(max(total / Double(pages), 5), 120)
+    }
+
     /// Lecturas desde `date`.
     func since(_ date: Date) -> [ReadingSession] {
         let limit = date.timeIntervalSince1970

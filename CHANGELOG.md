@@ -2,6 +2,14 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.44 · Lector más cómodo
+- **Deslizá hacia abajo para cerrar** el lector (la página baja con el dedo; si la soltás antes, vuelve). No funciona con zoom ni en modo vertical.
+- **Barra para saltar**: al arrastrar la barra de abajo se ve la página en grande y su número; al soltar, vas a esa página.
+- **Brillo propio del lector** (⚙︎ → Pantalla): elegís el brillo para leer y al cerrar vuelve el del iPhone.
+- **Cuánto falta**: abajo, al lado del número de página, "~6 min", según lo rápido que leés (historial).
+- **Candado de giro** (arriba): traba el lector derecho o de costado, como esté en ese momento.
+- **Hora y batería** en chiquito abajo mientras leés (se apaga en ⚙︎ → Pantalla).
+
 ## 0.43.1 · Portadas al instante
 - **Barra de abajo flotante**: con el Estilo moderno, las pestañas van en una cápsula de vidrio que flota sobre el contenido (como en las apps nuevas); el resaltado se desliza de una pestaña a otra, y se esconde cuando aparece el teclado. Si cambiás el estilo, la barra cambia al volver a abrir la app.
 - "Seguir leyendo": la tapa difuminada de fondo ya no se sale de la tarjeta.
