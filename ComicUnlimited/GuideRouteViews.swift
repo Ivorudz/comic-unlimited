@@ -111,9 +111,11 @@ private struct GuideRouteScreen: View {
     @State private var showSettings = false
     @State private var cheer: GuideCheer?
     @State private var cheers = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var progress: GuideProgress { GuideProgress.shared }
 
     var body: some View {
+        let modern = AppearanceSettings.shared.modernRoutes
         let read = progress.readSet()
         let path = progress.path(route.id)
         let start = progress.start(route.id)
@@ -128,10 +130,15 @@ private struct GuideRouteScreen: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    header(read: read, eras: eras, path: path, start: start)
+                    if modern {
+                        modernHeader(read: read, eras: eras, path: path, start: start)
+                            .padding(.top, 8)
+                    } else {
+                        header(read: read, eras: eras, path: path, start: start)
+                    }
                     if let next {
                         NextUpCard(route: route, info: info, block: next, path: path, read: read, owned: owned,
-                                   onToggle: { toggle(next) })
+                                   modern: modern, onToggle: { toggle(next) })
                             .padding(.top, 18)
                     } else if !blocks.isEmpty {
                         doneCard.padding(.top, 18)
@@ -163,9 +170,10 @@ private struct GuideRouteScreen: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .background(info.color, in: Capsule())
-                            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                            .overlay(Capsule().strokeBorder(.white.opacity(modern ? 0.35 : 0), lineWidth: 1))
+                            .shadow(color: modern ? info.color.opacity(0.5) : .black.opacity(0.25), radius: modern ? 12 : 6, y: 3)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(TiltPressStyle())
                     .padding(.trailing, 18)
                     .padding(.bottom, 18)
                 }
@@ -192,7 +200,17 @@ private struct GuideRouteScreen: View {
                 }
             }
         }
-        .background(Theme.paper)
+        .background {
+            ZStack {
+                Theme.paper
+                // Versión moderna: manchas de color de la ruta que se mueven despacio.
+                if modern {
+                    RoutesBackdrop(colors: [info.color, info.color, info.color], still: reduceMotion)
+                        .opacity(0.8)
+                }
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle(route.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -257,6 +275,15 @@ private struct GuideRouteScreen: View {
                 .lineLimit(1)
         }
         .padding(.top, 12)
+    }
+
+    private func modernHeader(read: Set<Int>, eras: [EraCount], path: RoutePath, start: Int) -> some View {
+        let score = progress.score(route, read)
+        let essential = eras.reduce(EraCount()) { EraCount(total: $0.total + $1.total, read: $0.read + $1.read) }
+        return ModernRouteHeader(info: info, title: route.title,
+                                 essentialRead: essential.read, essentialTotal: essential.total,
+                                 medals: score.medals, eras: score.eras, points: score.points,
+                                 line: "\(path.label) · \(GuideLayout.startName(route, start))")
     }
 
     private var doneCard: some View {
@@ -703,6 +730,7 @@ private struct NextUpCard: View {
     let path: RoutePath
     let read: Set<Int>
     let owned: [Int: LocalComic]
+    var modern = false
     let onToggle: () -> Void
     @Environment(LibraryActions.self) private var actions
     private var covers: GuideCovers { GuideCovers.shared }
@@ -723,7 +751,7 @@ private struct NextUpCard: View {
                 Text("SEGUÍ POR ACÁ")
                     .font(.caption2.weight(.black))
                     .tracking(1)
-                    .foregroundStyle(Theme.ink2)
+                    .foregroundStyle(modern ? info.color : Theme.ink2)
                 Text("\(block.series.label) \(block.numbersText)")
                     .font(.headline.weight(.heavy))
                     .foregroundStyle(Theme.ink)
@@ -761,9 +789,25 @@ private struct NextUpCard: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(12)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.yellow, lineWidth: 2))
+        .padding(modern ? 14 : 12)
+        .background {
+            // Moderna: vidrio con borde del color de la ruta y un resplandor.
+            if modern {
+                RoundedRectangle(cornerRadius: 22, style: .continuous).fill(.ultraThinMaterial)
+            } else {
+                RoundedRectangle(cornerRadius: 14).fill(Theme.card)
+            }
+        }
+        .overlay {
+            if modern {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [info.color, info.color.opacity(0.3)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2)
+            } else {
+                RoundedRectangle(cornerRadius: 14).stroke(Theme.yellow, lineWidth: 2)
+            }
+        }
+        .shadow(color: modern ? info.color.opacity(0.35) : .clear, radius: 16, y: 8)
         .onAppear { covers.want(firstID) }
     }
 }

@@ -154,7 +154,6 @@ private struct RouteHeroCard: View {
             let dotY: CGFloat = 60 + CGFloat(sin(t * 0.6 + phase)) * 6
             let tilt: Double = sin(t * 0.8 + phase) * 3
             let bob: CGFloat = CGFloat(sin(t * 1.2 + phase)) * 5
-            let cycle: CGFloat = CGFloat((t * 0.22 + Double(index) * 0.17).truncatingRemainder(dividingBy: 1))
             ZStack(alignment: .leading) {
                 // Fondo: color de la ruta, más oscuro abajo, con círculos de luz.
                 ZStack {
@@ -195,19 +194,8 @@ private struct RouteHeroCard: View {
                 .frame(maxWidth: 210, alignment: .leading)
             }
             .frame(height: 156)
-            // Un brillo que pasa cada tanto.
-            .overlay {
-                GeometryReader { geo in
-                    let shineX: CGFloat = geo.size.width * (cycle * 2.2 - 0.5)
-                    LinearGradient(colors: [.clear, .white.opacity(0.28), .clear],
-                                   startPoint: .leading, endPoint: .trailing)
-                        .frame(width: geo.size.width * 0.35)
-                        .rotationEffect(.degrees(18))
-                        .offset(x: shineX)
-                        .opacity(still ? 0 : 1)
-                }
-                .allowsHitTesting(false)
-            }
+            // Reflejo suave que pasa cada tanto, como una ola que baja de tarjeta en tarjeta.
+            .overlay { CardSheen(time: t, delay: Double(index) * 0.22, still: still) }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -218,6 +206,47 @@ private struct RouteHeroCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(Int(fraction * 100)) % de lo esencial leído")
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Reflejo suave: cada 7 segundos pasa una luz difusa en diagonal (en 1,6 s, entra y sale despacio),
+/// y arriba queda un borde de luz fijo, como un vidrio.
+struct CardSheen: View {
+    let time: Double
+    var delay: Double = 0
+    let still: Bool
+
+    var body: some View {
+        let period: Double = 7
+        let duration: Double = 1.6
+        let local: Double = (time + period - delay.truncatingRemainder(dividingBy: period)).truncatingRemainder(dividingBy: period)
+        let active: Bool = !still && local < duration
+        let raw: Double = active ? local / duration : 0
+        let eased: Double = raw * raw * (3 - 2 * raw)
+        let fade: Double = active ? sin(raw * .pi) : 0
+        GeometryReader { geo in
+            let w: CGFloat = geo.size.width
+            ZStack(alignment: .topLeading) {
+                // Borde de luz arriba (fijo).
+                LinearGradient(colors: [.white.opacity(0.22), .clear], startPoint: .top, endPoint: .center)
+                    .blendMode(.plusLighter)
+                // La luz que pasa.
+                LinearGradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .white.opacity(0.10), location: 0.35),
+                    .init(color: .white.opacity(0.30), location: 0.5),
+                    .init(color: .white.opacity(0.10), location: 0.65),
+                    .init(color: .clear, location: 1),
+                ], startPoint: .leading, endPoint: .trailing)
+                .frame(width: w * 0.7, height: geo.size.height * 2)
+                .rotationEffect(.degrees(24))
+                .offset(x: w * (CGFloat(eased) * 1.9 - 0.8), y: -geo.size.height * 0.5)
+                .opacity(fade)
+                .blendMode(.plusLighter)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -253,9 +282,116 @@ struct TiltPressStyle: ButtonStyle {
     }
 }
 
+// MARK: - Encabezado moderno de una ruta (adentro de la ruta)
+
+struct ModernRouteHeader: View {
+    let info: RouteInfo
+    let title: String
+    let essentialRead: Int
+    let essentialTotal: Int
+    let medals: Int
+    let eras: Int
+    let points: Int
+    let line: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+
+    var body: some View {
+        let fraction: Double = Double(essentialRead) / Double(max(essentialTotal, 1))
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { timeline in
+            let t: Double = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            let tilt: Double = sin(t * 0.8) * 3
+            let bob: CGFloat = CGFloat(sin(t * 1.2)) * 6
+            let glowX: CGFloat = 110 + CGFloat(sin(t * 0.5)) * 12
+            ZStack(alignment: .topLeading) {
+                ZStack {
+                    Color.black
+                    LinearGradient(colors: [info.color, info.color.opacity(0.5)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Circle()
+                        .fill(.white.opacity(0.14))
+                        .frame(width: 260, height: 260)
+                        .offset(x: glowX, y: -50)
+                }
+
+                RouteEmblem(routeID: info.id)
+                    .frame(width: 140, height: 140)
+                    .shadow(color: .white.opacity(0.45), radius: 14)
+                    .rotationEffect(.degrees(tilt))
+                    .offset(y: bob)
+                    .frame(maxWidth: .infinity, alignment: .topTrailing)
+                    .padding(.top, 18)
+                    .padding(.trailing, 16)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(title)
+                        .font(.system(.largeTitle, weight: .black).width(Theme.titleWidth))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                        .frame(maxWidth: 220, alignment: .leading)
+                    HStack(spacing: 10) {
+                        ZStack {
+                            Circle().stroke(.white.opacity(0.25), lineWidth: 5)
+                            Circle()
+                                .trim(from: 0, to: max(min(fraction, 1), 0.001))
+                                .stroke(.white, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                            Text("\(Int(fraction * 100))%")
+                                .font(.caption2.weight(.heavy).monospacedDigit())
+                                .foregroundStyle(.white)
+                        }
+                        .frame(width: 46, height: 46)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(essentialRead) de \(essentialTotal)")
+                                .font(.headline.weight(.heavy).monospacedDigit())
+                                .foregroundStyle(.white)
+                            Text("esenciales leídos")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                    }
+                    HStack(spacing: 8) {
+                        chip("medal.fill", "\(medals)/\(eras)")
+                        chip("star.fill", "\(points) pts")
+                    }
+                    Text(line)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .lineLimit(1)
+                }
+                .padding(20)
+            }
+            .frame(height: 250)
+            .overlay { CardSheen(time: t, still: reduceMotion) }
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(.white.opacity(0.28), lineWidth: 1))
+            .shadow(color: info.color.opacity(0.45), radius: 20, y: 12)
+        }
+        .scaleEffect(appeared ? 1 : 0.94)
+        .opacity(appeared ? 1 : 0)
+        .onAppear {
+            if reduceMotion { appeared = true } else {
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.8)) { appeared = true }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func chip(_ icon: String, _ text: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption.weight(.bold).monospacedDigit())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.18), in: Capsule())
+    }
+}
+
 // MARK: - Fondo de colores que se mueve
 
-private struct RoutesBackdrop: View {
+struct RoutesBackdrop: View {
     let colors: [Color]
     let still: Bool
 

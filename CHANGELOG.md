@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.41.1 · Adentro de cada ruta, también moderno
+- Brillo nuevo en las tarjetas: un reflejo suave y difuso que pasa cada tanto, como una ola que baja de tarjeta en tarjeta, y un borde de luz arriba, como un vidrio.
+- Con **Rutas modernas** prendido, la pantalla de cada ruta también es moderna: encabezado grande con el dibujo flotando, aro de avance, medallas y puntos; fondo de colores de la ruta que se mueve; "Seguí por acá" de vidrio con resplandor; botones que se inclinan al apretarlos. Apagado, todo queda como antes.
+
 ## 0.41 · Rutas modernas
 - La pestaña **Rutas** pasa a ser súper simple: cada ruta es un botón grande con su propio dibujo (escudo con rayo, hélice de ADN, telaraña, ciudad de noche con luna, planeta con anillo) y el avance en un aro.
 - Efectos: fondo de colores que se mueve, entrada escalonada, dibujos que flotan, un brillo que pasa, botones que se inclinan al apretarlos y vibran. Si en el iPhone tenés "Reducir movimiento", todo queda quieto.
