@@ -2,6 +2,13 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.45 · Viñetas inteligentes
+- **Zoom a la viñeta**: la app busca los recuadros de cada página (en el iPhone, sin internet). Doble toque sobre una viñeta la agranda justo para que llene la pantalla; otro doble toque vuelve a la página entera. Viene prendido.
+- **Viñeta por viñeta** (⚙︎ → Viñetas): tocar los bordes pasa de viñeta en viñeta, con el zoom justo; después de la última, a la página siguiente (que se ve entera primero). Arriba dice en qué viñeta estás ("2 / 5"). Funciona en manga (de derecha a izquierda).
+- **Mostrar viñetas detectadas** (⚙︎ → Viñetas): dibuja un borde de tu color y el número de orden sobre cada viñeta encontrada, para ver si las encontró bien.
+- En páginas de un solo dibujo, o si no encuentra los recuadros, el doble toque hace el zoom de siempre. No anda en modo vertical ni con dos páginas juntas.
+- Lo encontrado se guarda (en la carpeta de caché), así cada página se analiza una sola vez.
+
 ## 0.44.1 · Lector y fichas modernos
 - El lector usa **el color que elegiste** en Personalizar (barra, marcadores, candado, miniatura actual, opciones), en vez del rosa de siempre.
 - Con el **Estilo moderno**, el lector también se ve moderno: botones de arriba de vidrio, y abajo las miniaturas y la barra van en una tarjeta de vidrio flotante con borde de luz; la miniatura de la página actual se agranda y brilla con tu color.

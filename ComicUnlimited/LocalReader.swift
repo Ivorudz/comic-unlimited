@@ -140,6 +140,10 @@ enum ReaderSettings {
     static let brightnessOn = "reader.brightnessOn"
     static let brightness = "reader.brightness"
     static let clock = "reader.clock"
+    /// Viñetas (PanelDetector.swift): doble toque hace zoom a la viñeta, modo viñeta por viñeta, ver lo detectado.
+    static let smartZoom = "reader.smartZoom"
+    static let panelMode = "reader.panelMode"
+    static let showPanels = "reader.showPanels"
 }
 
 /// Deslizar hacia abajo para cerrar: la página (UIKit) avisa cuánto la arrastraste y el lector se mueve.
@@ -192,7 +196,17 @@ struct LocalReaderView: View {
     @AppStorage(ReaderSettings.brightnessOn) private var brightnessOn = false
     @AppStorage(ReaderSettings.brightness) private var brightness = 0.6
     @AppStorage(ReaderSettings.clock) private var showClock = true
+    @AppStorage(ReaderSettings.smartZoom) private var smartZoom = true
+    @AppStorage(ReaderSettings.panelMode) private var panelMode = false
+    @AppStorage(ReaderSettings.showPanels) private var showPanels = false
     @Environment(\.scenePhase) private var scenePhase
+
+    /// Viñetas encontradas en cada página (de 0 a 1, en orden de lectura).
+    @State private var pagePanels: [Int: [CGRect]] = [:]
+    /// Viñeta que se está mostrando en la página actual (nil = la página entera).
+    @State private var panelIndex: Int?
+    /// Sube cada vez que hay que mover el zoom a otra viñeta (o volver a la página entera).
+    @State private var panelToken = 0
 
     /// Cuánto arrastraste la página hacia abajo (para cerrar).
     @State private var pullDown: CGFloat = 0
@@ -256,6 +270,20 @@ struct LocalReaderView: View {
                 }
 
                 if night { nightFilter }
+
+                // Viñeta por viñeta: en qué viñeta estás ("2 / 5"), arriba en chiquito.
+                if panelMode, !showControls, let shown = panelIndex, let total = pagePanels[page]?.count, total > 0 {
+                    Text("\(shown + 1) / \(total)")
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.85))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(.black.opacity(0.4), in: Capsule())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 6)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
 
                 if adjustingBrightness {
                     BrightnessIndicator(value: brightness)
@@ -370,6 +398,9 @@ struct LocalReaderView: View {
             withAnimation(.easeOut(duration: 0.2)) { showControls = false }
         }
         .onChange(of: page) { _, newPage in
+            // La página nueva se ve entera (en viñeta por viñeta, el próximo toque va a la primera viñeta).
+            panelIndex = nil
+            panelToken += 1
             guard loader != nil else { return }
             if newPage < pageCount { seenPages.insert(newPage) }
             if newPage >= pageCount {
@@ -412,7 +443,13 @@ struct LocalReaderView: View {
         } else {
             TabView(selection: $page) {
                 ForEach(0..<loader.pageCount, id: \.self) { index in
-                    LocalPageView(loader: loader, index: index, maxWidth: decodeWidth, fit: fit, crop: cropMargins) { x in
+                    LocalPageView(loader: loader, index: index, maxWidth: decodeWidth, fit: fit, crop: cropMargins,
+                                  comicID: comic.id, rightToLeft: direction == .rightToLeft,
+                                  panelOptions: panelOptions,
+                                  focus: index == page ? panelIndex : nil,
+                                  focusToken: index == page ? panelToken : -1,
+                                  onPanels: { found in pagePanels[index] = found },
+                                  onFocus: { shown in if index == page { panelIndex = shown } }) { x in
                         handleTap(at: x, width: size.width)
                     }
                     .environment(\.layoutDirection, .leftToRight)   // la página nunca se da vuelta
@@ -477,6 +514,26 @@ struct LocalReaderView: View {
     private func handleTap(at x: CGFloat, width: CGFloat, inSpreads: Bool = false) {
         let ratio = x / max(width, 1)
         let leftEdge = ratio < 0.25, rightEdge = ratio > 0.75
+        // Viñeta por viñeta: los bordes pasan de viñeta (después de la última, a la página siguiente).
+        if panelMode, !inSpreads, direction != .vertical, leftEdge || rightEdge, page < pageCount,
+           let panels = pagePanels[page], !panels.isEmpty {
+            let forward = direction == .rightToLeft ? leftEdge : rightEdge
+            if forward {
+                let next = (panelIndex ?? -1) + 1
+                if next < panels.count {
+                    panelIndex = next
+                    panelToken += 1
+                } else {
+                    withAnimation { page = min(pageCount, page + 1) }
+                }
+            } else if let current = panelIndex {
+                panelIndex = current > 0 ? current - 1 : nil
+                panelToken += 1
+            } else {
+                withAnimation { page = max(0, page - 1) }
+            }
+            return
+        }
         guard tapEdges, leftEdge || rightEdge else {
             withAnimation(.easeOut(duration: 0.2)) { showControls.toggle() }
             return
@@ -632,6 +689,11 @@ struct LocalReaderView: View {
     /// Estilo moderno (Personalizar): botones y panel de vidrio.
     private var modern: Bool { AppearanceSettings.shared.modern }
 
+    /// Qué hacer con las viñetas en cada página.
+    private var panelOptions: PanelOptions {
+        PanelOptions(smartZoom: smartZoom, guided: panelMode && direction != .vertical, show: showPanels)
+    }
+
     /// "Quedan ~6 min" según tu velocidad de lectura.
     private var timeLeftText: String {
         let left = max(pageCount - (min(page, pageCount - 1) + 1), 0)
@@ -764,6 +826,9 @@ struct ReaderSettingsSheet: View {
     @AppStorage(ReaderSettings.brightnessOn) private var brightnessOn = false
     @AppStorage(ReaderSettings.brightness) private var brightness = 0.6
     @AppStorage(ReaderSettings.clock) private var showClock = true
+    @AppStorage(ReaderSettings.smartZoom) private var smartZoom = true
+    @AppStorage(ReaderSettings.panelMode) private var panelMode = false
+    @AppStorage(ReaderSettings.showPanels) private var showPanels = false
 
     private var profiles: ReadingProfiles { ReadingProfiles.shared }
     private var profile: ReadingProfiles.Profile? { comic.flatMap { profiles.profile(for: $0) } }
@@ -867,6 +932,16 @@ struct ReaderSettingsSheet: View {
                 Section("Al tocar") {
                     Toggle("Tocar los bordes pasa de página", isOn: $tapEdges)
                     Toggle("Mostrar miniaturas abajo", isOn: $thumbnails)
+                }
+
+                Section {
+                    Toggle("Zoom a la viñeta con doble toque", isOn: $smartZoom)
+                    Toggle("Viñeta por viñeta", isOn: $panelMode)
+                    Toggle("Mostrar viñetas detectadas", isOn: $showPanels)
+                } header: {
+                    Text("Viñetas")
+                } footer: {
+                    Text("La app busca los recuadros de cada página. Doble toque sobre una viñeta la agranda justo; otro doble toque vuelve a la página entera. Con \"Viñeta por viñeta\", tocar los bordes pasa de viñeta en viñeta y, después de la última, a la página siguiente. En páginas de un solo dibujo, o si no encuentra los recuadros, funciona como siempre. No anda en vertical ni con dos páginas juntas.")
                 }
 
                 Section {
@@ -1064,27 +1139,54 @@ struct ThumbnailView: View {
 // MARK: - Página (deslizando)
 
 /// Una página: la carga en segundo plano y deja hacer zoom.
+/// Qué hacer con las viñetas (ver PanelDetector.swift).
+struct PanelOptions: Equatable {
+    var smartZoom = false
+    var guided = false
+    var show = false
+    /// Hace falta buscar las viñetas.
+    var detect: Bool { smartZoom || guided || show }
+}
+
 private struct LocalPageView: View {
     let loader: PageLoader
     let index: Int
     let maxWidth: CGFloat
     let fit: ReaderFit
     var crop = false
+    var comicID = ""
+    var rightToLeft = false
+    var panelOptions = PanelOptions()
+    /// Viñeta que hay que mostrar (nil = página entera) y cuándo (cambia el número = moverse).
+    var focus: Int? = nil
+    var focusToken = -1
+    var onPanels: ([CGRect]) -> Void = { _ in }
+    var onFocus: (Int?) -> Void = { _ in }
     let onTap: (CGFloat) -> Void
 
     @State private var image: UIImage?
+    @State private var panels: [CGRect] = []
 
     var body: some View {
         ZStack {
             if let image {
-                ZoomableImage(image: image, fit: fit, onSingleTap: onTap)
+                ZoomableImage(image: image, fit: fit, onSingleTap: onTap,
+                              panels: panelOptions.detect ? panels : [], options: panelOptions,
+                              focus: focus, focusToken: focusToken, onFocus: onFocus)
             } else {
                 ProgressView().tint(.white)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: "\(index)-\(Int(maxWidth))-\(crop)") {
+        .task(id: "\(index)-\(Int(maxWidth))-\(crop)-\(rightToLeft)-\(panelOptions.detect)") {
             image = await loader.image(index, maxWidth: maxWidth)
+            // Buscar las viñetas (una sola vez por página; queda guardado).
+            if panelOptions.detect, let image, !comicID.isEmpty {
+                let found = await PanelStore.shared.panels(comicID: comicID, index: index, crop: crop,
+                                                           rightToLeft: rightToLeft, image: image)
+                panels = found
+                onPanels(found)
+            }
             // Dejamos lista la siguiente página para que no haya espera al pasar.
             _ = await loader.image(index + 1, maxWidth: maxWidth)
         }
@@ -1317,6 +1419,12 @@ private struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
     let fit: ReaderFit
     let onSingleTap: (CGFloat) -> Void
+    /// Viñetas de la página (de 0 a 1) y qué hacer con ellas.
+    var panels: [CGRect] = []
+    var options = PanelOptions()
+    var focus: Int? = nil
+    var focusToken = -1
+    var onFocus: (Int?) -> Void = { _ in }
 
     func makeUIView(context: Context) -> PageScrollView {
         let scroll = PageScrollView()
@@ -1347,12 +1455,33 @@ private struct ZoomableImage: UIViewRepresentable {
     }
 
     func updateUIView(_ scroll: PageScrollView, context: Context) {
-        context.coordinator.onSingleTap = onSingleTap
+        let c = context.coordinator
+        c.onSingleTap = onSingleTap
+        c.panels = panels
+        c.options = options
+        c.onFocus = onFocus
         if scroll.imageView.image !== image || scroll.fit != fit {
             scroll.setZoomScale(1, animated: false)
             scroll.imageView.image = image
             scroll.fit = fit
             scroll.relayoutImage()
+        }
+        if scroll.panels != panels || scroll.showPanels != options.show {
+            scroll.panels = panels
+            scroll.showPanels = options.show
+            scroll.drawPanels()
+        }
+        // Moverse a otra viñeta (viñeta por viñeta) o volver a la página entera.
+        if focusToken >= 0, focusToken != c.lastToken {
+            c.lastToken = focusToken
+            let target = focus.flatMap { $0 < panels.count ? panels[$0] : nil }
+            DispatchQueue.main.async {
+                if let target {
+                    scroll.show(panel: target, animated: true)
+                } else if scroll.zoomScale > 1.01 {
+                    scroll.setZoomScale(1, animated: true)
+                }
+            }
         }
     }
 
@@ -1360,6 +1489,10 @@ private struct ZoomableImage: UIViewRepresentable {
 
     final class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
         var onSingleTap: (CGFloat) -> Void
+        var panels: [CGRect] = []
+        var options = PanelOptions()
+        var onFocus: (Int?) -> Void = { _ in }
+        var lastToken = -1
 
         init(onSingleTap: @escaping (CGFloat) -> Void) { self.onSingleTap = onSingleTap }
 
@@ -1394,6 +1527,12 @@ private struct ZoomableImage: UIViewRepresentable {
             guard let scroll = gesture.view as? PageScrollView else { return }
             if scroll.zoomScale > 1.01 {
                 scroll.setZoomScale(1, animated: true)
+                onFocus(nil)
+            } else if options.smartZoom || options.guided,
+                      let index = panelIndex(at: gesture.location(in: scroll.imageView), in: scroll) {
+                // Zoom justo a la viñeta que tocaste.
+                scroll.show(panel: panels[index], animated: true)
+                onFocus(index)
             } else {
                 let point = gesture.location(in: scroll.imageView)
                 let size = CGSize(width: scroll.bounds.width / 2.5, height: scroll.bounds.height / 2.5)
@@ -1402,10 +1541,28 @@ private struct ZoomableImage: UIViewRepresentable {
             }
         }
 
+        /// La viñeta que tiene ese punto (o la más cercana, si tocaste justo en la calle).
+        private func panelIndex(at point: CGPoint, in scroll: PageScrollView) -> Int? {
+            let size = scroll.imageView.bounds.size
+            guard !panels.isEmpty, size.width > 0, size.height > 0 else { return nil }
+            let p = CGPoint(x: point.x / size.width, y: point.y / size.height)
+            let containing = panels.indices.filter { panels[$0].contains(p) }
+            if let smallest = containing.min(by: { panels[$0].width * panels[$0].height < panels[$1].width * panels[$1].height }) {
+                return smallest
+            }
+            let near = panels.indices.filter { panels[$0].insetBy(dx: -0.03, dy: -0.02).contains(p) }
+            return near.min { distance(p, panels[$0]) < distance(p, panels[$1]) }
+        }
+
+        private func distance(_ p: CGPoint, _ r: CGRect) -> CGFloat {
+            hypot(p.x - r.midX, p.y - r.midY)
+        }
+
         @objc func singleTapped(_ gesture: UITapGestureRecognizer) {
             guard let scroll = gesture.view as? UIScrollView else { return }
             // Con zoom, un toque solo muestra u oculta los controles (no pasa de página).
-            if scroll.zoomScale > 1.01 {
+            // En viñeta por viñeta, los bordes siguen pasando de viñeta.
+            if scroll.zoomScale > 1.01 && !options.guided {
                 onSingleTap(scroll.bounds.width / 2)
             } else {
                 // Posición del toque en la pantalla (no en la página, que puede ser más ancha).
@@ -1421,11 +1578,80 @@ final class PageScrollView: UIScrollView {
     var fit: ReaderFit = .page
     private var lastLayout: (CGSize, ReaderFit, ObjectIdentifier?)?
 
+    /// Viñetas de la página (de 0 a 1) y si se dibujan encima.
+    var panels: [CGRect] = []
+    var showPanels = false
+    private let panelLayer = CAShapeLayer()
+    private var numberLayers: [CATextLayer] = []
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         imageView.contentMode = .scaleToFill
         imageView.isUserInteractionEnabled = true
         addSubview(imageView)
+        panelLayer.fillColor = UIColor.clear.cgColor
+        panelLayer.lineWidth = 2
+        imageView.layer.addSublayer(panelLayer)
+    }
+
+    /// Dibuja un borde de tu color y su número sobre cada viñeta encontrada.
+    func drawPanels() {
+        numberLayers.forEach { $0.removeFromSuperlayer() }
+        numberLayers = []
+        guard showPanels, !panels.isEmpty, imageView.bounds.width > 0 else {
+            panelLayer.path = nil
+            return
+        }
+        let accent = UIColor(Theme.magenta).resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+        let size = imageView.bounds.size
+        let path = UIBezierPath()
+        for (i, p) in panels.enumerated() {
+            let r = CGRect(x: p.minX * size.width, y: p.minY * size.height,
+                           width: p.width * size.width, height: p.height * size.height)
+            path.append(UIBezierPath(roundedRect: r, cornerRadius: 4))
+            let number = CATextLayer()
+            number.string = "\(i + 1)"
+            number.fontSize = 12
+            number.font = UIFont.boldSystemFont(ofSize: 12)
+            number.alignmentMode = .center
+            number.foregroundColor = UIColor.white.cgColor
+            number.backgroundColor = accent.cgColor
+            number.cornerRadius = 9
+            number.contentsScale = UIScreen.main.scale
+            number.frame = CGRect(x: r.minX + 4, y: r.minY + 4, width: 18, height: 18)
+            imageView.layer.addSublayer(number)
+            numberLayers.append(number)
+        }
+        panelLayer.strokeColor = accent.cgColor
+        panelLayer.path = path.cgPath
+    }
+
+    /// Agranda la página para que la viñeta llene la pantalla (con un poquito de margen), centrada.
+    func show(panel: CGRect, animated: Bool) {
+        let base = imageView.bounds.size
+        guard base.width > 0, base.height > 0, bounds.width > 0, bounds.height > 0 else { return }
+        let r = CGRect(x: panel.minX * base.width, y: panel.minY * base.height,
+                       width: panel.width * base.width, height: panel.height * base.height)
+            .insetBy(dx: -base.width * 0.015, dy: -base.height * 0.01)
+        let scale = min(bounds.width / max(r.width, 1), bounds.height / max(r.height, 1))
+        maximumZoomScale = max(4, scale)
+        let apply = {
+            self.zoomScale = max(1, scale)
+            self.centerContent()
+            let zoom = self.zoomScale
+            let minX = -self.contentInset.left
+            let maxX = max(minX, self.contentSize.width - self.bounds.width + self.contentInset.right)
+            let minY = -self.contentInset.top
+            let maxY = max(minY, self.contentSize.height - self.bounds.height + self.contentInset.bottom)
+            let x = r.midX * zoom - self.bounds.width / 2
+            let y = r.midY * zoom - self.bounds.height / 2
+            self.contentOffset = CGPoint(x: min(max(x, minX), maxX), y: min(max(y, minY), maxY))
+        }
+        if animated {
+            UIView.animate(withDuration: 0.35, delay: 0, options: [.curveEaseInOut, .allowUserInteraction], animations: apply)
+        } else {
+            apply()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -1457,6 +1683,7 @@ final class PageScrollView: UIScrollView {
         contentSize = size
         contentOffset = .zero
         centerContent()
+        drawPanels()
     }
 
     /// Si la página es más chica que la pantalla, la centra.
