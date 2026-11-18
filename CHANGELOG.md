@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.45.1 · Mejor detección de viñetas
+- La detección de viñetas se rehízo: ahora busca **calles de cualquier color** (blancas, negras, grises, beige…), anda con **viñetas que tocan el borde de la página** y ya no corta viñetas por el pelo o las sombras oscuras.
+- Probada con páginas reales: encuentra todas las viñetas en el orden correcto en las que antes fallaban.
+- Las páginas ya analizadas se vuelven a analizar solas con el método nuevo.
+
 ## 0.45 · Viñetas inteligentes
 - **Zoom a la viñeta**: la app busca los recuadros de cada página (en el iPhone, sin internet). Doble toque sobre una viñeta la agranda justo para que llene la pantalla; otro doble toque vuelve a la página entera. Viene prendido.
 - **Viñeta por viñeta** (⚙︎ → Viñetas): tocar los bordes pasa de viñeta en viñeta, con el zoom justo; después de la última, a la página siguiente (que se ve entera primero). Arriba dice en qué viñeta estás ("2 / 5"). Funciona en manga (de derecha a izquierda).

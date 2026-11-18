@@ -1,15 +1,19 @@
 import UIKit
 
 // Detecta las viñetas de una página, sin internet y en el iPhone.
-// 1. Achica la página (240 px de ancho) y la pasa a grises.
-// 2. Mira el color de los bordes: si casi todo es blanco (o negro), ese es el "fondo" (las calles).
-// 3. "Pinta" el fondo desde los bordes hacia adentro; lo que no se pinta son viñetas.
-// 4. Separa lo que quedó en manchas y corta cada mancha por las calles (aunque un globo cruce la calle).
-// 5. Saca lo muy chico, lo repetido y la página de un solo dibujo, y ordena en orden de lectura.
-// Devuelve rectángulos de 0 a 1 (proporción de la página). Si no encuentra viñetas claras, devuelve [].
+// Las viñetas están separadas por "calles": franjas rectas de un solo color (blanco, negro, gris, beige…).
+// 1. Achica la página (400 px de ancho).
+// 2. Busca los colores de calle: filas o columnas de toda la página que son casi de un solo color.
+// 3. Corta la página por las calles que la cruzan de lado a lado (primero en filas, después en columnas)
+//    y repite adentro de cada parte, solo con calles del mismo color que las que la separaron.
+//    Una línea es calle si al menos el 72 % es de ese color (así un globo puede cruzarla)
+//    y sus dos puntas también (así el cielo liso adentro de una viñeta con borde no cuenta).
+// 4. Saca lo muy chico; si queda una sola parte (página de un solo dibujo), no hay viñetas.
+// El orden de los cortes ya es el orden de lectura (en manga, las columnas de derecha a izquierda).
+// Devuelve rectángulos de 0 a 1 (proporción de la página). Probado con páginas reales y dibujadas.
 
 enum PanelDetector {
-    static let width = 240
+    static let width = 400
 
     static func detect(_ image: UIImage, rightToLeft: Bool) -> [CGRect] {
         guard let cg = image.cgImage, cg.width > 40, cg.height > 40 else { return [] }
@@ -17,19 +21,26 @@ enum PanelDetector {
         let h = max(20, Int((CGFloat(cg.height) * CGFloat(w) / CGFloat(cg.width)).rounded()))
         // Páginas larguísimas (tiras verticales): no se buscan viñetas.
         guard h <= w * 4 else { return [] }
-        var gray = [UInt8](repeating: 255, count: w * h)
-        let drawn: Bool = gray.withUnsafeMutableBytes { raw in
+        var pixels = [UInt8](repeating: 255, count: w * h * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { raw in
             guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
-                                      bytesPerRow: w, space: CGColorSpaceCreateDeviceGray(),
-                                      bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
+                                      bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
             ctx.interpolationQuality = .medium
             ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
             return true
         }
         guard drawn else { return [] }
         // La fila 0 de la copia es la de arriba de la página.
-        return PanelGrid(gray: gray, width: w, height: h)?.panels(rightToLeft: rightToLeft) ?? []
+        return PanelCutter(pixels: pixels, width: w, height: h).panels(rightToLeft: rightToLeft)
     }
+}
+
+private struct PanelColor {
+    var r: Int, g: Int, b: Int
+
+    /// Diferencia más grande entre los tres canales.
+    func distance(_ o: PanelColor) -> Int { max(abs(r - o.r), abs(g - o.g), abs(b - o.b)) }
 }
 
 private struct PanelBox {
@@ -37,221 +48,168 @@ private struct PanelBox {
     var width: Int { x1 - x0 }
     var height: Int { y1 - y0 }
     var area: Int { width * height }
-
-    func overlap(_ other: PanelBox) -> Int {
-        let ix = max(0, min(x1, other.x1) - max(x0, other.x0))
-        let iy = max(0, min(y1, other.y1) - max(y0, other.y0))
-        return ix * iy
-    }
 }
 
-private final class PanelGrid {
-    let w: Int
-    let h: Int
-    /// El punto tiene el color del fondo (blanco o negro).
-    private var bg: [Bool]
-    /// El punto es fondo y se llega a él desde el borde de la página (calles y márgenes).
-    private var out: [Bool]
+private final class PanelCutter {
+    /// "Mismo color": diferencia de hasta 32 en cada canal.
+    private static let tolerance = 32
+    /// Colores parecidos (para agrupar colores de calle).
+    private static let similar = 40
+    /// Parte de la línea que tiene que ser del color de la calle.
+    private static let lineShare = 0.72
+
+    private let px: [UInt8]
+    private let w: Int
+    private let h: Int
     private var pieces: [PanelBox] = []
 
-    init?(gray: [UInt8], width w: Int, height h: Int) {
-        self.w = w
-        self.h = h
-        // ¿El fondo es blanco o negro? Se mira el borde de la página.
-        var light = 0, dark = 0, total = 0
-        func sample(_ v: UInt8) {
-            total += 1
-            if v >= 200 { light += 1 } else if v <= 60 { dark += 1 }
-        }
-        for x in 0..<w { sample(gray[x]); sample(gray[(h - 1) * w + x]) }
-        for y in 0..<h { sample(gray[y * w]); sample(gray[y * w + w - 1]) }
-        let isLight: Bool
-        if Double(light) >= 0.55 * Double(total) {
-            isLight = true
-        } else if Double(dark) >= 0.55 * Double(total) {
-            isLight = false
-        } else {
-            return nil   // el dibujo llega a los bordes: página de un solo dibujo
-        }
-        let bgMask = gray.map { isLight ? $0 >= 200 : $0 <= 60 }
-
-        // Pintar el fondo desde los bordes.
-        var out = [Bool](repeating: false, count: w * h)
-        var stack: [Int] = []
-        stack.reserveCapacity(w * h / 4)
-        func seed(_ i: Int) {
-            if bgMask[i] && !out[i] {
-                out[i] = true
-                stack.append(i)
-            }
-        }
-        for x in 0..<w { seed(x); seed((h - 1) * w + x) }
-        for y in 0..<h { seed(y * w); seed(y * w + w - 1) }
-        while let i = stack.popLast() {
-            let x = i % w, y = i / w
-            if x > 0 { seed(i - 1) }
-            if x < w - 1 { seed(i + 1) }
-            if y > 0 { seed(i - w) }
-            if y < h - 1 { seed(i + w) }
-        }
-        self.bg = bgMask
-        self.out = out
+    init(pixels: [UInt8], width: Int, height: Int) {
+        px = pixels
+        w = width
+        h = height
     }
 
     func panels(rightToLeft: Bool) -> [CGRect] {
+        let colors = pageColors()
+        guard !colors.isEmpty else { return [] }
+        cut(PanelBox(x0: 0, y0: 0, x1: w, y1: h), colors: colors, depth: 0, rightToLeft: rightToLeft)
         let pageArea = w * h
-        // Cada mancha (lo que no es calle), y cada mancha cortada por sus calles.
-        for box in components() where box.area >= pageArea / 100 {
-            cut(box, depth: 0)
-        }
-        let minW = w / 10, minH = h * 6 / 100, minArea = pageArea * 2 / 100
-        let found = pieces.filter { $0.width >= minW && $0.height >= minH && $0.area >= minArea }
-        // Sin repetidos: si una está casi toda dentro de otra más grande, se descarta.
-        var kept: [PanelBox] = []
-        for box in found.sorted(by: { $0.area > $1.area }) {
-            if kept.contains(where: { $0.overlap(box) * 10 >= box.area * 6 }) { continue }
-            kept.append(box)
+        let found = pieces.filter {
+            $0.width * 10 >= w && $0.height * 100 >= h * 6 && $0.area * 100 >= pageArea * 2
         }
         // Una sola viñeta, o una que ocupa casi toda la página: no hay nada que separar.
-        guard kept.count >= 2, !kept.contains(where: { $0.area * 100 >= pageArea * 85 }) else { return [] }
-        return readingOrder(kept, rightToLeft: rightToLeft).map {
+        guard found.count >= 2, !found.contains(where: { $0.area * 100 >= pageArea * 85 }) else { return [] }
+        return found.map {
             CGRect(x: CGFloat($0.x0) / CGFloat(w), y: CGFloat($0.y0) / CGFloat(h),
                    width: CGFloat($0.width) / CGFloat(w), height: CGFloat($0.height) / CGFloat(h))
         }
     }
 
-    /// Manchas de puntos que no son calle (unidas por arriba, abajo y los costados).
-    private func components() -> [PanelBox] {
-        var seen = [Bool](repeating: false, count: w * h)
-        var boxes: [PanelBox] = []
-        var stack: [Int] = []
-        for start in 0..<(w * h) where !out[start] && !seen[start] {
-            seen[start] = true
-            stack.append(start)
-            var box = PanelBox(x0: start % w, y0: start / w, x1: start % w + 1, y1: start / w + 1)
-            while let i = stack.popLast() {
-                let x = i % w, y = i / w
-                box.x0 = min(box.x0, x); box.x1 = max(box.x1, x + 1)
-                box.y0 = min(box.y0, y); box.y1 = max(box.y1, y + 1)
-                if x > 0, !out[i - 1], !seen[i - 1] { seen[i - 1] = true; stack.append(i - 1) }
-                if x < w - 1, !out[i + 1], !seen[i + 1] { seen[i + 1] = true; stack.append(i + 1) }
-                if y > 0, !out[i - w], !seen[i - w] { seen[i - w] = true; stack.append(i - w) }
-                if y < h - 1, !out[i + w], !seen[i + w] { seen[i + w] = true; stack.append(i + w) }
-            }
-            boxes.append(box)
-        }
-        return boxes
+    // MARK: Píxeles y líneas
+
+    private func color(_ x: Int, _ y: Int) -> PanelColor {
+        let i = (y * w + x) * 4
+        return PanelColor(r: Int(px[i]), g: Int(px[i + 1]), b: Int(px[i + 2]))
     }
 
-    /// Lo que no es calle dentro del recuadro, ajustado.
-    private func contentBox(_ b: PanelBox) -> PanelBox? {
-        var x0 = Int.max, y0 = Int.max, x1 = -1, y1 = -1
-        for y in b.y0..<b.y1 {
-            let row = y * w
-            for x in b.x0..<b.x1 where !out[row + x] {
-                if x < x0 { x0 = x }
-                if x > x1 { x1 = x }
-                if y < y0 { y0 = y }
-                if y > y1 { y1 = y }
-            }
-        }
-        return x1 < 0 ? nil : PanelBox(x0: x0, y0: y0, x1: x1 + 1, y1: y1 + 1)
+    /// Punto número `i` de una línea: una fila `k` (de `a0` a `a1`) o una columna.
+    private func point(_ horizontal: Bool, _ k: Int, _ i: Int) -> PanelColor {
+        horizontal ? color(i, k) : color(k, i)
     }
 
-    /// Corta el recuadro por la primera calle que lo cruza (primero de lado a lado, después de arriba abajo).
-    private func cut(_ start: PanelBox, depth: Int) {
-        guard let b = contentBox(start) else { return }
-        if depth < 8 {
-            for horizontal in [true, false] {
-                if let found = gutter(in: b, horizontal: horizontal) {
-                    let (a, z) = found
-                    if horizontal {
-                        cut(PanelBox(x0: b.x0, y0: b.y0, x1: b.x1, y1: a), depth: depth + 1)
-                        cut(PanelBox(x0: b.x0, y0: z, x1: b.x1, y1: b.y1), depth: depth + 1)
-                    } else {
-                        cut(PanelBox(x0: b.x0, y0: b.y0, x1: a, y1: b.y1), depth: depth + 1)
-                        cut(PanelBox(x0: z, y0: b.y0, x1: b.x1, y1: b.y1), depth: depth + 1)
-                    }
-                    return
-                }
-            }
+    /// Si la línea es casi toda de un color (95 %), ese color.
+    private func uniformColor(_ horizontal: Bool, _ k: Int, _ a0: Int, _ a1: Int) -> PanelColor? {
+        let n = a1 - a0
+        guard n > 0 else { return nil }
+        var r = 0, g = 0, b = 0
+        for i in a0..<a1 {
+            let c = point(horizontal, k, i)
+            r += c.r; g += c.g; b += c.b
         }
-        pieces.append(b)
+        let mean = PanelColor(r: r / n, g: g / n, b: b / n)
+        var near = 0
+        for i in a0..<a1 where point(horizontal, k, i).distance(mean) <= Self.tolerance { near += 1 }
+        return near * 100 >= n * 95 ? mean : nil
     }
 
-    /// Busca una calle que cruce todo el recuadro (filas si `horizontal`, columnas si no).
-    /// Cuenta como calle: casi toda calle; o casi todo fondo y al menos la mitad calle (un globo que la cruza);
-    /// o una franja de al menos dos filas mayormente calle (un dibujo que se sale un poco).
-    private func gutter(in b: PanelBox, horizontal: Bool) -> (Int, Int)? {
-        let length = Double(horizontal ? b.width : b.height)
-        let lines = horizontal ? Array(b.y0..<b.y1) : Array(b.x0..<b.x1)
-        guard lines.count >= 3 else { return nil }
-        var outside = [Double](repeating: 0, count: lines.count)
-        var background = [Double](repeating: 0, count: lines.count)
-        for (k, line) in lines.enumerated() {
-            var o = 0, g = 0
-            if horizontal {
-                let row = line * w
-                for x in b.x0..<b.x1 {
-                    if out[row + x] { o += 1 }
-                    if bg[row + x] { g += 1 }
-                }
-            } else {
-                for y in b.y0..<b.y1 {
-                    if out[y * w + line] { o += 1 }
-                    if bg[y * w + line] { g += 1 }
-                }
+    /// ¿La línea es calle de alguno de esos colores? Devuelve el color.
+    private func separator(_ horizontal: Bool, _ k: Int, _ a0: Int, _ a1: Int, _ colors: [PanelColor]) -> PanelColor? {
+        let n = a1 - a0
+        guard n > 0 else { return nil }
+        let end = max(2, n / 50)
+        for c in colors {
+            var near = 0, first = 0, last = 0
+            for i in a0..<a1 where point(horizontal, k, i).distance(c) <= Self.tolerance {
+                near += 1
+                if i - a0 < end { first += 1 }
+                if a1 - 1 - i < end { last += 1 }
             }
-            outside[k] = Double(o) / length
-            background[k] = Double(g) / length
-        }
-        var isGutter = [Bool](repeating: false, count: lines.count)
-        for k in 0..<lines.count {
-            let strong = outside[k] >= 0.85 || (background[k] >= 0.92 && outside[k] >= 0.45)
-            let before = k > 0 && outside[k - 1] >= 0.6
-            let after = k + 1 < lines.count && outside[k + 1] >= 0.6
-            isGutter[k] = strong || (outside[k] >= 0.6 && (before || after))
-        }
-        // La primera calle de adentro (no en el borde).
-        var k = 1
-        while k < lines.count - 1 {
-            if isGutter[k] {
-                var e = k
-                while e < lines.count && isGutter[e] { e += 1 }
-                return e < lines.count ? (lines[k], lines[e]) : nil
+            if Double(near) >= Self.lineShare * Double(n) && first * 2 >= end && last * 2 >= end {
+                return c
             }
-            k += 1
         }
         return nil
     }
 
-    /// Orden de lectura: por filas de arriba abajo; en cada fila, de izquierda a derecha (o al revés en manga).
-    private func readingOrder(_ boxes: [PanelBox], rightToLeft: Bool) -> [PanelBox] {
-        var rows: [[PanelBox]] = []
-        for box in boxes.sorted(by: { $0.y0 < $1.y0 }) {
-            var placed = false
-            for r in rows.indices {
-                let top = rows[r].map(\.y0).min() ?? 0
-                let bottom = rows[r].map(\.y1).max() ?? 0
-                let shared = min(bottom, box.y1) - max(top, box.y0)
-                if shared * 2 >= min(box.height, bottom - top) {
-                    rows[r].append(box)
-                    placed = true
-                    break
+    private func adding(_ c: PanelColor, to colors: [PanelColor]) -> [PanelColor] {
+        colors.contains { $0.distance(c) <= Self.similar } ? colors : colors + [c]
+    }
+
+    /// Colores de calle de la página: los de las filas y columnas enteras de un solo color (los 3 más comunes).
+    private func pageColors() -> [PanelColor] {
+        var found: [(color: PanelColor, count: Int)] = []
+        for horizontal in [true, false] {
+            let lines = horizontal ? h : w
+            let length = horizontal ? w : h
+            for k in 0..<lines {
+                guard let c = uniformColor(horizontal, k, 0, length) else { continue }
+                if let i = found.firstIndex(where: { $0.color.distance(c) <= Self.similar }) {
+                    found[i].count += 1
+                } else {
+                    found.append((c, 1))
                 }
             }
-            if !placed { rows.append([box]) }
         }
-        rows.sort { ($0.map(\.y0).min() ?? 0) < ($1.map(\.y0).min() ?? 0) }
-        return rows.flatMap { row in
-            // Orden estable: en una misma columna quedan de arriba abajo.
-            row.enumerated().sorted { a, b in
-                if a.element.x0 != b.element.x0 {
-                    return rightToLeft ? a.element.x0 > b.element.x0 : a.element.x0 < b.element.x0
+        return found.filter { $0.count >= 2 }.sorted { $0.count > $1.count }.prefix(3).map(\.color)
+    }
+
+    // MARK: Cortes
+
+    /// Saca márgenes y calles de los bordes de la zona (solo de los colores de calle).
+    private func trim(_ start: PanelBox, _ colors: [PanelColor]) -> PanelBox {
+        var b = start
+        var changed = true
+        while changed && b.width > 4 && b.height > 4 {
+            changed = false
+            if separator(true, b.y0, b.x0, b.x1, colors) != nil { b.y0 += 1; changed = true }
+            if b.height > 4, separator(true, b.y1 - 1, b.x0, b.x1, colors) != nil { b.y1 -= 1; changed = true }
+            if separator(false, b.x0, b.y0, b.y1, colors) != nil { b.x0 += 1; changed = true }
+            if b.width > 4, separator(false, b.x1 - 1, b.y0, b.y1, colors) != nil { b.x1 -= 1; changed = true }
+        }
+        return b
+    }
+
+    private func cut(_ start: PanelBox, colors: [PanelColor], depth: Int, rightToLeft: Bool) {
+        let b = trim(start, colors)
+        guard b.width >= 8, b.height >= 8 else { return }
+        if depth < 10 {
+            for horizontal in [true, false] {
+                let lines = horizontal ? Array(b.y0..<b.y1) : Array(b.x0..<b.x1)
+                let (a0, a1) = horizontal ? (b.x0, b.x1) : (b.y0, b.y1)
+                let seps = lines.map { separator(horizontal, $0, a0, a1, colors) }
+                // Bandas entre calles (las muy finitas no cuentan).
+                let minBand = max(3, (horizontal ? h : w) * 4 / 100)
+                var bands: [(Int, Int)] = []
+                var bandStart: Int?
+                for (i, s) in seps.enumerated() {
+                    if s == nil, bandStart == nil { bandStart = i }
+                    if s != nil, let begin = bandStart { bands.append((begin, i)); bandStart = nil }
                 }
-                return a.offset < b.offset
-            }.map(\.element)
+                if let begin = bandStart { bands.append((begin, seps.count)) }
+                bands = bands.filter { $0.1 - $0.0 >= minBand }
+                guard bands.count >= 2 else { continue }
+                // Adentro, las calles son del mismo color que las que separaron estas bandas.
+                var used: [PanelColor] = []
+                for (left, right) in zip(bands, bands.dropFirst()) {
+                    let run = seps[left.1..<right.0].compactMap { $0 }
+                    let best = run.max { a, c in
+                        run.filter { $0.distance(a) <= Self.similar }.count < run.filter { $0.distance(c) <= Self.similar }.count
+                    }
+                    if let best { used = adding(best, to: used) }
+                }
+                if used.isEmpty { used = colors }
+                let base = horizontal ? b.y0 : b.x0
+                let ordered = (!horizontal && rightToLeft) ? Array(bands.reversed()) : bands
+                for (s, e) in ordered {
+                    let part = horizontal
+                        ? PanelBox(x0: b.x0, y0: base + s, x1: b.x1, y1: base + e)
+                        : PanelBox(x0: base + s, y0: b.y0, x1: base + e, y1: b.y1)
+                    cut(part, colors: used, depth: depth + 1, rightToLeft: rightToLeft)
+                }
+                return
+            }
         }
+        pieces.append(b)
     }
 }
 
@@ -259,7 +217,7 @@ private final class PanelGrid {
 actor PanelStore {
     static let shared = PanelStore()
     /// Si cambia la forma de buscar, se cambia este número y se vuelven a buscar.
-    private static let version = 1
+    private static let version = 2
     private var memory: [String: [String: [[Double]]]] = [:]
 
     private static let folder: URL = {
