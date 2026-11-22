@@ -10,7 +10,7 @@ Uso:
 - No modifica ni copia los cómics. Las imágenes de resultado son solo para mirar en la computadora:
   no subirlas a GitHub (tienen derechos de autor).
 
-La lógica es la MISMA que ComicUnlimited/PanelDetector.swift (PanelStore versión 3). Si se cambia una, cambiar la otra.
+La lógica es la MISMA que ComicUnlimited/PanelDetector.swift (PanelStore versión 4). Si se cambia una, cambiar la otra.
 Necesita: pip install pillow numpy
 """
 import argparse, io, os, subprocess, sys, tempfile, zipfile
@@ -22,6 +22,7 @@ TOL = 32         # "mismo color": diferencia por canal
 SIMILAR = 40     # colores parecidos
 SHARE = 0.72     # parte de la línea que tiene que ser del color de la calle
 EDGE = 5         # % de cada punta donde tiene que aparecer el color de la calle (por marcos o bordes sucios)
+COVER = 0.85     # segundo intento: parte de la página que tienen que cubrir las viñetas
 IMAGES = ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp')
 
 
@@ -66,14 +67,14 @@ def separator(px, colors, loose=True):
     return None
 
 
-def page_colors(pg, skip=0):
+def page_colors(pg, skip=0, uniform=95):
     found = []  # [color, count]
     for horizontal in (True, False):
         lines, length = (pg.h, pg.w) if horizontal else (pg.w, pg.h)
         for k in range(lines):
             px = pg.line(horizontal, k, length * skip // 100, length - length * skip // 100)
             c = px.mean(axis=0).astype(int)
-            if near(px, c).sum() * 100 >= len(px) * 95:
+            if near(px, c).sum() * 100 >= len(px) * uniform:
                 for f in found:
                     if same(f[0], c):
                         f[1] += 1
@@ -138,10 +139,24 @@ def detect(img, rtl=False):
     pg = Page(img)
     if pg.h > pg.w * 4:
         return []
-    # Si no hay ninguna, puede haber un marco dibujado alrededor de la página: se mira sin los bordes.
-    colors = page_colors(pg) or page_colors(pg, EDGE)
+    # Primer intento: colores de filas o columnas enteras. Si no hay ninguna, puede haber un marco
+    # dibujado alrededor de la página: se mira sin el 5 % de cada borde.
+    found = panels_with(pg, page_colors(pg) or page_colors(pg, EDGE), rtl)
+    if found:
+        return found
+    # Segundo intento, más flexible (márgenes de otro color, calles finitas): sin mirar el 5 % de cada
+    # borde y con 90 % de un color. Solo vale si las viñetas cubren casi toda la página (si no, son
+    # pedazos de una tapa o de un dibujo grande).
+    found = panels_with(pg, page_colors(pg, EDGE, 90), rtl)
+    if sum(w * h for _, _, w, h in found) >= COVER:
+        return found
+    return []
+
+
+def panels_with(pg, colors, rtl):
     if not colors:
         return []
+    pg.pieces = []
     cut(pg, (0, 0, pg.w, pg.h), colors, 0, rtl)
     area = pg.w * pg.h
     found = [p for p in pg.pieces

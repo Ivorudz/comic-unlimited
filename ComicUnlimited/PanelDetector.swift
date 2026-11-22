@@ -10,6 +10,8 @@ import UIKit
 //    Una línea es calle si al menos el 72 % es de ese color (así un globo puede cruzarla)
 //    y el color aparece en el 5 % de cada punta (al recortar los bordes de una zona se pide más).
 // 4. Saca lo muy chico; si queda una sola parte (página de un solo dibujo), no hay viñetas.
+// 5. Si no salió nada, segundo intento más flexible (90 % de un color, sin mirar los bordes); vale solo
+//    si las viñetas cubren al menos el 85 % de la página.
 // El orden de los cortes ya es el orden de lectura (en manga, las columnas de derecha a izquierda).
 // Devuelve rectángulos de 0 a 1 (proporción de la página). Probado con páginas reales y dibujadas.
 
@@ -60,6 +62,8 @@ private final class PanelCutter {
     private static let lineShare = 0.72
     /// Porcentaje de cada punta de la línea que se mira (o se saltea, si la página tiene marco).
     private static let edge = 5
+    /// Segundo intento: parte de la página que tienen que cubrir las viñetas.
+    private static let cover: CGFloat = 0.85
 
     private let px: [UInt8]
     private let w: Int
@@ -73,10 +77,23 @@ private final class PanelCutter {
     }
 
     func panels(rightToLeft: Bool) -> [CGRect] {
-        // Si no hay ninguna, puede haber un marco dibujado alrededor de la página: se mira sin los bordes.
-        var colors = pageColors(skip: 0)
-        if colors.isEmpty { colors = pageColors(skip: Self.edge) }
+        // Primer intento: colores de filas o columnas enteras. Si no hay ninguna, puede haber un marco
+        // dibujado alrededor de la página: se mira sin el 5 % de cada borde.
+        var colors = pageColors(skip: 0, uniform: 95)
+        if colors.isEmpty { colors = pageColors(skip: Self.edge, uniform: 95) }
+        let first = panels(colors: colors, rightToLeft: rightToLeft)
+        if !first.isEmpty { return first }
+        // Segundo intento, más flexible (márgenes de otro color, calles finitas): sin mirar el 5 % de cada
+        // borde y con 90 % de un color. Solo vale si las viñetas cubren casi toda la página (si no, son
+        // pedazos de una tapa o de un dibujo grande).
+        let second = panels(colors: pageColors(skip: Self.edge, uniform: 90), rightToLeft: rightToLeft)
+        let covered = second.reduce(0) { $0 + $1.width * $1.height }
+        return covered >= Self.cover ? second : []
+    }
+
+    private func panels(colors: [PanelColor], rightToLeft: Bool) -> [CGRect] {
         guard !colors.isEmpty else { return [] }
+        pieces = []
         cut(PanelBox(x0: 0, y0: 0, x1: w, y1: h), colors: colors, depth: 0, rightToLeft: rightToLeft)
         let pageArea = w * h
         let found = pieces.filter {
@@ -102,8 +119,8 @@ private final class PanelCutter {
         horizontal ? color(i, k) : color(k, i)
     }
 
-    /// Si la línea es casi toda de un color (95 %), ese color.
-    private func uniformColor(_ horizontal: Bool, _ k: Int, _ a0: Int, _ a1: Int) -> PanelColor? {
+    /// Si la línea es casi toda de un color (`uniform` %), ese color.
+    private func uniformColor(_ horizontal: Bool, _ k: Int, _ a0: Int, _ a1: Int, _ uniform: Int) -> PanelColor? {
         let n = a1 - a0
         guard n > 0 else { return nil }
         var r = 0, g = 0, b = 0
@@ -114,7 +131,7 @@ private final class PanelCutter {
         let mean = PanelColor(r: r / n, g: g / n, b: b / n)
         var near = 0
         for i in a0..<a1 where point(horizontal, k, i).distance(mean) <= Self.tolerance { near += 1 }
-        return near * 100 >= n * 95 ? mean : nil
+        return near * 100 >= n * uniform ? mean : nil
     }
 
     /// ¿La línea es calle de alguno de esos colores? Devuelve el color.
@@ -146,14 +163,14 @@ private final class PanelCutter {
 
     /// Colores de calle de la página: los de las filas y columnas enteras de un solo color (los 3 más comunes).
     /// `skip`: porcentaje de cada punta que no se mira.
-    private func pageColors(skip: Int) -> [PanelColor] {
+    private func pageColors(skip: Int, uniform: Int) -> [PanelColor] {
         var found: [(color: PanelColor, count: Int)] = []
         for horizontal in [true, false] {
             let lines = horizontal ? h : w
             let length = horizontal ? w : h
             let cut = length * skip / 100
             for k in 0..<lines {
-                guard let c = uniformColor(horizontal, k, cut, length - cut) else { continue }
+                guard let c = uniformColor(horizontal, k, cut, length - cut, uniform) else { continue }
                 if let i = found.firstIndex(where: { $0.color.distance(c) <= Self.similar }) {
                     found[i].count += 1
                 } else {
@@ -228,7 +245,7 @@ private final class PanelCutter {
 actor PanelStore {
     static let shared = PanelStore()
     /// Si cambia la forma de buscar, se cambia este número y se vuelven a buscar.
-    private static let version = 3
+    private static let version = 4
     private var memory: [String: [String: [[Double]]]] = [:]
 
     private static let folder: URL = {
