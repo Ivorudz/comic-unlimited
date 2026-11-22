@@ -5,3 +5,6 @@ Payload/
 *.ipa
 ComicUnlimited/Info.plist
 .DS_Store
+
+# Resultados de tools/vinetas (tienen páginas de cómics: no subir)
+resultados-vinetas/
