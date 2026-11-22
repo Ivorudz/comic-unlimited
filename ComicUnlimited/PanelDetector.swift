@@ -1,6 +1,7 @@
 import UIKit
 
 // Detecta las viñetas de una página, sin internet y en el iPhone.
+// Primero prueba con el modelo entrenado (PanelModel.swift). Si no está, usa estas reglas:
 // Las viñetas están separadas por "calles": franjas rectas de un solo color (blanco, negro, gris, beige…).
 // 1. Achica la página (400 px de ancho).
 // 2. Busca los colores de calle: filas o columnas de toda la página que son casi de un solo color.
@@ -24,6 +25,8 @@ enum PanelDetector {
         let h = max(20, Int((CGFloat(cg.height) * CGFloat(w) / CGFloat(cg.width)).rounded()))
         // Páginas larguísimas (tiras verticales): no se buscan viñetas.
         guard h <= w * 4 else { return [] }
+        // Primero el modelo entrenado (PanelModel.swift); si no está o falla, las reglas de acá abajo.
+        if let found = PanelModel.detect(cg, rightToLeft: rightToLeft) { return found }
         var pixels = [UInt8](repeating: 255, count: w * h * 4)
         let drawn: Bool = pixels.withUnsafeMutableBytes { raw in
             guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
@@ -245,7 +248,7 @@ private final class PanelCutter {
 actor PanelStore {
     static let shared = PanelStore()
     /// Si cambia la forma de buscar, se cambia este número y se vuelven a buscar.
-    private static let version = 4
+    private static let version = 5
     private var memory: [String: [String: [[Double]]]] = [:]
 
     private static let folder: URL = {

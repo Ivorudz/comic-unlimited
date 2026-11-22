@@ -47,6 +47,7 @@ App de iPhone para leer cómics, hecha en SwiftUI. La dueña o dueño del proyec
   - `LocalLibrary.swift`: guarda una copia de tus archivos, su portada, la página donde quedaste y su unión con Comic Vine.
   - `LocalReader.swift`: lector de tus archivos (páginas en segundo plano, zoom, dirección izq/der/vertical, ajuste entera/ancho/alto, miniaturas, tocar bordes, pantalla encendida, modo nocturno, brillo propio, deslizar para cerrar, barra con vista previa, tiempo que falta, candado de giro, hora y batería; opciones en el engranaje).
   - `PanelDetector.swift`: busca las viñetas de cada página (sin internet) y las guarda; las usa el lector para el zoom a la viñeta y viñeta por viñeta.
+  - `PanelModel.swift`: viñetas con el modelo entrenado (`Vinetas.mlmodel`, Core ML de Apple); si no está o falla, `PanelDetector` usa sus reglas. Se entrena en la compu con `tools/vinetas/` (ver su README).
   - `ReadingContext.swift`: desde qué arco, serie o lista abriste cada cómic y cuál es el siguiente.
   - `CustomLists.swift`: Mis listas (Biblioteca → Listas): listas propias con orden propio, "Agregar a una lista", subir listas .cbl.
   - `MetronIssue.swift`: ficha de un número de Metron (Próximos) cuando Comic Vine no lo tiene.

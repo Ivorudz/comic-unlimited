@@ -240,7 +240,16 @@ def main():
     ap.add_argument('--salida', default='resultados-vinetas')
     ap.add_argument('--paginas', type=int, default=20)
     ap.add_argument('--manga', action='store_true', help='orden de derecha a izquierda')
+    ap.add_argument('--modelo', help='modelo.pt entrenado: usa el modelo en vez de las reglas')
     args = ap.parse_args()
+    find = lambda img: detect(img, args.manga)
+    if args.modelo:
+        import torch
+        import modelo_vinetas as mv
+        net = mv.ModeloVinetas(pretrained=False)
+        net.load_state_dict(torch.load(args.modelo, map_location='cpu'))
+        net.eval()
+        find = lambda img: mv.recuadros(net, img, rtl=args.manga)
     os.makedirs(args.salida, exist_ok=True)
     items = sorted(os.listdir(args.carpeta))
     lines = []
@@ -252,7 +261,7 @@ def main():
         print(name)
         shots, counts = [], []
         for pname, img in pages:
-            panels = detect(img, args.manga)
+            panels = find(img)
             counts.append(len(panels))
             shots.append(annotate(img, panels))
             lines.append(f'{name}\t{pname}\t{len(panels)}')

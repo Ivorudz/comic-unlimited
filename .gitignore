@@ -8,3 +8,6 @@ ComicUnlimited/Info.plist
 
 # Resultados de tools/vinetas (tienen páginas de cómics: no subir)
 resultados-vinetas/
+
+# Archivos temporales de Python
+__pycache__/
