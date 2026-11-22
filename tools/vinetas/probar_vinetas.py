@@ -10,7 +10,7 @@ Uso:
 - No modifica ni copia los cómics. Las imágenes de resultado son solo para mirar en la computadora:
   no subirlas a GitHub (tienen derechos de autor).
 
-La lógica es la MISMA que ComicUnlimited/PanelDetector.swift (versión 0.45.1). Si se cambia una, cambiar la otra.
+La lógica es la MISMA que ComicUnlimited/PanelDetector.swift (PanelStore versión 3). Si se cambia una, cambiar la otra.
 Necesita: pip install pillow numpy
 """
 import argparse, io, os, subprocess, sys, tempfile, zipfile
@@ -21,6 +21,7 @@ W = 400          # ancho de trabajo
 TOL = 32         # "mismo color": diferencia por canal
 SIMILAR = 40     # colores parecidos
 SHARE = 0.72     # parte de la línea que tiene que ser del color de la calle
+EDGE = 5         # % de cada punta donde tiene que aparecer el color de la calle (por marcos o bordes sucios)
 IMAGES = ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp')
 
 
@@ -48,24 +49,29 @@ def adding(c, colors):
     return colors if any(same(c, o) for o in colors) else colors + [c]
 
 
-def separator(px, colors):
+def separator(px, colors, loose=True):
+    # loose: las puntas solo tienen que tocar el color en el último 5 %; al recortar bordes (trim) se pide más.
     n = len(px)
     if n == 0:
         return None
-    end = max(2, n // 50)
+    end = max(2, n * EDGE // 100) if loose else max(2, n // 50)
     for c in colors:
         m = near(px, c)
-        if m.sum() >= SHARE * n and m[:end].sum() * 2 >= end and m[-end:].sum() * 2 >= end:
+        if m.sum() < SHARE * n:
+            continue
+        if loose and m[:end].any() and m[-end:].any():
+            return c
+        if not loose and m[:end].sum() * 2 >= end and m[-end:].sum() * 2 >= end:
             return c
     return None
 
 
-def page_colors(pg):
+def page_colors(pg, skip=0):
     found = []  # [color, count]
     for horizontal in (True, False):
         lines, length = (pg.h, pg.w) if horizontal else (pg.w, pg.h)
         for k in range(lines):
-            px = pg.line(horizontal, k, 0, length)
+            px = pg.line(horizontal, k, length * skip // 100, length - length * skip // 100)
             c = px.mean(axis=0).astype(int)
             if near(px, c).sum() * 100 >= len(px) * 95:
                 for f in found:
@@ -84,10 +90,10 @@ def trim(pg, b, colors):
     changed = True
     while changed and x1 - x0 > 4 and y1 - y0 > 4:
         changed = False
-        if separator(pg.line(True, y0, x0, x1), colors) is not None: y0 += 1; changed = True
-        if y1 - y0 > 4 and separator(pg.line(True, y1 - 1, x0, x1), colors) is not None: y1 -= 1; changed = True
-        if separator(pg.line(False, x0, y0, y1), colors) is not None: x0 += 1; changed = True
-        if x1 - x0 > 4 and separator(pg.line(False, x1 - 1, y0, y1), colors) is not None: x1 -= 1; changed = True
+        if separator(pg.line(True, y0, x0, x1), colors, False) is not None: y0 += 1; changed = True
+        if y1 - y0 > 4 and separator(pg.line(True, y1 - 1, x0, x1), colors, False) is not None: y1 -= 1; changed = True
+        if separator(pg.line(False, x0, y0, y1), colors, False) is not None: x0 += 1; changed = True
+        if x1 - x0 > 4 and separator(pg.line(False, x1 - 1, y0, y1), colors, False) is not None: x1 -= 1; changed = True
     return x0, y0, x1, y1
 
 
@@ -132,7 +138,8 @@ def detect(img, rtl=False):
     pg = Page(img)
     if pg.h > pg.w * 4:
         return []
-    colors = page_colors(pg)
+    # Si no hay ninguna, puede haber un marco dibujado alrededor de la página: se mira sin los bordes.
+    colors = page_colors(pg) or page_colors(pg, EDGE)
     if not colors:
         return []
     cut(pg, (0, 0, pg.w, pg.h), colors, 0, rtl)
