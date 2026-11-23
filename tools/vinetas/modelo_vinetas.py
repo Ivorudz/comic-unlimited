@@ -11,7 +11,8 @@ import torch.nn.functional as F
 from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights
 
 W, H = 320, 480          # tamaño de entrada (las páginas se estiran a esto, también las apaisadas)
-BAND = 0.012             # ancho del "borde" alrededor de cada viñeta, en proporción del lado de la página
+MIN_FILL = 0.85          # cada viñeta tiene que llenar al menos esto de su rectángulo (si no, página entera)
+BAND = 0.012            # ancho del "borde" alrededor de cada viñeta, en proporción del lado de la página
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
 
@@ -99,6 +100,9 @@ def componentes_a_recuadros(clases, min_area=0.004):
                         stack.append((ny, nx))
             if n < min_area * w * h:
                 continue
+            # Mancha que no llena su rectángulo (forma de L, dos viñetas pegadas): el modelo duda → página entera.
+            if n < MIN_FILL * (x1 - x0 + 1) * (y1 - y0 + 1):
+                return []
             # El borde pintado se come un poco de la viñeta: se agrega de vuelta.
             fx0, fy0 = max(0, x0 - bx), max(0, y0 - by)
             fx1, fy1 = min(w, x1 + 1 + bx), min(h, y1 + 1 + by)

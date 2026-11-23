@@ -248,7 +248,7 @@ private final class PanelCutter {
 actor PanelStore {
     static let shared = PanelStore()
     /// Si cambia la forma de buscar, se cambia este número y se vuelven a buscar.
-    private static let version = 5
+    private static let version = 6
     private var memory: [String: [String: [[Double]]]] = [:]
 
     private static let folder: URL = {

@@ -15,6 +15,8 @@ enum PanelModel {
     static let band = 0.012
     /// Manchas más chicas que esto (proporción de la página) no cuentan.
     static let minArea = 0.004
+    /// Cada viñeta tiene que llenar al menos esto de su rectángulo; si no, el modelo duda y se ve la página entera.
+    static let minFill = 0.85
 
     private static let model: MLModel? = {
         guard let url = Bundle.main.url(forResource: "Vinetas", withExtension: "mlmodelc") else { return nil }
@@ -74,6 +76,8 @@ enum PanelModel {
                 }
             }
             guard Double(n) >= minArea * Double(w * h) else { continue }
+            // Mancha que no llena su rectángulo (forma de L, dos viñetas pegadas): el modelo duda → página entera.
+            if Double(n) < minFill * Double((x1 - x0 + 1) * (y1 - y0 + 1)) { return [] }
             // El borde pintado se come un poco de la viñeta: se agrega de vuelta.
             let fx0 = max(0, Double(x0) - bx), fy0 = max(0, Double(y0) - by)
             let fx1 = min(Double(w), Double(x1 + 1) + bx), fy1 = min(Double(h), Double(y1 + 1) + by)

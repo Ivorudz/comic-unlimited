@@ -32,12 +32,20 @@ python tools/vinetas/probar_vinetas.py "CARPETA_CON_COMICS" --modelo modelo.pt
 ```
 
 - `marcar_vinetas.py` abre `http://127.0.0.1:8765`: cada página trae los recuadros de las reglas para
-  corregir. Un recuadro por viñeta; `T` = página de un solo dibujo; `X` = texto o publicidad.
+  corregir. Un recuadro por viñeta; `T` = página de un solo dibujo; `X` = texto o publicidad;
+  `D` = viñetas en diagonal (la app la muestra entera). `↑`/`↓` cambian el número del recuadro elegido;
+  `R` marca la página como dudosa y `V` va a la próxima dudosa o salteada.
 - `entrenar_modelo.py` separa el 15 % de los cómics para examen y al final dice cuántas páginas de
   examen acierta el modelo y cuántas las reglas.
 - El modelo (`modelo_vinetas.py`) es una MobileNetV3 (torchvision, licencia BSD) con un decodificador
   tipo U-Net: pinta cada punto como fondo, adentro de viñeta o borde, y cada mancha de "adentro" es
   una viñeta. Si se cambia cómo se arman los recuadros, cambiarlo también en `PanelModel.swift`.
+- Si una mancha llena menos del 85 % de su rectángulo (forma de L, dos viñetas pegadas), el modelo duda y la
+  página se ve entera (`MIN_FILL` / `minFill`). Elegido con 4 entrenamientos de prueba sobre 497 páginas:
+  viñetas equivocadas del 28 % al 12 %, bien del 69 % al 62 %, el resto entera.
+- `premarcar_magi.py` (opcional, solo en la compu) marca páginas con Magi
+  (https://huggingface.co/ragavsachdeva/magi, licencia solo para uso personal y no comercial). Magi no va
+  en la app.
 - Las páginas, las etiquetas y `modelo.pt` quedan en la compu. Solo `Vinetas.mlmodel` va al repositorio
   (no tiene imágenes; son los números que aprendió).
 

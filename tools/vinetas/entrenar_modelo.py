@@ -6,7 +6,8 @@ Uso:
 
 - Separa algunos cómics enteros para examen (el modelo nunca los ve al aprender) y al final dice, en esas
   páginas, cuántas acierta el modelo y cuántas las reglas.
-- Una página "acierta" si encuentra las mismas viñetas que las marcadas (cada una superpuesta en un 75 % o más).
+- Una página "acierta" si encuentra las mismas viñetas que las marcadas (cada una superpuesta en un 50 % o más:
+  un recuadro un poco corrido cuenta como acierto). Las de texto y diagonal aciertan si no da viñetas.
 - Necesita: pip install torch torchvision pillow numpy (con placa NVIDIA, la versión de torch con CUDA).
 """
 import argparse, json, os, random, sys, time, zlib
@@ -95,7 +96,7 @@ def como_la_app(boxes):
     return [] if len(boxes) < 2 or any(b[2] * b[3] >= 0.85 for b in boxes) else boxes
 
 
-def acierta(pred, real, umbral=0.75):
+def acierta(pred, real, umbral=0.5):
     real = como_la_app(real)
     if len(pred) != len(real):
         return False

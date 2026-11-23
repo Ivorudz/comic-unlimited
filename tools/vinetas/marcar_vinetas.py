@@ -38,7 +38,13 @@ class App:
         out = []
         for n in self.names:
             p = self.label_path(n)
-            out.append({'name': n, 'done': os.path.exists(p)})
+            done = os.path.exists(p)
+            doubt = False
+            if done:
+                with open(p, encoding='utf-8') as f:
+                    d = json.load(f)
+                doubt = d.get('kind') == 'skip' or bool(d.get('dudosa'))
+            out.append({'name': n, 'done': done, 'doubt': doubt})
         return out
 
     def label(self, name):
@@ -54,7 +60,7 @@ class App:
     def save(self, name, data):
         kind = data.get('kind')
         boxes = data.get('boxes')
-        if kind not in ('panels', 'text', 'skip') or not isinstance(boxes, list):
+        if kind not in ('panels', 'text', 'diagonal', 'skip') or not isinstance(boxes, list):
             raise ValueError('datos inválidos')
         clean = []
         for b in boxes:
@@ -62,7 +68,7 @@ class App:
             if w > 0.005 and h > 0.005:
                 clean.append([round(x, 4), round(y, 4), round(w, 4), round(h, 4)])
         with open(self.label_path(name), 'w', encoding='utf-8') as f:
-            json.dump({'boxes': clean, 'kind': kind}, f)
+            json.dump({'boxes': clean, 'kind': kind, 'dudosa': bool(data.get('dudosa'))}, f)
 
 
 def handler(app):
@@ -144,6 +150,11 @@ PAGE = r'''<!doctype html>
  <button class="main" id="next">Guardar y siguiente <kbd>Enter</kbd></button>
  <button id="whole">Toda la página es un solo dibujo <kbd>T</kbd></button>
  <button id="text">Página de texto o publicidad <kbd>X</kbd></button>
+ <button id="diag">Viñetas en diagonal (se lee entera) <kbd>D</kbd></button>
+ <button id="up">Subir número del recuadro elegido <kbd>↑</kbd></button>
+ <button id="down">Bajar número del recuadro elegido <kbd>↓</kbd></button>
+ <button id="doubt">Dudosa: volver a mirarla después <kbd>R</kbd></button>
+ <button id="nextdoubt">Ir a la próxima dudosa o salteada <kbd>V</kbd></button>
  <button id="del">Borrar recuadro elegido <kbd>Supr</kbd></button>
  <button id="clear">Borrar todos <kbd>C</kbd></button>
  <button id="skip">Saltear (no sé cómo marcarla) <kbd>S</kbd></button>
@@ -157,12 +168,13 @@ PAGE = r'''<!doctype html>
  • Recuadro chico encima de un dibujo grande: marcá los dos.<br>
  • Tapa o dibujo de página entera: <kbd>T</kbd>.<br>
  • Cartas, créditos, publicidad: <kbd>X</kbd>.<br>
+ • Viñetas torcidas que no entran en un rectángulo: <kbd>D</kbd> (la app muestra la página entera).<br>
  • Los globos de diálogo que salen de la viñeta no cuentan.<br>
  Se guarda solo al pasar de página (siguiente o anterior).</p>
 </div>
 <div id="main"><div id="wrap"><img id="img" draggable="false"></div></div>
 <script>
-let list = [], idx = 0, boxes = [], sel = -1, kind = 'panels', drag = null;
+let list = [], idx = 0, boxes = [], sel = -1, kind = 'panels', dudosa = false, drag = null;
 const img = document.getElementById('img'), wrap = document.getElementById('wrap');
 const $ = id => document.getElementById(id);
 const clamp = v => Math.min(1, Math.max(0, v));
@@ -176,9 +188,9 @@ async function start() {
 async function load() {
   const p = list[idx];
   const d = await (await fetch('/api/label/' + encodeURIComponent(p.name))).json();
-  boxes = d.boxes; kind = d.kind || 'panels'; sel = -1;
+  boxes = d.boxes; kind = d.kind || 'panels'; dudosa = !!d.dudosa; sel = -1;
   img.src = '/img/' + encodeURIComponent(p.name);
-  $('state').textContent = (d.saved ? 'Ya marcada: ' + ({panels:'viñetas', text:'texto', skip:'salteada'}[kind]) : 'Recuadros puestos por las reglas: revisalos') + ' — ' + p.name;
+  $('state').textContent = (d.saved ? 'Ya marcada: ' + ({panels:'viñetas', text:'texto', diagonal:'diagonal', skip:'salteada'}[kind]) : 'Recuadros puestos por las reglas: revisalos') + ' — ' + p.name;
   progress(); draw();
 }
 function progress() {
@@ -195,7 +207,8 @@ function draw() {
     d.innerHTML = `<span class="num">${i+1}</span>` + ['nw','ne','sw','se'].map(c => `<div class="h ${c}" data-c="${c}"></div>`).join('');
     d.dataset.i = i; wrap.appendChild(d);
   });
-  $('msg').textContent = kind === 'text' ? 'Marcada como texto o publicidad' : kind === 'skip' ? 'Salteada' : '';
+  $('doubt').textContent = (dudosa ? '✓ Dudosa (tocá para quitar)' : 'Dudosa: volver a mirarla después') + ' R';
+  $('msg').textContent = kind === 'text' ? 'Marcada como texto o publicidad' : kind === 'diagonal' ? 'Viñetas en diagonal: se lee entera' : kind === 'skip' ? 'Salteada' : '';
 }
 function pos(e) { const r = img.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width), clamp((e.clientY - r.top) / r.height)]; }
 wrap.addEventListener('mousedown', e => {
@@ -227,9 +240,9 @@ window.addEventListener('mouseup', () => {
 });
 async function save() {
   const p = list[idx];
-  const r = await fetch('/api/label/' + encodeURIComponent(p.name), { method: 'POST', body: JSON.stringify({ boxes: kind === 'panels' ? boxes : [], kind }) });
+  const r = await fetch('/api/label/' + encodeURIComponent(p.name), { method: 'POST', body: JSON.stringify({ boxes: kind === 'panels' ? boxes : [], kind, dudosa }) });
   if (!r.ok) { $('msg').textContent = 'No se pudo guardar: ' + await r.text(); return false; }
-  p.done = true; return true;
+  p.done = true; p.doubt = dudosa || kind === 'skip'; return true;
 }
 async function go(step) { if (await save()) { idx = (idx + step + list.length) % list.length; load(); } }
 const act = {
@@ -237,14 +250,31 @@ const act = {
   prev: () => go(-1),
   whole: () => { kind = 'panels'; boxes = [[0, 0, 1, 1]]; sel = 0; draw(); },
   text: () => { kind = 'text'; boxes = []; sel = -1; draw(); },
+  diag: () => { kind = 'diagonal'; boxes = []; sel = -1; draw(); },
   skip: () => { kind = 'skip'; draw(); },
+  up: () => move(-1),
+  down: () => move(1),
+  doubt: () => { dudosa = !dudosa; draw(); },
+  nextdoubt: async () => {
+    if (!await save()) return;
+    for (let s = 1; s <= list.length; s++) {
+      const j = (idx + s) % list.length;
+      if (list[j].doubt) { idx = j; load(); return; }
+    }
+    $('msg').textContent = 'No hay páginas dudosas ni salteadas';
+  },
   del: () => { if (sel >= 0) { boxes.splice(sel, 1); sel = -1; draw(); } },
   clear: () => { boxes = []; sel = -1; kind = 'panels'; draw(); },
   todo: () => { const i = list.findIndex((p, j) => j > idx && !p.done); if (i >= 0) { idx = i; load(); } },
 };
+function move(step) {  // cambia el número (orden de lectura) del recuadro elegido
+  const j = sel + step;
+  if (sel < 0 || j < 0 || j >= boxes.length) return;
+  [boxes[sel], boxes[j]] = [boxes[j], boxes[sel]]; sel = j; kind = 'panels'; draw();
+}
 Object.keys(act).forEach(k => $(k).onclick = act[k]);
 window.addEventListener('keydown', e => {
-  const k = { Enter: 'next', ArrowRight: 'next', ArrowLeft: 'prev', Delete: 'del', Backspace: 'del', t: 'whole', x: 'text', s: 'skip', c: 'clear' }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+  const k = { Enter: 'next', ArrowRight: 'next', ArrowLeft: 'prev', Delete: 'del', Backspace: 'del', ArrowUp: 'up', ArrowDown: 'down', r: 'doubt', v: 'nextdoubt', t: 'whole', x: 'text', d: 'diag', s: 'skip', c: 'clear' }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
   if (k) { e.preventDefault(); act[k](); }
 });
 start();
