@@ -1,11 +1,12 @@
 import SwiftUI
 import WebKit
 
-// "Leer en Marvel Comics": abre la app oficial de Marvel Comics directo en el lector de ese cómic
-// (con su link de la app: marvelcomicsapp://viewer?issueId=1477). Para saber el número de cada cómic,
-// la primera vez se busca en la página oficial (marvelcomicsapp.com) dentro de nuestra app; al abrir el cómic
-// aparece "¿Es este? Guardar". La app no lee ni guarda nada de la página: solo ese número.
-// (La página no deja leer en el celular y detecta a propósito si es un teléfono o tablet: no se le miente.)
+// "Leer en Marvel Comics": abre el lector web oficial de Marvel Comics (marvelcomicsapp.com) dentro de nuestra app,
+// con la cuenta y la suscripción del dueño. La página solo deja leer en computadora, así que el navegador de adentro
+// se presenta como una computadora (Safari de Mac, sin pantalla táctil). Lo pidió el dueño, con autorización para
+// uso personal y no comercial (0.47). También se puede abrir la app oficial directo en el cómic
+// (marvelcomicsapp://viewer?issueId=1477). La app no lee ni guarda nada de la página: solo el número de cada cómic
+// cuando el dueño toca "Guardar".
 
 /// Números de cada cómic en Marvel Comics, guardados en el iPhone (`marvel-comics.json`).
 @MainActor
@@ -101,8 +102,8 @@ struct MarvelReadButton: View {
             if isMarvel {
                 let saved = links.id(forCV: cvID)
                 Button {
-                    // Ya sabemos su número: directo a la app de Marvel. Si no, a buscarlo.
-                    if let saved { MarvelLinks.openInApp(saved) } else { open = true }
+                    // Con el número guardado abre el lector; si no, el buscador de Marvel Comics.
+                    open = true
                 } label: {
                     Label(saved == nil ? "Buscar en Marvel Comics" : "Leer en Marvel Comics",
                           systemImage: saved == nil ? "magnifyingglass" : "book.pages")
@@ -114,15 +115,17 @@ struct MarvelReadButton: View {
                 .buttonStyle(.plain)
                 .padding(.top, 10)
                 .contextMenu {
-                    if saved != nil {
-                        Button { open = true } label: { Label("Ver en la página de Marvel", systemImage: "safari") }
+                    if let saved {
+                        Button { MarvelLinks.openInApp(saved) } label: {
+                            Label("Abrir en la app de Marvel Comics", systemImage: "arrow.up.forward.app")
+                        }
                         Button(role: .destructive) { links.set(nil, forCV: cvID) } label: {
                             Label("Olvidar el link de este cómic", systemImage: "link")
                         }
                     }
                 }
                 if saved != nil {
-                    Text("Abre la app de Marvel Comics en este cómic. Mantené apretado para más opciones.")
+                    Text("Se lee acá, con tu cuenta de Marvel Comics. Mantené apretado para abrirlo en la app de Marvel.")
                         .font(.caption)
                         .foregroundStyle(Theme.ink2)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,7 +185,7 @@ struct MarvelWebScreen: View {
     }
 
     private var startURL: URL {
-        if let id = links.id(forCV: cvID) { return MarvelLinks.issueURL(id) }
+        if let id = links.id(forCV: cvID) { return MarvelLinks.viewerURL(id) }
         return MarvelLinks.site.appendingPathComponent("explore")
     }
 
@@ -231,7 +234,7 @@ struct MarvelWebScreen: View {
 
     @ViewBuilder
     private var banner: some View {
-        if let current = model.currentID {
+        if let current = model.currentID, !(model.inViewer && current == links.id(forCV: cvID)) {
             let isSaved = current == links.id(forCV: cvID)
             // Abriste un cómic en Marvel Comics: ¿es este? Al guardarlo, el botón de la ficha abre directo la app.
             HStack(spacing: 10) {
@@ -285,6 +288,8 @@ final class MarvelWebModel {
     var canGoBack = false
     /// Número de Marvel Comics del cómic abierto (nil si no estás en un cómic).
     var currentID: Int?
+    /// Estás en el lector (…/viewer/N), no en la página del cómic.
+    var inViewer = false
     weak var webView: WKWebView?
 
     func goBack() { webView?.goBack() }
@@ -300,18 +305,36 @@ final class MarvelWebModel {
     }
 }
 
-/// El navegador (WKWebView) con la página de Marvel Comics (la de celular, para buscar y guardar).
+/// El navegador (WKWebView), presentado como una computadora para que la página deje leer.
 private struct MarvelWebView: UIViewRepresentable {
     let model: MarvelWebModel
     let start: URL
+
+    /// Safari de Mac.
+    private static let desktopAgent =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+
+    /// Antes de que cargue la página: una Mac sin pantalla táctil (la página mira esto para mandar a su app).
+    private static let desktopScript = """
+    (function () {
+      try {
+        Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: function () { return 0; }, configurable: true });
+        Object.defineProperty(Navigator.prototype, 'platform', { get: function () { return 'MacIntel'; }, configurable: true });
+      } catch (e) {}
+    })();
+    """
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()   // la sesión queda guardada
+        config.defaultWebpagePreferences.preferredContentMode = .desktop
+        config.userContentController.addUserScript(
+            WKUserScript(source: Self.desktopScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.allowsInlineMediaPlayback = true
         let web = WKWebView(frame: .zero, configuration: config)
+        web.customUserAgent = Self.desktopAgent
         web.allowsBackForwardNavigationGestures = true
         web.navigationDelegate = context.coordinator
         web.uiDelegate = context.coordinator
@@ -335,8 +358,13 @@ private struct MarvelWebView: UIViewRepresentable {
         func observe(_ web: WKWebView) {
             watchers = [
                 web.observe(\.url, options: [.initial, .new]) { [weak self] _, change in
-                    let id = MarvelLinks.marvelID(from: change.newValue ?? nil)
-                    Task { @MainActor in self?.model.currentID = id }
+                    let url = change.newValue ?? nil
+                    let id = MarvelLinks.marvelID(from: url)
+                    let viewer = url?.pathComponents.contains("viewer") == true
+                    Task { @MainActor in
+                        self?.model.currentID = id
+                        self?.model.inViewer = viewer
+                    }
                 },
                 web.observe(\.isLoading, options: [.initial, .new]) { [weak self] _, change in
                     let loading = change.newValue ?? false
