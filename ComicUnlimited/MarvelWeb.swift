@@ -131,12 +131,12 @@ struct MarvelReadButton: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 4)
                 }
-                .fullScreenCover(isPresented: $open) {
-                    MarvelWebScreen(cvID: cvID, searchText: searchText)
-                }
             } else {
                 Color.clear.frame(height: 0)
             }
+        }
+        .fullScreenCover(isPresented: $open) {
+            MarvelWebScreen(cvID: cvID, searchText: searchText)
         }
         .task(id: volumeID) {
             guard let volumeID else { return }
