@@ -2,6 +2,9 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.46.1 · Arreglo del botón de Marvel Comics
+- El botón "Buscar en Marvel Comics" no aparecía en las fichas: la app nunca llegaba a averiguar si el cómic era de Marvel. Ahora aparece.
+
 ## 0.46 · Leer en Marvel Comics
 - En la ficha de cada cómic de **Marvel**, botón **"Buscar en Marvel Comics"** / **"Leer en Marvel Comics"**: abre la página oficial de Marvel Comics **dentro de la app**, en versión de computadora (en el celular la página no deja leer). Entrás con tu cuenta una vez y queda guardada.
 - La primera vez, la app copia el nombre del cómic para que lo pegues en el buscador de Marvel. Cuando lo abrís, aparece **"¿Es este? Guardar"**: con un toque queda guardado y la próxima vez el botón abre ese cómic directo.

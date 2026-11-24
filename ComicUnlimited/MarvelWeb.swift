@@ -86,7 +86,8 @@ struct MarvelReadButton: View {
     private var links: MarvelLinks { MarvelLinks.shared }
 
     var body: some View {
-        Group {
+        // Siempre hay una vista (aunque sea vacía), así la consulta de la editorial de abajo arranca.
+        VStack(spacing: 0) {
             if isMarvel {
                 Button { open = true } label: {
                     Label(links.id(forCV: cvID) == nil ? "Buscar en Marvel Comics" : "Leer en Marvel Comics",
@@ -101,6 +102,8 @@ struct MarvelReadButton: View {
                 .fullScreenCover(isPresented: $open) {
                     MarvelWebScreen(cvID: cvID, searchText: searchText)
                 }
+            } else {
+                Color.clear.frame(height: 0)
             }
         }
         .task(id: volumeID) {
