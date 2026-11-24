@@ -1,11 +1,11 @@
 import SwiftUI
 import WebKit
 
-// "Leer en Marvel Comics": abre la página oficial de Marvel Comics (marvelcomicsapp.com) dentro de la app,
-// pidiendo la versión de computadora (como "Solicitar sitio de escritorio" de Safari), porque en el celular
-// la página no deja leer. Entrás con tu propia cuenta y la sesión queda guardada en el iPhone.
-// La app no lee ni guarda nada de la página: solo recuerda el número de cada cómic en Marvel Comics
-// (el de la dirección .../viewer/1477) cuando vos confirmás "Guardar", así la próxima vez abre directo.
+// "Leer en Marvel Comics": abre la app oficial de Marvel Comics directo en el lector de ese cómic
+// (con su link de la app: marvelcomicsapp://viewer?issueId=1477). Para saber el número de cada cómic,
+// la primera vez se busca en la página oficial (marvelcomicsapp.com) dentro de nuestra app; al abrir el cómic
+// aparece "¿Es este? Guardar". La app no lee ni guarda nada de la página: solo ese número.
+// (La página no deja leer en el celular y detecta a propósito si es un teléfono o tablet: no se le miente.)
 
 /// Números de cada cómic en Marvel Comics, guardados en el iPhone (`marvel-comics.json`).
 @MainActor
@@ -41,6 +41,16 @@ final class MarvelLinks {
     }
 
     nonisolated static func viewerURL(_ id: Int) -> URL { site.appendingPathComponent("viewer/\(id)") }
+    nonisolated static func issueURL(_ id: Int) -> URL { site.appendingPathComponent("issues/\(id)") }
+    /// Link de la app oficial que abre directo el lector de ese cómic.
+    nonisolated static func appURL(_ id: Int) -> URL { URL(string: "marvelcomicsapp://viewer?issueId=\(id)")! }
+
+    /// Abre el cómic en la app oficial de Marvel Comics; si no está instalada, su página en Safari.
+    static func openInApp(_ id: Int) {
+        UIApplication.shared.open(appURL(id)) { opened in
+            if !opened { UIApplication.shared.open(issueURL(id)) }
+        }
+    }
 
     /// El número de Marvel Comics de una dirección como .../viewer/1477 o .../issues/1477.
     nonisolated static func marvelID(from url: URL?) -> Int? {
@@ -89,9 +99,13 @@ struct MarvelReadButton: View {
         // Siempre hay una vista (aunque sea vacía), así la consulta de la editorial de abajo arranca.
         VStack(spacing: 0) {
             if isMarvel {
-                Button { open = true } label: {
-                    Label(links.id(forCV: cvID) == nil ? "Buscar en Marvel Comics" : "Leer en Marvel Comics",
-                          systemImage: "safari")
+                let saved = links.id(forCV: cvID)
+                Button {
+                    // Ya sabemos su número: directo a la app de Marvel. Si no, a buscarlo.
+                    if let saved { MarvelLinks.openInApp(saved) } else { open = true }
+                } label: {
+                    Label(saved == nil ? "Buscar en Marvel Comics" : "Leer en Marvel Comics",
+                          systemImage: saved == nil ? "magnifyingglass" : "book.pages")
                         .font(.system(size: 15, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .padding(12)
@@ -99,6 +113,21 @@ struct MarvelReadButton: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 10)
+                .contextMenu {
+                    if saved != nil {
+                        Button { open = true } label: { Label("Ver en la página de Marvel", systemImage: "safari") }
+                        Button(role: .destructive) { links.set(nil, forCV: cvID) } label: {
+                            Label("Olvidar el link de este cómic", systemImage: "link")
+                        }
+                    }
+                }
+                if saved != nil {
+                    Text("Abre la app de Marvel Comics en este cómic. Mantené apretado para más opciones.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.ink2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 4)
+                }
                 .fullScreenCover(isPresented: $open) {
                     MarvelWebScreen(cvID: cvID, searchText: searchText)
                 }
@@ -153,7 +182,7 @@ struct MarvelWebScreen: View {
     }
 
     private var startURL: URL {
-        if let id = links.id(forCV: cvID) { return MarvelLinks.viewerURL(id) }
+        if let id = links.id(forCV: cvID) { return MarvelLinks.issueURL(id) }
         return MarvelLinks.site.appendingPathComponent("explore")
     }
 
@@ -175,9 +204,12 @@ struct MarvelWebScreen: View {
             Menu {
                 Button { model.reload() } label: { Label("Recargar", systemImage: "arrow.clockwise") }
                 if let id = model.currentID {
-                    Button {
-                        UIApplication.shared.open(MarvelLinks.site.appendingPathComponent("issues/\(id)"))
-                    } label: { Label("Abrir en Safari", systemImage: "safari") }
+                    Button { MarvelLinks.openInApp(id) } label: {
+                        Label("Abrir en la app de Marvel", systemImage: "arrow.up.forward.app")
+                    }
+                    Button { UIApplication.shared.open(MarvelLinks.issueURL(id)) } label: {
+                        Label("Abrir en Safari", systemImage: "safari")
+                    }
                 }
                 if links.id(forCV: cvID) != nil {
                     Button(role: .destructive) { links.set(nil, forCV: cvID) } label: {
@@ -199,22 +231,32 @@ struct MarvelWebScreen: View {
 
     @ViewBuilder
     private var banner: some View {
-        if let current = model.currentID, current != links.id(forCV: cvID) {
-            // Abriste un cómic en Marvel Comics: ¿es este? Así la próxima vez va directo.
+        if let current = model.currentID {
+            let isSaved = current == links.id(forCV: cvID)
+            // Abriste un cómic en Marvel Comics: ¿es este? Al guardarlo, el botón de la ficha abre directo la app.
             HStack(spacing: 10) {
-                Text("¿Es \(searchText)?")
+                Text(isSaved ? "Guardado ✓ \(searchText)" : "¿Es \(searchText)?")
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                 Spacer(minLength: 8)
-                Button("Guardar") {
-                    links.set(current, forCV: cvID)
-                    copiedNotice = false
+                if isSaved {
+                    Button("Leer en la app") { MarvelLinks.openInApp(current) }
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Theme.magenta, in: Capsule())
+                        .foregroundStyle(.white)
+                } else {
+                    Button("Guardar") {
+                        links.set(current, forCV: cvID)
+                        copiedNotice = false
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Theme.magenta, in: Capsule())
+                    .foregroundStyle(.white)
                 }
-                .font(.subheadline.weight(.bold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Theme.magenta, in: Capsule())
-                .foregroundStyle(.white)
             }
             .padding(12)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -222,7 +264,7 @@ struct MarvelWebScreen: View {
         } else if copiedNotice {
             HStack(spacing: 10) {
                 Image(systemName: "doc.on.clipboard")
-                Text("Copié \"\(searchText)\": pegalo en el buscador de Marvel Comics y abrí el cómic.")
+                Text("Copié \"\(searchText)\": pegalo en el buscador (la lupa de arriba) y abrí el cómic.")
                     .font(.footnote)
                 Spacer(minLength: 4)
                 Button { copiedNotice = false } label: { Image(systemName: "xmark") }
@@ -258,24 +300,18 @@ final class MarvelWebModel {
     }
 }
 
-/// El navegador (WKWebView) en modo computadora.
+/// El navegador (WKWebView) con la página de Marvel Comics (la de celular, para buscar y guardar).
 private struct MarvelWebView: UIViewRepresentable {
     let model: MarvelWebModel
     let start: URL
-
-    /// Safari de Mac: así la página muestra su lector (en el celular solo ofrece bajar la app).
-    private static let desktopAgent =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()   // la sesión queda guardada
-        config.defaultWebpagePreferences.preferredContentMode = .desktop
         config.allowsInlineMediaPlayback = true
         let web = WKWebView(frame: .zero, configuration: config)
-        web.customUserAgent = Self.desktopAgent
         web.allowsBackForwardNavigationGestures = true
         web.navigationDelegate = context.coordinator
         web.uiDelegate = context.coordinator
