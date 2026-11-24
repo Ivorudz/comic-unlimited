@@ -677,6 +677,9 @@ struct AccountsForm: View {
     @State private var metronUser = ""
     @State private var metronPassword = ""
     @State private var comicVineKey = ""
+    @State private var marvelEmail = ""
+    @State private var marvelPassword = ""
+    @State private var marvelSaved = MarvelAccount.isSet
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -715,6 +718,28 @@ struct AccountsForm: View {
                     saveButton(disabled: comicVineKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
                         model.saveComicVineKey(comicVineKey)
                         comicVineKey = ""
+                    }
+                }
+            }
+
+            card {
+                Text("Marvel Comics").font(.headline).foregroundStyle(Theme.ink)
+                Text("Para leer cómics de Marvel adentro de la app (botón \"Leer en Marvel Comics\" de cada ficha): la app entra sola a tu cuenta y busca cada cómic la primera vez. Se completa solo en las páginas de inicio de sesión de Marvel Comics, WEBTOON o Disney.")
+                    .font(.subheadline).foregroundStyle(Theme.ink2)
+                if marvelSaved {
+                    Text("Guardada: \(MarvelAccount.email)").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                    Button("Quitar cuenta de Marvel Comics", role: .destructive) {
+                        MarvelAccount.forget()
+                        marvelSaved = false
+                    }
+                    .font(.subheadline)
+                } else {
+                    field(TextField("Mail de Marvel Comics", text: $marvelEmail).keyboardType(.emailAddress))
+                    field(SecureField("Contraseña de Marvel Comics", text: $marvelPassword))
+                    saveButton(disabled: marvelEmail.trimmingCharacters(in: .whitespaces).isEmpty || marvelPassword.isEmpty) {
+                        MarvelAccount.save(email: marvelEmail, password: marvelPassword)
+                        marvelPassword = ""
+                        marvelSaved = MarvelAccount.isSet
                     }
                 }
             }

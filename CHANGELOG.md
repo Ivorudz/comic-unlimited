@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.48 · Marvel Comics automático
+- **Cuenta de Marvel Comics** en Perfil → Configuración → Cuentas (junto a Metron y Comic Vine). La contraseña se guarda en el llavero del iPhone.
+- Si la página de Marvel pide iniciar sesión, la app **completa tu mail y contraseña sola** (solo en las páginas de inicio de sesión de Marvel Comics, WEBTOON o Disney).
+- La primera vez con cada cómic, la app **lo busca sola** en Marvel Comics, elige el resultado con la misma serie y número (y el volumen del año correcto), **lo guarda y abre el lector**. Si se equivocó: "No es este". Si no lo encuentra, queda el nombre copiado para buscarlo a mano.
+
 ## 0.47 · Leer Marvel Comics en la app (prueba)
 - **"Leer en Marvel Comics" abre el lector oficial de Marvel Comics dentro de nuestra app**, con tu cuenta. La página solo deja leer en computadora, así que el navegador de adentro se presenta como una computadora (Mac, sin pantalla táctil). Es una prueba, para uso personal y no comercial, como autorizó el dueño.
 - La primera vez: "Buscar en Marvel Comics", buscás el cómic, lo abrís y tocás "Guardar". Desde ahí el botón abre directo el lector de ese cómic.

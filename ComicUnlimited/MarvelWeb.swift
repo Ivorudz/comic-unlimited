@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import Security
 
 // "Leer en Marvel Comics": abre el lector web oficial de Marvel Comics (marvelcomicsapp.com) dentro de nuestra app,
 // con la cuenta y la suscripción del dueño. La página solo deja leer en computadora, así que el navegador de adentro
@@ -62,6 +63,66 @@ final class MarvelLinks {
     }
 }
 
+/// Mail y contraseña de Marvel Comics, guardados solo en este iPhone (la contraseña en el llavero).
+/// Se completan solos en las páginas de inicio de sesión de Marvel Comics, WEBTOON o Disney, dentro de la app.
+enum MarvelAccount {
+    private static let emailKey = "marvel.email"
+    private static let fallbackKey = "marvel.password.fallback"
+    private static let service = "ComicUnlimited.marvel"
+
+    static var email: String { UserDefaults.standard.string(forKey: emailKey) ?? "" }
+    static var password: String { readKeychain() ?? UserDefaults.standard.string(forKey: fallbackKey) ?? "" }
+    static var isSet: Bool { !email.isEmpty && !password.isEmpty }
+
+    static func save(email: String, password: String) {
+        UserDefaults.standard.set(email.trimmingCharacters(in: .whitespacesAndNewlines), forKey: emailKey)
+        // Si el llavero no anda (puede pasar dentro de LiveContainer), queda guardada en el iPhone igual.
+        if writeKeychain(password) {
+            UserDefaults.standard.removeObject(forKey: fallbackKey)
+        } else {
+            UserDefaults.standard.set(password, forKey: fallbackKey)
+        }
+    }
+
+    static func forget() {
+        UserDefaults.standard.removeObject(forKey: emailKey)
+        UserDefaults.standard.removeObject(forKey: fallbackKey)
+        SecItemDelete(baseQuery as CFDictionary)
+    }
+
+    private static var baseQuery: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: "password"]
+    }
+
+    private static func readKeychain() -> String? {
+        var query = baseQuery
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func writeKeychain(_ password: String) -> Bool {
+        SecItemDelete(baseQuery as CFDictionary)
+        var item = baseQuery
+        item[kSecValueData as String] = Data(password.utf8)
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
+    }
+}
+
+/// Lo que se busca en Marvel Comics: serie, número y año de tapa (para elegir el volumen correcto).
+struct MarvelQuery: Equatable {
+    var series: String
+    var number: String
+    var year: Int?
+    var text: String { [series, number].filter { !$0.isEmpty }.joined(separator: " ") }
+}
+
 /// ¿La serie es de Marvel? Se mira tu Biblioteca y, si no, se le pregunta a Comic Vine (una vez por serie; queda guardado).
 enum MarvelPublisher {
     private static let key = "marvel.publisherByVolume"
@@ -90,8 +151,8 @@ enum MarvelPublisher {
 struct MarvelReadButton: View {
     let cvID: Int
     let volumeID: Int?
-    /// Lo que se copia para buscar en Marvel Comics ("New Avengers 9").
-    let searchText: String
+    /// Lo que se busca en Marvel Comics ("New Avengers" 9, 2005).
+    let query: MarvelQuery
     @State private var isMarvel = false
     @State private var open = false
     private var links: MarvelLinks { MarvelLinks.shared }
@@ -136,7 +197,7 @@ struct MarvelReadButton: View {
             }
         }
         .fullScreenCover(isPresented: $open) {
-            MarvelWebScreen(cvID: cvID, searchText: searchText)
+            MarvelWebScreen(cvID: cvID, query: query)
         }
         .task(id: volumeID) {
             guard let volumeID else { return }
@@ -149,12 +210,14 @@ struct MarvelReadButton: View {
 
 struct MarvelWebScreen: View {
     let cvID: Int
-    let searchText: String
+    let query: MarvelQuery
     @Environment(\.dismiss) private var dismiss
     @State private var model = MarvelWebModel()
     @State private var copiedNotice = false
     @State private var showSignOut = false
+    @State private var foundDismissed = false
     private var links: MarvelLinks { MarvelLinks.shared }
+    private var searchText: String { query.text }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -168,10 +231,22 @@ struct MarvelWebScreen: View {
         .onAppear {
             AppOrientation.readerOpened(keepAwake: true)
             if links.id(forCV: cvID) == nil {
-                // Todavía no sabemos su número: se copia el nombre para pegarlo en el buscador de Marvel.
+                // Todavía no sabemos su número: la app lo busca sola en Marvel Comics.
+                // (Se copia el nombre también, por si hay que buscarlo a mano.)
                 UIPasteboard.general.string = searchText
-                copiedNotice = true
+                model.query = query
+                model.auto = .searching
             }
+        }
+        .onChange(of: model.foundID) { _, found in
+            // Lo encontró: se guarda y se abre el lector.
+            guard let found else { return }
+            links.set(found, forCV: cvID)
+            foundDismissed = false
+            model.webView?.load(URLRequest(url: MarvelLinks.viewerURL(found)))
+        }
+        .onChange(of: model.auto) { _, state in
+            if state == .notFound { copiedNotice = true }
         }
         .onDisappear { AppOrientation.readerClosed() }
         .confirmationDialog("¿Cerrar la sesión de Marvel Comics en esta app?", isPresented: $showSignOut, titleVisibility: .visible) {
@@ -234,7 +309,40 @@ struct MarvelWebScreen: View {
 
     @ViewBuilder
     private var banner: some View {
-        if let current = model.currentID, !(model.inViewer && current == links.id(forCV: cvID)) {
+        if model.auto == .searching {
+            HStack(spacing: 10) {
+                ProgressView().tint(.white)
+                Text("Buscando \"\(searchText)\" en Marvel Comics…")
+                    .font(.footnote.weight(.semibold))
+                Spacer(minLength: 4)
+                Button("A mano") { model.auto = .notFound }
+                    .font(.footnote.weight(.bold))
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        } else if case .found(let title) = model.auto, !foundDismissed {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.magenta)
+                Text("Encontré y guardé: \(title)")
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(2)
+                Spacer(minLength: 4)
+                Button("No es este") {
+                    // Se olvida y se vuelve a buscar a mano.
+                    links.set(nil, forCV: cvID)
+                    model.foundID = nil
+                    model.auto = .notFound
+                    model.webView?.load(URLRequest(url: MarvelLinks.site.appendingPathComponent("explore")))
+                }
+                .font(.footnote.weight(.bold))
+                Button { foundDismissed = true } label: { Image(systemName: "xmark") }
+                    .accessibilityLabel("Cerrar aviso")
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        } else if let current = model.currentID, !(model.inViewer && current == links.id(forCV: cvID)) {
             let isSaved = current == links.id(forCV: cvID)
             // Abriste un cómic en Marvel Comics: ¿es este? Al guardarlo, el botón de la ficha abre directo la app.
             HStack(spacing: 10) {
@@ -267,7 +375,7 @@ struct MarvelWebScreen: View {
         } else if copiedNotice {
             HStack(spacing: 10) {
                 Image(systemName: "doc.on.clipboard")
-                Text("Copié \"\(searchText)\": pegalo en el buscador (la lupa de arriba) y abrí el cómic.")
+                Text("No lo encontré solo. Copié \"\(searchText)\": pegalo en el buscador (la lupa de arriba) y abrí el cómic.")
                     .font(.footnote)
                 Spacer(minLength: 4)
                 Button { copiedNotice = false } label: { Image(systemName: "xmark") }
@@ -291,6 +399,13 @@ final class MarvelWebModel {
     /// Estás en el lector (…/viewer/N), no en la página del cómic.
     var inViewer = false
     weak var webView: WKWebView?
+
+    /// Búsqueda automática del cómic (la primera vez).
+    enum AutoSearch: Equatable { case off, searching, found(String), notFound }
+    var auto: AutoSearch = .off
+    var query: MarvelQuery?
+    /// Número que encontró la búsqueda automática.
+    var foundID: Int?
 
     func goBack() { webView?.goBack() }
     func reload() { webView?.reload() }
@@ -333,6 +448,10 @@ private struct MarvelWebView: UIViewRepresentable {
         config.userContentController.addUserScript(
             WKUserScript(source: Self.desktopScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.allowsInlineMediaPlayback = true
+        // La página avisa lo que encontró la búsqueda automática.
+        let proxy = MarvelScriptProxy()
+        proxy.target = context.coordinator
+        config.userContentController.add(proxy, name: "cuMarvel")
         let web = WKWebView(frame: .zero, configuration: config)
         web.customUserAgent = Self.desktopAgent
         web.allowsBackForwardNavigationGestures = true
@@ -341,6 +460,7 @@ private struct MarvelWebView: UIViewRepresentable {
         web.isOpaque = false
         web.backgroundColor = .black
         context.coordinator.observe(web)
+        context.coordinator.web = web
         model.webView = web
         web.load(URLRequest(url: start))
         return web
@@ -352,8 +472,46 @@ private struct MarvelWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let model: MarvelWebModel
         private var watchers: [NSKeyValueObservation] = []
+        private var searchStarted = false
+        /// Veces que se completó el inicio de sesión en cada dirección (como mucho 2, para no repetir sin fin).
+        private var loginTries: [String: Int] = [:]
+        weak var web: WKWebView?
 
         init(model: MarvelWebModel) { self.model = model }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            pageChanged(webView)
+        }
+
+        /// Cada página nueva: completar el inicio de sesión si hace falta y, en Explorar, buscar el cómic.
+        func pageChanged(_ webView: WKWebView) {
+            tryLogin(webView)
+            guard model.auto == .searching, !searchStarted, let query = model.query,
+                  webView.url?.path.contains("explore") == true else { return }
+            searchStarted = true
+            webView.evaluateJavaScript(MarvelScripts.search(query)) { _, _ in }
+        }
+
+        private func tryLogin(_ webView: WKWebView) {
+            guard MarvelAccount.isSet, let url = webView.url, MarvelScripts.isLoginHost(url.host) else { return }
+            let key = url.absoluteString
+            guard loginTries[key, default: 0] < 2 else { return }
+            loginTries[key, default: 0] += 1
+            webView.evaluateJavaScript(MarvelScripts.login(email: MarvelAccount.email, password: MarvelAccount.password)) { _, _ in }
+        }
+
+        /// Lo que manda la página: "found" (con el número y el título) o "notFound".
+        func received(_ body: Any) {
+            guard let info = body as? [String: Any], let type = info["type"] as? String else { return }
+            switch type {
+            case "found":
+                guard model.auto == .searching, let id = (info["id"] as? NSNumber)?.intValue else { return }
+                model.auto = .found((info["title"] as? String) ?? "")
+                model.foundID = id
+            default:
+                if model.auto == .searching { model.auto = .notFound }
+            }
+        }
 
         func observe(_ web: WKWebView) {
             watchers = [
@@ -364,6 +522,9 @@ private struct MarvelWebView: UIViewRepresentable {
                     Task { @MainActor in
                         self?.model.currentID = id
                         self?.model.inViewer = viewer
+                        // La página cambia de dirección sin recargar (es una "app web"): se revisa un poco después.
+                        try? await Task.sleep(for: .milliseconds(1200))
+                        if let self, let web = self.web { self.pageChanged(web) }
                     }
                 },
                 web.observe(\.isLoading, options: [.initial, .new]) { [weak self] _, change in
@@ -398,4 +559,150 @@ private struct MarvelWebView: UIViewRepresentable {
             return nil
         }
     }
+}
+
+/// Recibe los mensajes de la página sin quedar atado a ella (si no, la pantalla nunca se liberaría).
+@MainActor
+private final class MarvelScriptProxy: NSObject, WKScriptMessageHandler {
+    weak var target: MarvelWebView.Coordinator?
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.received(message.body)
+    }
+}
+
+/// Lo que la app hace adentro de la página de Marvel Comics, como lo haría una persona con el dedo.
+enum MarvelScripts {
+    /// Páginas donde se completa el inicio de sesión (Marvel Comics, WEBTOON, Disney). En ninguna otra.
+    static func isLoginHost(_ host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        return ["marvelcomicsapp.com", "webtoons.com", "webtoon.com", "disney.com", "go.com", "disneyplus.com"]
+            .contains { host == $0 || host.hasSuffix("." + $0) }
+    }
+
+    private static func json(_ value: [String: Any]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: value),
+              let text = String(data: data, encoding: .utf8) else { return "{}" }
+        return text
+    }
+
+    /// Completa mail y contraseña (o solo el mail, si la página los pide de a uno) y toca el botón de entrar.
+    static func login(email: String, password: String) -> String {
+        loginScript.replacingOccurrences(of: "__CONFIG__", with: json(["email": email, "password": password]))
+    }
+
+    /// Escribe la búsqueda en Explorar, va a la pestaña "Issues" y busca el resultado con la misma serie y número
+    /// (si hay varios volúmenes, el del año más cercano antes de la tapa). Avisa "found" o "notFound".
+    static func search(_ query: MarvelQuery) -> String {
+        var config: [String: Any] = ["query": query.text, "series": query.series, "number": query.number]
+        if let year = query.year { config["year"] = year }
+        return searchScript.replacingOccurrences(of: "__CONFIG__", with: json(config))
+    }
+
+    private static let loginScript = #"""
+    (function (cfg) {
+      var inputs = Array.prototype.slice.call(document.querySelectorAll('input'));
+      var visible = function (el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); };
+      var pw = inputs.find(function (i) { return i.type === 'password' && visible(i); });
+      var mail = inputs.find(function (i) {
+        var t = (i.type || '') + ' ' + (i.name || '') + ' ' + (i.id || '') + ' ' + (i.autocomplete || '') + ' ' + (i.placeholder || '');
+        return visible(i) && i.type !== 'password' && i.type !== 'hidden' && /mail|user|login|account/i.test(t);
+      });
+      if (!pw && !mail) { return 'none'; }
+      // Sin campo de contraseña, solo en páginas de inicio de sesión (nunca, por ejemplo, en un formulario de novedades).
+      if (!pw && !/login|log-in|signin|sign-in|auth|account|session/i.test(location.href)) { return 'none'; }
+      var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      var fill = function (el, value) {
+        el.focus(); setter.call(el, value);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      if (mail && !mail.value) { fill(mail, cfg.email); }
+      if (pw) { fill(pw, cfg.password); }
+      setTimeout(function () {
+        var root = (pw || mail).closest('form') || document;
+        var buttons = Array.prototype.slice.call(root.querySelectorAll('button, input[type=submit]'));
+        var go = buttons.find(function (b) { return b.type === 'submit'; }) ||
+                 buttons.find(function (b) { return /log ?in|sign ?in|continue|next|continuar|siguiente|iniciar/i.test(b.innerText || b.value || ''); });
+        if (go) { go.click(); }
+      }, 500);
+      return 'filled';
+    })(__CONFIG__);
+    """#
+
+    private static let searchScript = #"""
+    (function (cfg) {
+      if (window.__cuSearch) { return; }
+      window.__cuSearch = true;
+      var post = function (m) { try { window.webkit.messageHandlers.cuMarvel.postMessage(m); } catch (e) {} };
+      var norm = function (s) {
+        return (s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9#]+/g, ' ').replace(/\s+/g, ' ').trim();
+      };
+      var seriesKey = function (s) {
+        return norm(s).replace(/\b(19|20)\d\d\b/g, ' ').replace(/^the /, '').replace(/\s+/g, ' ').trim();
+      };
+      var target = seriesKey(cfg.series);
+      var number = String(cfg.number || '').trim().replace(/^0+(?=\d)/, '').toLowerCase();
+      var start = Date.now(), typedAt = 0, tabbed = false;
+      var textOf = function (a) {
+        var t = (a.innerText || '') + ' ' + (a.getAttribute('aria-label') || '') + ' ' + (a.title || '');
+        a.querySelectorAll('img').forEach(function (i) { t += ' ' + (i.alt || ''); });
+        return t.replace(/\s+/g, ' ').trim();
+      };
+      var typeQuery = function () {
+        var inputs = Array.prototype.slice.call(document.querySelectorAll('input'));
+        var box = inputs.find(function (i) { return /search/i.test(i.placeholder || '') || i.type === 'search'; });
+        if (!box) { return false; }
+        var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        box.focus(); setter.call(box, cfg.query);
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+        ['keydown', 'keypress', 'keyup'].forEach(function (type) {
+          box.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+        });
+        var form = box.closest('form');
+        if (form && form.requestSubmit) { try { form.requestSubmit(); } catch (e) {} }
+        return true;
+      };
+      var clickIssues = function () {
+        var all = Array.prototype.slice.call(document.querySelectorAll('button, [role=tab], a'));
+        var tab = all.find(function (e) { return (e.innerText || '').trim() === 'Issues'; });
+        if (tab) { tab.click(); return true; }
+        return false;
+      };
+      var scan = function () {
+        var hits = [];
+        Array.prototype.slice.call(document.querySelectorAll('a[href*="/issues/"]')).forEach(function (a) {
+          var m = (a.getAttribute('href') || '').match(/\/issues\/(\d+)/);
+          if (!m) { return; }
+          var title = textOf(a), t = norm(title);
+          var hash = t.indexOf('#');
+          if (hash < 0) { return; }
+          var num = t.slice(hash + 1).trim().split(' ')[0].replace(/^0+(?=\d)/, '');
+          if (num !== number) { return; }
+          if (seriesKey(t.slice(0, hash)) !== target) { return; }
+          var y = title.match(/\((\d{4})/);
+          hits.push({ id: parseInt(m[1], 10), title: title.slice(0, 120), year: y ? parseInt(y[1], 10) : null });
+        });
+        if (!hits.length) { return null; }
+        if (cfg.year) {
+          var ok = hits.filter(function (h) { return h.year === null || h.year <= cfg.year + 1; });
+          if (ok.length) {
+            ok.sort(function (a, b) { return (b.year || 0) - (a.year || 0); });
+            return ok[0];
+          }
+        }
+        return hits[0];
+      };
+      var timer = setInterval(function () {
+        if (!typedAt) { if (typeQuery()) { typedAt = Date.now(); } }
+        else if (!tabbed && Date.now() - typedAt > 1500) { tabbed = clickIssues() || Date.now() - typedAt > 5000; }
+        if (typedAt && Date.now() - typedAt > 800) {
+          var hit = scan();
+          if (hit) { clearInterval(timer); post({ type: 'found', id: hit.id, title: hit.title }); return; }
+        }
+        if (Date.now() - start > 18000) { clearInterval(timer); post({ type: typedAt ? 'notFound' : 'noSearchBox' }); }
+      }, 600);
+    })(__CONFIG__);
+    """#
 }
