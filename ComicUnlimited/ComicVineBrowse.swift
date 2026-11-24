@@ -388,6 +388,10 @@ struct IssueView: View {
 
         LibraryAvailability(detail: d)
 
+        // Leer en la app oficial de Marvel Comics (solo cómics de Marvel; ver MarvelWeb.swift).
+        MarvelReadButton(cvID: d.id, volumeID: d.volume?.id,
+                         searchText: [d.volume?.name, d.issueNumber].compactMap { $0 }.joined(separator: " "))
+
         // "De qué se trata" va justo debajo de Leer / Descargar.
         if ComicVineSummary.hasContent(deck: d.deck, description: d.description) {
             SectionTitle("De qué se trata")

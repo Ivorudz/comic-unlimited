@@ -2,6 +2,12 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.46 · Leer en Marvel Comics
+- En la ficha de cada cómic de **Marvel**, botón **"Buscar en Marvel Comics"** / **"Leer en Marvel Comics"**: abre la página oficial de Marvel Comics **dentro de la app**, en versión de computadora (en el celular la página no deja leer). Entrás con tu cuenta una vez y queda guardada.
+- La primera vez, la app copia el nombre del cómic para que lo pegues en el buscador de Marvel. Cuando lo abrís, aparece **"¿Es este? Guardar"**: con un toque queda guardado y la próxima vez el botón abre ese cómic directo.
+- Menú (⋯): recargar, abrir en Safari, olvidar el link y cerrar sesión de Marvel. Los botones de "Abrir en la app" de la página abren la app oficial. Se puede girar el teléfono.
+- Incluye la mejora de la detección de viñetas de la 0.45.1.
+
 ## 0.45.1 · Mejor detección de viñetas
 - La detección de viñetas se rehízo: ahora busca **calles de cualquier color** (blancas, negras, grises, beige…), anda con **viñetas que tocan el borde de la página** y ya no corta viñetas por el pelo o las sombras oscuras.
 - Probada con páginas reales: encuentra todas las viñetas en el orden correcto en las que antes fallaban.
