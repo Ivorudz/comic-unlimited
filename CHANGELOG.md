@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.48.6 · Marvel Comics: no se rinde mientras iniciás sesión
+- La búsqueda se rendía a los 18 segundos aunque estuvieras iniciando sesión con Google; cuando llegaban los resultados ya había dicho "No lo encontré". Ahora sigue mirando los resultados hasta encontrarlo, y el aviso de "buscalo a mano" aparece recién después de 40 segundos en la página de resultados.
+- Si el cómic aparece después de ese aviso, igual se guarda y se abre.
+- "No es este" no vuelve a elegir solo el mismo cómic.
+
 ## 0.48.5 · Marvel Comics: botones dentro de ventanitas
 - La página de la cuenta de WEBTOON puede estar metida como una ventanita adentro de la página. Ahora la app toca "Get Started" y "Continue with Google" también ahí adentro (y sigue probando unos 40 segundos).
 - Menú ⋯ → **"Copiar diagnóstico"**: copia lo que ve la app en la página (dirección, ventanitas y botones), para pegarlo en el chat si algo se traba.

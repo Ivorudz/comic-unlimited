@@ -262,10 +262,10 @@ struct MarvelWebScreen: View {
             if state == .notFound { copiedNotice = true }
         }
         .task(id: "\(model.auto == .searching)|\(model.pageURL)") {
-            // Si en la página de resultados no aparece en 25 segundos, se pasa a buscar a mano.
-            // (Mientras estás en "Get Started" o iniciando sesión, el reloj no corre.)
+            // Si en la página de resultados no aparece en 40 segundos, se pasa a buscar a mano.
+            // (Mientras estás en "Get Started" o iniciando sesión en otra página, el reloj no corre.)
             guard model.auto == .searching, model.pageURL.contains("/explore") else { return }
-            try? await Task.sleep(for: .seconds(25))
+            try? await Task.sleep(for: .seconds(40))
             if model.auto == .searching, model.pageURL.contains("/explore") { model.auto = .notFound }
         }
         .onDisappear { AppOrientation.readerClosed() }
@@ -365,6 +365,7 @@ struct MarvelWebScreen: View {
                 Button("No es este") {
                     // Se olvida y se vuelve a buscar a mano.
                     links.set(nil, forCV: cvID)
+                    if let wrong = model.foundID { model.rejected.insert(wrong) }
                     model.foundID = nil
                     model.auto = .notFound
                     model.webView?.load(URLRequest(url: query.searchURL))
@@ -442,6 +443,8 @@ final class MarvelWebModel {
     var query: MarvelQuery?
     /// Número que encontró la búsqueda automática.
     var foundID: Int?
+    /// Los que dijiste "No es este" (no se vuelven a elegir solos).
+    var rejected: Set<Int> = []
 
     func goBack() { webView?.goBack() }
     func reload() { webView?.reload() }
@@ -558,7 +561,9 @@ private struct MarvelWebView: UIViewRepresentable {
             guard let info = body as? [String: Any], let type = info["type"] as? String else { return }
             switch type {
             case "found":
-                guard model.auto == .searching, let id = (info["id"] as? NSNumber)?.intValue else { return }
+                // También si ya había pasado a "buscalo a mano" (los resultados llegaron tarde).
+                guard model.auto == .searching || model.auto == .notFound,
+                      let id = (info["id"] as? NSNumber)?.intValue, !model.rejected.contains(id) else { return }
                 model.auto = .found((info["title"] as? String) ?? "")
                 model.foundID = id
             default:
@@ -821,11 +826,13 @@ enum MarvelScripts {
       var timer = setInterval(function () {
         if (!typedAt) { if (typeQuery()) { typedAt = Date.now(); } }
         else if (!tabbed && Date.now() - typedAt > 1500) { tabbed = clickIssues() || Date.now() - typedAt > 5000; }
-        if (typedAt && Date.now() - typedAt > 800) {
+        // Sin reloj propio: mientras estés en los resultados se sigue mirando (iniciar sesión puede tardar).
+        // Quien decide cuándo pasar a "buscalo a mano" es la app. Se deja de mirar a los 5 minutos.
+        if (typedAt && Date.now() - typedAt > 800 && location.pathname.indexOf('explore') >= 0) {
           var hit = scan();
           if (hit) { clearInterval(timer); post({ type: 'found', id: hit.id, title: hit.title }); return; }
         }
-        if (Date.now() - start > 18000) { clearInterval(timer); post({ type: typedAt ? 'notFound' : 'noSearchBox' }); }
+        if (Date.now() - start > 300000) { clearInterval(timer); }
       }, 600);
     })(__CONFIG__);
     """#
