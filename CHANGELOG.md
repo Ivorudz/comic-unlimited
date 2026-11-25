@@ -2,6 +2,10 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.48.5 · Marvel Comics: botones dentro de ventanitas
+- La página de la cuenta de WEBTOON puede estar metida como una ventanita adentro de la página. Ahora la app toca "Get Started" y "Continue with Google" también ahí adentro (y sigue probando unos 40 segundos).
+- Menú ⋯ → **"Copiar diagnóstico"**: copia lo que ve la app en la página (dirección, ventanitas y botones), para pegarlo en el chat si algo se traba.
+
 ## 0.48.4 · Marvel Comics: "Continue with Google" de verdad
 - La app no tocaba "Continue with Google" en la página de la cuenta de WEBTOON: ahora encuentra ese botón aunque esté en otra dirección o no sea un botón común, y lo toca.
 - Mientras estás en la bienvenida o iniciando sesión, la búsqueda ya no se rinde a los 25 segundos: el reloj cuenta solo en la página de resultados.

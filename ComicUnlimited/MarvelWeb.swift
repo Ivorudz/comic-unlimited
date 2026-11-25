@@ -227,6 +227,7 @@ struct MarvelWebScreen: View {
     @State private var copiedNotice = false
     @State private var showSignOut = false
     @State private var foundDismissed = false
+    @State private var diagnosticsCopied = false
     private var links: MarvelLinks { MarvelLinks.shared }
     private var searchText: String { query.text }
 
@@ -268,6 +269,11 @@ struct MarvelWebScreen: View {
             if model.auto == .searching, model.pageURL.contains("/explore") { model.auto = .notFound }
         }
         .onDisappear { AppOrientation.readerClosed() }
+        .alert("Diagnóstico copiado", isPresented: $diagnosticsCopied) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Pegalo en el chat para revisar qué ve la app en esta página.")
+        }
         .confirmationDialog("¿Cerrar la sesión de Marvel Comics en esta app?", isPresented: $showSignOut, titleVisibility: .visible) {
             Button("Cerrar sesión", role: .destructive) {
                 Task {
@@ -312,6 +318,15 @@ struct MarvelWebScreen: View {
                     Button(role: .destructive) { links.set(nil, forCV: cvID) } label: {
                         Label("Olvidar el link de este cómic", systemImage: "link.badge.plus")
                     }
+                }
+                Button {
+                    // Lo que ve la app en esta página, para pegarlo en el chat si algo se traba.
+                    model.webView?.evaluateJavaScript(MarvelScripts.diagnostics) { result, _ in
+                        UIPasteboard.general.string = (result as? String) ?? "Sin datos de la página"
+                        diagnosticsCopied = true
+                    }
+                } label: {
+                    Label("Copiar diagnóstico", systemImage: "stethoscope")
                 }
                 Button(role: .destructive) { showSignOut = true } label: {
                     Label("Cerrar sesión de Marvel", systemImage: "rectangle.portrait.and.arrow.right")
@@ -475,6 +490,13 @@ private struct MarvelWebView: UIViewRepresentable {
         let proxy = MarvelScriptProxy()
         proxy.target = context.coordinator
         config.userContentController.add(proxy, name: "cuMarvel")
+        // Inicio de sesión: corre en cada página y también adentro de las ventanitas (iframes),
+        // en un espacio aparte del de la página (la página no ve la contraseña ni el código).
+        config.userContentController.addUserScript(
+            WKUserScript(source: MarvelScripts.login(email: MarvelAccount.isSet ? MarvelAccount.email : "",
+                                                     password: MarvelAccount.isSet ? MarvelAccount.password : "",
+                                                     useGoogle: MarvelAccount.useGoogle),
+                         injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient))
         if let autoQuery {
             config.userContentController.addUserScript(
                 WKUserScript(source: MarvelScripts.search(autoQuery), injectionTime: .atDocumentEnd, forMainFrameOnly: true))
@@ -499,8 +521,6 @@ private struct MarvelWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let model: MarvelWebModel
         private var watchers: [NSKeyValueObservation] = []
-        /// Veces que se completó el inicio de sesión en cada dirección (como mucho 2, para no repetir sin fin).
-        private var loginTries: [String: Int] = [:]
         weak var web: WKWebView?
 
         init(model: MarvelWebModel) { self.model = model }
@@ -511,24 +531,7 @@ private struct MarvelWebView: UIViewRepresentable {
 
         /// Cada página nueva: completar el inicio de sesión si hace falta y, en Explorar, buscar el cómic.
         func pageChanged(_ webView: WKWebView) {
-            tryLogin(webView)
             returnToSearch(webView)
-        }
-
-        /// Get Started, Continue with Google, Sign In y (si hay cuenta guardada) mail y contraseña.
-        private func tryLogin(_ webView: WKWebView) {
-            guard let url = webView.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
-            // Los botones ("Get Started", "Continue with Google"…) se tocan en cualquier página de esta pantalla;
-            // el mail y la contraseña se completan solo en páginas de Marvel Comics, WEBTOON o Disney.
-            let canFill = MarvelScripts.isLoginHost(url.host)
-            let key = url.absoluteString
-            guard loginTries[key, default: 0] < 2 else { return }
-            loginTries[key, default: 0] += 1
-            let script = MarvelScripts.login(email: MarvelAccount.isSet && canFill ? MarvelAccount.email : "",
-                                             password: MarvelAccount.isSet && canFill ? MarvelAccount.password : "",
-                                             clickSignIn: model.auto != .searching,
-                                             useGoogle: MarvelAccount.useGoogle)
-            webView.evaluateJavaScript(script) { _, _ in }
         }
 
         /// Si mientras se busca la página se fue a otro lado (por ejemplo, al terminar de iniciar sesión),
@@ -640,11 +643,27 @@ enum MarvelScripts {
     /// Completa mail y contraseña (o solo el mail, si la página los pide de a uno) y toca el botón de entrar.
     /// `clickSignIn`: si no hay campos, tocar el botón "Sign In" de la página (no mientras se busca un cómic).
     /// `useGoogle`: tocar "Continue with Google" (si no, "Log in with Another Account" y completar mail y contraseña).
-    static func login(email: String, password: String, clickSignIn: Bool, useGoogle: Bool) -> String {
+    /// Mail y contraseña se completan solo si la página (o ventanita) es de Marvel Comics, WEBTOON o Disney.
+    /// "Sign In" se toca solo en el lector (/viewer/…), para no cortar la búsqueda.
+    static func login(email: String, password: String, useGoogle: Bool) -> String {
         loginScript.replacingOccurrences(of: "__CONFIG__",
-                                         with: json(["email": email, "password": password,
-                                                     "clickSignIn": clickSignIn, "useGoogle": useGoogle]))
+                                         with: json(["email": email, "password": password, "useGoogle": useGoogle,
+                                                     "hosts": loginHosts]))
     }
+
+    private static let loginHosts = ["marvelcomicsapp.com", "webtoons.com", "webtoon.com", "disney.com", "go.com", "disneyplus.com"]
+
+    /// Lo que ve la app en la página, para copiar y mandar si algo se traba.
+    static let diagnostics = #"""
+    (function () {
+      var vis = function (el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); };
+      var texts = Array.prototype.slice.call(document.querySelectorAll('button, a, [role=button]')).filter(vis)
+        .map(function (b) { return (b.tagName + ': ' + (b.innerText || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim()).slice(0, 60); })
+        .filter(function (t) { return t.length > 3; }).slice(0, 25);
+      var frames = Array.prototype.slice.call(document.querySelectorAll('iframe')).map(function (f) { return f.src || '(sin dirección)'; });
+      return JSON.stringify({ direccion: location.href, titulo: document.title, ventanitas: frames, botones: texts }, null, 1);
+    })();
+    """#
 
     /// Escribe la búsqueda en Explorar, va a la pestaña "Issues" y busca el resultado con la misma serie y número
     /// (si hay varios volúmenes, el del año más cercano antes de la tapa). Avisa "found" o "notFound".
@@ -658,6 +677,10 @@ enum MarvelScripts {
     (function (cfg) {
       if (window.__cuLogin) { return 'running'; }
       window.__cuLogin = true;
+      var host = location.hostname.toLowerCase();
+      var canFill = cfg.hosts.some(function (h) { return host === h || host.slice(-(h.length + 1)) === '.' + h; });
+      cfg.clickSignIn = /\/viewer\//.test(location.pathname);
+      if (!canFill) { cfg.email = ''; cfg.password = ''; }
       var clickedSignIn = false;
       var visible = function (el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); };
       var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
@@ -722,7 +745,7 @@ enum MarvelScripts {
       var tries = 0;
       var timer = setInterval(function () {
         tries += 1;
-        if (attempt() || tries > 16) { clearInterval(timer); window.__cuLogin = false; return; }
+        if (attempt() || tries > 57) { clearInterval(timer); return; }
         clickStep();
       }, 700);
       return 'waiting';
