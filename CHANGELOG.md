@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.48.4 · Marvel Comics: "Continue with Google" de verdad
+- La app no tocaba "Continue with Google" en la página de la cuenta de WEBTOON: ahora encuentra ese botón aunque esté en otra dirección o no sea un botón común, y lo toca.
+- Mientras estás en la bienvenida o iniciando sesión, la búsqueda ya no se rinde a los 25 segundos: el reloj cuenta solo en la página de resultados.
+- Tu mail y contraseña se siguen completando solo en páginas de Marvel Comics, WEBTOON o Disney.
+
 ## 0.48.3 · Marvel Comics: Get Started, Google y búsqueda directa
 - La búsqueda ahora abre **directamente los resultados de números** de Marvel Comics (sin escribir en la caja), y la app elige el que coincide.
 - La app toca sola **"Get Started"** y **"Continue with Google"** (con la cuenta de Google que la página ya recuerde) y después vuelve a la búsqueda.

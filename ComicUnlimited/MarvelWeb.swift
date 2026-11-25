@@ -260,11 +260,12 @@ struct MarvelWebScreen: View {
         .onChange(of: model.auto) { _, state in
             if state == .notFound { copiedNotice = true }
         }
-        .task(id: model.auto == .searching) {
-            // Si la página no contesta en 25 segundos, se pasa a buscar a mano.
-            guard model.auto == .searching else { return }
+        .task(id: "\(model.auto == .searching)|\(model.pageURL)") {
+            // Si en la página de resultados no aparece en 25 segundos, se pasa a buscar a mano.
+            // (Mientras estás en "Get Started" o iniciando sesión, el reloj no corre.)
+            guard model.auto == .searching, model.pageURL.contains("/explore") else { return }
             try? await Task.sleep(for: .seconds(25))
-            if model.auto == .searching { model.auto = .notFound }
+            if model.auto == .searching, model.pageURL.contains("/explore") { model.auto = .notFound }
         }
         .onDisappear { AppOrientation.readerClosed() }
         .confirmationDialog("¿Cerrar la sesión de Marvel Comics en esta app?", isPresented: $showSignOut, titleVisibility: .visible) {
@@ -418,6 +419,8 @@ final class MarvelWebModel {
     var inViewer = false
     weak var webView: WKWebView?
 
+    /// Dirección actual de la página (para el reloj de la búsqueda).
+    var pageURL = ""
     /// Búsqueda automática del cómic (la primera vez).
     enum AutoSearch: Equatable { case off, searching, found(String), notFound }
     var auto: AutoSearch = .off
@@ -514,12 +517,15 @@ private struct MarvelWebView: UIViewRepresentable {
 
         /// Get Started, Continue with Google, Sign In y (si hay cuenta guardada) mail y contraseña.
         private func tryLogin(_ webView: WKWebView) {
-            guard let url = webView.url, MarvelScripts.isLoginHost(url.host) else { return }
+            guard let url = webView.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
+            // Los botones ("Get Started", "Continue with Google"…) se tocan en cualquier página de esta pantalla;
+            // el mail y la contraseña se completan solo en páginas de Marvel Comics, WEBTOON o Disney.
+            let canFill = MarvelScripts.isLoginHost(url.host)
             let key = url.absoluteString
             guard loginTries[key, default: 0] < 2 else { return }
             loginTries[key, default: 0] += 1
-            let script = MarvelScripts.login(email: MarvelAccount.isSet ? MarvelAccount.email : "",
-                                             password: MarvelAccount.isSet ? MarvelAccount.password : "",
+            let script = MarvelScripts.login(email: MarvelAccount.isSet && canFill ? MarvelAccount.email : "",
+                                             password: MarvelAccount.isSet && canFill ? MarvelAccount.password : "",
                                              clickSignIn: model.auto != .searching,
                                              useGoogle: MarvelAccount.useGoogle)
             webView.evaluateJavaScript(script) { _, _ in }
@@ -566,6 +572,7 @@ private struct MarvelWebView: UIViewRepresentable {
                     Task { @MainActor in
                         self?.model.currentID = id
                         self?.model.inViewer = viewer
+                        self?.model.pageURL = url?.absoluteString ?? ""
                         // La página cambia de dirección sin recargar (es una "app web"): se revisa un poco después.
                         try? await Task.sleep(for: .milliseconds(1200))
                         if let self, let web = self.web { self.pageChanged(web) }
@@ -684,12 +691,22 @@ enum MarvelScripts {
       };
       // Botones de la bienvenida y de la cuenta de WEBTOON, cada uno una sola vez por página.
       var done = {};
+      var textOf = function (b) { return (b.innerText || b.getAttribute('aria-label') || b.value || '').replace(/\s+/g, ' ').trim(); };
+      // El "botón" puede ser un <div>: se busca el elemento más chico con ese texto y se toca él (o el botón que lo contiene).
       var press = function (key, pattern) {
         if (done[key]) { return false; }
-        var all = Array.prototype.slice.call(document.querySelectorAll('button, a, [role=button]')).filter(visible);
-        var el = all.find(function (b) { return pattern.test((b.innerText || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim()); });
-        if (!el) { return false; }
-        done[key] = true; el.click(); return true;
+        var all = Array.prototype.slice.call(document.querySelectorAll('button, a, [role=button], input[type=submit], div, span, li, p')).filter(visible);
+        var hits = all.filter(function (b) { return pattern.test(textOf(b)); });
+        if (!hits.length) { return false; }
+        hits.sort(function (a, b) { return a.getElementsByTagName('*').length - b.getElementsByTagName('*').length; });
+        var el = hits[0];
+        var target = el.closest('button, a, [role=button], [onclick]') || el;
+        done[key] = true;
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].forEach(function (t) {
+          try { target.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })); } catch (e) {}
+        });
+        target.click();
+        return true;
       };
       var clickStep = function () {
         if (press('start', /^get started$/i)) { return true; }
