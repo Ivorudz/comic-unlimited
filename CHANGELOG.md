@@ -2,6 +2,12 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.48.3 · Marvel Comics: Get Started, Google y búsqueda directa
+- La búsqueda ahora abre **directamente los resultados de números** de Marvel Comics (sin escribir en la caja), y la app elige el que coincide.
+- La app toca sola **"Get Started"** y **"Continue with Google"** (con la cuenta de Google que la página ya recuerde) y después vuelve a la búsqueda.
+- En Cuentas → Marvel Comics: interruptor **"Entrar con Google"** (prendido). Apagado, toca "Log in with Another Account" y completa mail y contraseña.
+- "No es este" vuelve a los resultados de la búsqueda, para elegir el correcto a mano.
+
 ## 0.48.2 · Botón de Marvel como "Descargar"
 - "Buscar en Marvel Comics" / "Leer en Marvel Comics" tiene el mismo color, tamaño y letra que "Descargar".
 

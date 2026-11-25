@@ -680,6 +680,7 @@ struct AccountsForm: View {
     @State private var marvelEmail = ""
     @State private var marvelPassword = ""
     @State private var marvelSaved = MarvelAccount.isSet
+    @AppStorage(MarvelAccount.useGoogleKey) private var marvelUseGoogle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -724,9 +725,18 @@ struct AccountsForm: View {
 
             card {
                 Text("Marvel Comics").font(.headline).foregroundStyle(Theme.ink)
-                Text("Para leer cómics de Marvel adentro de la app (botón \"Leer en Marvel Comics\" de cada ficha): la app entra sola a tu cuenta y busca cada cómic la primera vez. Se completa solo en las páginas de inicio de sesión de Marvel Comics, WEBTOON o Disney.")
+                Text("Para leer cómics de Marvel adentro de la app (botón \"Leer en Marvel Comics\" de cada ficha): la app entra sola a tu cuenta y busca cada cómic la primera vez.")
                     .font(.subheadline).foregroundStyle(Theme.ink2)
-                if marvelSaved {
+                Toggle("Entrar con Google", isOn: $marvelUseGoogle)
+                    .font(.subheadline.weight(.semibold))
+                    .tint(Theme.magenta)
+                Text(marvelUseGoogle
+                     ? "La app toca \"Get Started\" y \"Continue with Google\" sola, con la cuenta de Google que la página ya recuerde. No hace falta poner contraseña acá."
+                     : "La app toca \"Log in with Another Account\" y completa tu mail y contraseña de WEBTOON (solo en páginas de inicio de sesión de Marvel Comics, WEBTOON o Disney).")
+                    .font(.footnote).foregroundStyle(Theme.ink2)
+                if marvelUseGoogle {
+                    EmptyView()
+                } else if marvelSaved {
                     Text("Guardada: \(MarvelAccount.email)").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
                     Button("Quitar cuenta de Marvel Comics", role: .destructive) {
                         MarvelAccount.forget()

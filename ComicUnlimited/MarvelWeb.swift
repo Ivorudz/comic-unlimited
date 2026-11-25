@@ -73,6 +73,9 @@ enum MarvelAccount {
     static var email: String { UserDefaults.standard.string(forKey: emailKey) ?? "" }
     static var password: String { readKeychain() ?? UserDefaults.standard.string(forKey: fallbackKey) ?? "" }
     static var isSet: Bool { !email.isEmpty && !password.isEmpty }
+    /// Entrar con "Continue with Google" (la cuenta de Google que la página ya recuerde). Prendido de entrada.
+    static let useGoogleKey = "marvel.useGoogle"
+    static var useGoogle: Bool { UserDefaults.standard.object(forKey: useGoogleKey) as? Bool ?? true }
 
     static func save(email: String, password: String) {
         UserDefaults.standard.set(email.trimmingCharacters(in: .whitespacesAndNewlines), forKey: emailKey)
@@ -121,6 +124,13 @@ struct MarvelQuery: Equatable {
     var number: String
     var year: Int?
     var text: String { [series, number].filter { !$0.isEmpty }.joined(separator: " ") }
+
+    /// La búsqueda de Marvel Comics ya hecha, en la pestaña de números: /explore?q=…&tab=Issues
+    var searchURL: URL {
+        var parts = URLComponents(url: MarvelLinks.site.appendingPathComponent("explore"), resolvingAgainstBaseURL: false)!
+        parts.queryItems = [URLQueryItem(name: "q", value: text), URLQueryItem(name: "tab", value: "Issues")]
+        return parts.url ?? MarvelLinks.site
+    }
 }
 
 /// ¿La serie es de Marvel? Se mira tu Biblioteca y, si no, se le pregunta a Comic Vine (una vez por serie; queda guardado).
@@ -269,7 +279,7 @@ struct MarvelWebScreen: View {
 
     private var startURL: URL {
         if let id = links.id(forCV: cvID) { return MarvelLinks.viewerURL(id) }
-        return MarvelLinks.site.appendingPathComponent("explore")
+        return query.searchURL
     }
 
     private var topBar: some View {
@@ -341,7 +351,7 @@ struct MarvelWebScreen: View {
                     links.set(nil, forCV: cvID)
                     model.foundID = nil
                     model.auto = .notFound
-                    model.webView?.load(URLRequest(url: MarvelLinks.site.appendingPathComponent("explore")))
+                    model.webView?.load(URLRequest(url: query.searchURL))
                 }
                 .font(.footnote.weight(.bold))
                 Button { foundDismissed = true } label: { Image(systemName: "xmark") }
@@ -499,16 +509,39 @@ private struct MarvelWebView: UIViewRepresentable {
         /// Cada página nueva: completar el inicio de sesión si hace falta y, en Explorar, buscar el cómic.
         func pageChanged(_ webView: WKWebView) {
             tryLogin(webView)
+            returnToSearch(webView)
         }
 
+        /// Get Started, Continue with Google, Sign In y (si hay cuenta guardada) mail y contraseña.
         private func tryLogin(_ webView: WKWebView) {
-            guard MarvelAccount.isSet, let url = webView.url, MarvelScripts.isLoginHost(url.host) else { return }
+            guard let url = webView.url, MarvelScripts.isLoginHost(url.host) else { return }
             let key = url.absoluteString
             guard loginTries[key, default: 0] < 2 else { return }
             loginTries[key, default: 0] += 1
-            let script = MarvelScripts.login(email: MarvelAccount.email, password: MarvelAccount.password,
-                                             clickSignIn: model.auto != .searching)
+            let script = MarvelScripts.login(email: MarvelAccount.isSet ? MarvelAccount.email : "",
+                                             password: MarvelAccount.isSet ? MarvelAccount.password : "",
+                                             clickSignIn: model.auto != .searching,
+                                             useGoogle: MarvelAccount.useGoogle)
             webView.evaluateJavaScript(script) { _, _ in }
+        }
+
+        /// Si mientras se busca la página se fue a otro lado (por ejemplo, al terminar de iniciar sesión),
+        /// se vuelve a los resultados de la búsqueda (como mucho 3 veces).
+        private var searchReturns = 0
+        private func returnToSearch(_ webView: WKWebView) {
+            guard model.auto == .searching, let query = model.query, searchReturns < 3,
+                  let url = webView.url, let host = url.host?.lowercased(), host.hasSuffix("marvelcomicsapp.com") else { return }
+            let onSearch = url.path.contains("explore") && (url.query ?? "").contains("q=")
+            let onLogin = url.absoluteString.range(of: "login|signin|sign-in|auth|oauth|account", options: [.regularExpression, .caseInsensitive]) != nil
+            guard !onSearch, !onLogin else { return }
+            searchReturns += 1
+            Task { @MainActor [weak webView] in
+                try? await Task.sleep(for: .milliseconds(1500))
+                guard self.model.auto == .searching, let webView,
+                      webView.url?.host?.lowercased().hasSuffix("marvelcomicsapp.com") == true,
+                      webView.url?.path.contains("explore") != true else { return }
+                webView.load(URLRequest(url: query.searchURL))
+            }
         }
 
         /// Lo que manda la página: "found" (con el número y el título) o "notFound".
@@ -599,9 +632,11 @@ enum MarvelScripts {
 
     /// Completa mail y contraseña (o solo el mail, si la página los pide de a uno) y toca el botón de entrar.
     /// `clickSignIn`: si no hay campos, tocar el botón "Sign In" de la página (no mientras se busca un cómic).
-    static func login(email: String, password: String, clickSignIn: Bool) -> String {
+    /// `useGoogle`: tocar "Continue with Google" (si no, "Log in with Another Account" y completar mail y contraseña).
+    static func login(email: String, password: String, clickSignIn: Bool, useGoogle: Bool) -> String {
         loginScript.replacingOccurrences(of: "__CONFIG__",
-                                         with: json(["email": email, "password": password, "clickSignIn": clickSignIn]))
+                                         with: json(["email": email, "password": password,
+                                                     "clickSignIn": clickSignIn, "useGoogle": useGoogle]))
     }
 
     /// Escribe la búsqueda en Explorar, va a la pestaña "Issues" y busca el resultado con la misma serie y número
@@ -632,6 +667,7 @@ enum MarvelScripts {
           return i.type !== 'password' && i.type !== 'hidden' && /mail|user|login|account/i.test(t);
         });
         if (!pw && !mail) { return false; }
+        if (!cfg.email && !cfg.password) { return false; }
         // Sin contraseña, solo después de tocar "Sign In" o en una página de inicio de sesión
         // (nunca, por ejemplo, en un formulario de novedades).
         if (!pw && !clickedSignIn && !/login|log-in|signin|sign-in|auth|account|session/i.test(location.href)) { return false; }
@@ -646,17 +682,31 @@ enum MarvelScripts {
         }, 500);
         return true;
       };
+      // Botones de la bienvenida y de la cuenta de WEBTOON, cada uno una sola vez por página.
+      var done = {};
+      var press = function (key, pattern) {
+        if (done[key]) { return false; }
+        var all = Array.prototype.slice.call(document.querySelectorAll('button, a, [role=button]')).filter(visible);
+        var el = all.find(function (b) { return pattern.test((b.innerText || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim()); });
+        if (!el) { return false; }
+        done[key] = true; el.click(); return true;
+      };
+      var clickStep = function () {
+        if (press('start', /^get started$/i)) { return true; }
+        if (cfg.useGoogle) {
+          if (press('google', /^continue with google/i)) { return true; }
+        } else if (press('other', /^log ?in with another account$/i)) { clickedSignIn = true; return true; }
+        if (cfg.clickSignIn && press('signin', /^(sign ?in|log ?in)$/i)) { clickedSignIn = true; return true; }
+        return false;
+      };
       if (attempt()) { return 'filled'; }
-      if (cfg.clickSignIn) {
-        var buttons = Array.prototype.slice.call(document.querySelectorAll('button, a')).filter(visible);
-        var signIn = buttons.find(function (b) { return /^(sign ?in|log ?in)$/i.test((b.innerText || '').trim()); });
-        if (signIn) { clickedSignIn = true; signIn.click(); }
-      }
-      // Los campos pueden aparecer un poco después (o en una ventanita): se reintenta unos segundos.
+      clickStep();
+      // Los campos y botones pueden aparecer un poco después (o en una ventanita): se reintenta unos segundos.
       var tries = 0;
       var timer = setInterval(function () {
         tries += 1;
-        if (attempt() || tries > 16) { clearInterval(timer); window.__cuLogin = false; }
+        if (attempt() || tries > 16) { clearInterval(timer); window.__cuLogin = false; return; }
+        clickStep();
       }, 700);
       return 'waiting';
     })(__CONFIG__);
@@ -676,6 +726,8 @@ enum MarvelScripts {
       var target = seriesKey(cfg.series);
       var number = String(cfg.number || '').trim().replace(/^0+(?=\d)/, '').toLowerCase();
       var start = Date.now(), typedAt = 0, tabbed = false;
+      // Si la dirección ya trae la búsqueda (/explore?q=…&tab=Issues), no hace falta escribir.
+      if (new URLSearchParams(location.search).get('q')) { typedAt = start; tabbed = true; }
       var textOf = function (a) {
         var t = (a.innerText || '') + ' ' + (a.getAttribute('aria-label') || '') + ' ' + (a.title || '');
         a.querySelectorAll('img').forEach(function (i) { t += ' ' + (i.alt || ''); });
