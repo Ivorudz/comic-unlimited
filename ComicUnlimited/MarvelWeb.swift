@@ -222,7 +222,8 @@ struct MarvelWebScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            MarvelWebView(model: model, start: startURL)
+            MarvelWebView(model: model, start: startURL,
+                          autoQuery: links.id(forCV: cvID) == nil ? query : nil)
                 .ignoresSafeArea(edges: .bottom)
         }
         .background(Color.black.ignoresSafeArea())
@@ -247,6 +248,12 @@ struct MarvelWebScreen: View {
         }
         .onChange(of: model.auto) { _, state in
             if state == .notFound { copiedNotice = true }
+        }
+        .task(id: model.auto == .searching) {
+            // Si la página no contesta en 25 segundos, se pasa a buscar a mano.
+            guard model.auto == .searching else { return }
+            try? await Task.sleep(for: .seconds(25))
+            if model.auto == .searching { model.auto = .notFound }
         }
         .onDisappear { AppOrientation.readerClosed() }
         .confirmationDialog("¿Cerrar la sesión de Marvel Comics en esta app?", isPresented: $showSignOut, titleVisibility: .visible) {
@@ -424,6 +431,8 @@ final class MarvelWebModel {
 private struct MarvelWebView: UIViewRepresentable {
     let model: MarvelWebModel
     let start: URL
+    /// Si hay que buscar el cómic: se agrega la búsqueda a la página para que corra cuando termine de cargar.
+    var autoQuery: MarvelQuery?
 
     /// Safari de Mac.
     private static let desktopAgent =
@@ -452,6 +461,10 @@ private struct MarvelWebView: UIViewRepresentable {
         let proxy = MarvelScriptProxy()
         proxy.target = context.coordinator
         config.userContentController.add(proxy, name: "cuMarvel")
+        if let autoQuery {
+            config.userContentController.addUserScript(
+                WKUserScript(source: MarvelScripts.search(autoQuery), injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+        }
         let web = WKWebView(frame: .zero, configuration: config)
         web.customUserAgent = Self.desktopAgent
         web.allowsBackForwardNavigationGestures = true
@@ -472,7 +485,6 @@ private struct MarvelWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let model: MarvelWebModel
         private var watchers: [NSKeyValueObservation] = []
-        private var searchStarted = false
         /// Veces que se completó el inicio de sesión en cada dirección (como mucho 2, para no repetir sin fin).
         private var loginTries: [String: Int] = [:]
         weak var web: WKWebView?
@@ -486,10 +498,6 @@ private struct MarvelWebView: UIViewRepresentable {
         /// Cada página nueva: completar el inicio de sesión si hace falta y, en Explorar, buscar el cómic.
         func pageChanged(_ webView: WKWebView) {
             tryLogin(webView)
-            guard model.auto == .searching, !searchStarted, let query = model.query,
-                  webView.url?.path.contains("explore") == true else { return }
-            searchStarted = true
-            webView.evaluateJavaScript(MarvelScripts.search(query)) { _, _ in }
         }
 
         private func tryLogin(_ webView: WKWebView) {
@@ -497,7 +505,9 @@ private struct MarvelWebView: UIViewRepresentable {
             let key = url.absoluteString
             guard loginTries[key, default: 0] < 2 else { return }
             loginTries[key, default: 0] += 1
-            webView.evaluateJavaScript(MarvelScripts.login(email: MarvelAccount.email, password: MarvelAccount.password)) { _, _ in }
+            let script = MarvelScripts.login(email: MarvelAccount.email, password: MarvelAccount.password,
+                                             clickSignIn: model.auto != .searching)
+            webView.evaluateJavaScript(script) { _, _ in }
         }
 
         /// Lo que manda la página: "found" (con el número y el título) o "notFound".
@@ -587,8 +597,10 @@ enum MarvelScripts {
     }
 
     /// Completa mail y contraseña (o solo el mail, si la página los pide de a uno) y toca el botón de entrar.
-    static func login(email: String, password: String) -> String {
-        loginScript.replacingOccurrences(of: "__CONFIG__", with: json(["email": email, "password": password]))
+    /// `clickSignIn`: si no hay campos, tocar el botón "Sign In" de la página (no mientras se busca un cómic).
+    static func login(email: String, password: String, clickSignIn: Bool) -> String {
+        loginScript.replacingOccurrences(of: "__CONFIG__",
+                                         with: json(["email": email, "password": password, "clickSignIn": clickSignIn]))
     }
 
     /// Escribe la búsqueda en Explorar, va a la pestaña "Issues" y busca el resultado con la misma serie y número
@@ -601,38 +613,57 @@ enum MarvelScripts {
 
     private static let loginScript = #"""
     (function (cfg) {
-      var inputs = Array.prototype.slice.call(document.querySelectorAll('input'));
+      if (window.__cuLogin) { return 'running'; }
+      window.__cuLogin = true;
+      var clickedSignIn = false;
       var visible = function (el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); };
-      var pw = inputs.find(function (i) { return i.type === 'password' && visible(i); });
-      var mail = inputs.find(function (i) {
-        var t = (i.type || '') + ' ' + (i.name || '') + ' ' + (i.id || '') + ' ' + (i.autocomplete || '') + ' ' + (i.placeholder || '');
-        return visible(i) && i.type !== 'password' && i.type !== 'hidden' && /mail|user|login|account/i.test(t);
-      });
-      if (!pw && !mail) { return 'none'; }
-      // Sin campo de contraseña, solo en páginas de inicio de sesión (nunca, por ejemplo, en un formulario de novedades).
-      if (!pw && !/login|log-in|signin|sign-in|auth|account|session/i.test(location.href)) { return 'none'; }
       var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       var fill = function (el, value) {
         el.focus(); setter.call(el, value);
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       };
-      if (mail && !mail.value) { fill(mail, cfg.email); }
-      if (pw) { fill(pw, cfg.password); }
-      setTimeout(function () {
-        var root = (pw || mail).closest('form') || document;
-        var buttons = Array.prototype.slice.call(root.querySelectorAll('button, input[type=submit]'));
-        var go = buttons.find(function (b) { return b.type === 'submit'; }) ||
-                 buttons.find(function (b) { return /log ?in|sign ?in|continue|next|continuar|siguiente|iniciar/i.test(b.innerText || b.value || ''); });
-        if (go) { go.click(); }
-      }, 500);
-      return 'filled';
+      var attempt = function () {
+        var inputs = Array.prototype.slice.call(document.querySelectorAll('input')).filter(visible);
+        var pw = inputs.find(function (i) { return i.type === 'password'; });
+        var mail = inputs.find(function (i) {
+          var t = (i.type || '') + ' ' + (i.name || '') + ' ' + (i.id || '') + ' ' + (i.autocomplete || '') + ' ' + (i.placeholder || '');
+          return i.type !== 'password' && i.type !== 'hidden' && /mail|user|login|account/i.test(t);
+        });
+        if (!pw && !mail) { return false; }
+        // Sin contraseña, solo después de tocar "Sign In" o en una página de inicio de sesión
+        // (nunca, por ejemplo, en un formulario de novedades).
+        if (!pw && !clickedSignIn && !/login|log-in|signin|sign-in|auth|account|session/i.test(location.href)) { return false; }
+        if (mail && mail.value !== cfg.email) { fill(mail, cfg.email); }
+        if (pw && !pw.value) { fill(pw, cfg.password); }
+        setTimeout(function () {
+          var root = (pw || mail).closest('form') || document;
+          var buttons = Array.prototype.slice.call(root.querySelectorAll('button, input[type=submit]')).filter(visible);
+          var go = buttons.find(function (b) { return b.type === 'submit'; }) ||
+                   buttons.find(function (b) { return /^(log ?in|sign ?in|continue|next|continuar|siguiente|iniciar sesi)/i.test((b.innerText || b.value || '').trim()); });
+          if (go) { go.click(); }
+        }, 500);
+        return true;
+      };
+      if (attempt()) { return 'filled'; }
+      if (cfg.clickSignIn) {
+        var buttons = Array.prototype.slice.call(document.querySelectorAll('button, a')).filter(visible);
+        var signIn = buttons.find(function (b) { return /^(sign ?in|log ?in)$/i.test((b.innerText || '').trim()); });
+        if (signIn) { clickedSignIn = true; signIn.click(); }
+      }
+      // Los campos pueden aparecer un poco después (o en una ventanita): se reintenta unos segundos.
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries += 1;
+        if (attempt() || tries > 16) { clearInterval(timer); window.__cuLogin = false; }
+      }, 700);
+      return 'waiting';
     })(__CONFIG__);
     """#
 
     private static let searchScript = #"""
     (function (cfg) {
-      if (window.__cuSearch) { return; }
+      if (window.__cuSearch || location.pathname.indexOf('explore') < 0) { return; }
       window.__cuSearch = true;
       var post = function (m) { try { window.webkit.messageHandlers.cuMarvel.postMessage(m); } catch (e) {} };
       var norm = function (s) {
@@ -665,7 +696,7 @@ enum MarvelScripts {
         return true;
       };
       var clickIssues = function () {
-        var all = Array.prototype.slice.call(document.querySelectorAll('button, [role=tab], a'));
+        var all = Array.prototype.slice.call(document.querySelectorAll('[role=tab], button'));
         var tab = all.find(function (e) { return (e.innerText || '').trim() === 'Issues'; });
         if (tab) { tab.click(); return true; }
         return false;

@@ -2,6 +2,11 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.48.1 · Arreglos de Marvel Comics automático
+- La búsqueda automática se quedaba en "Buscando…" sin escribir nada: arrancaba antes de que la página terminara de cargar. Ahora espera a que cargue y escribe la búsqueda.
+- Si en 25 segundos no encuentra nada, pasa a "buscalo a mano" (antes podía quedarse esperando para siempre).
+- Inicio de sesión: si no tenés la sesión iniciada, la app toca "Sign In" sola y completa tu mail y contraseña cuando aparecen (no mientras está buscando un cómic).
+
 ## 0.48 · Marvel Comics automático
 - **Cuenta de Marvel Comics** en Perfil → Configuración → Cuentas (junto a Metron y Comic Vine). La contraseña se guarda en el llavero del iPhone.
 - Si la página de Marvel pide iniciar sesión, la app **completa tu mail y contraseña sola** (solo en las páginas de inicio de sesión de Marvel Comics, WEBTOON o Disney).
