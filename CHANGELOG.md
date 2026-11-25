@@ -2,6 +2,9 @@
 
 Cada versión se compila sola en GitHub y aparece en [Releases](https://github.com/ivorudz/comic-unlimited/releases).
 
+## 0.48.2 · Botón de Marvel como "Descargar"
+- "Buscar en Marvel Comics" / "Leer en Marvel Comics" tiene el mismo color, tamaño y letra que "Descargar".
+
 ## 0.48.1 · Arreglos de Marvel Comics automático
 - La búsqueda automática se quedaba en "Buscando…" sin escribir nada: arrancaba antes de que la página terminara de cargar. Ahora espera a que cargue y escribe la búsqueda.
 - Si en 25 segundos no encuentra nada, pasa a "buscalo a mano" (antes podía quedarse esperando para siempre).

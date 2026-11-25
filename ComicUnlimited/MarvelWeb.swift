@@ -166,12 +166,13 @@ struct MarvelReadButton: View {
                     // Con el número guardado abre el lector; si no, el buscador de Marvel Comics.
                     open = true
                 } label: {
+                    // Igual que el botón "Descargar" (mismo color, tamaño y letra).
                     Label(saved == nil ? "Buscar en Marvel Comics" : "Leer en Marvel Comics",
                           systemImage: saved == nil ? "magnifyingglass" : "book.pages")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 16, weight: .heavy))
                         .frame(maxWidth: .infinity)
-                        .padding(12)
-                        .detailButtonBackground(.secondary)
+                        .padding(13)
+                        .detailButtonBackground(.accent)
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 10)
